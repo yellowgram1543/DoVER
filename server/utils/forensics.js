@@ -55,6 +55,73 @@ async function fontConsistencyCheck(filePath) {
 }
 
 /**
+ * Detects horizontal text lines and checks for consistent baseline angles and rotations.
+ * @param {string} filePath - Absolute path to the image file.
+ * @returns {Promise<Object>} - { score: 0-100, suspicious: bool, misaligned_regions: [] }
+ */
+async function alignmentCheck(filePath) {
+    try {
+        const image = await Jimp.read(filePath);
+        image.greyscale();
+        const { width, height } = image.bitmap;
+        const misaligned_regions = [];
+        let score = 100;
+
+        // Detect "lines" by scanning pixel density horizontally
+        const lineY = [];
+        for (let y = 0; y < height; y++) {
+            let darkPixels = 0;
+            for (let x = 0; x < width; x++) {
+                const color = image.getPixelColor(x, y);
+                const lum = ((color >> 24) & 0xff + (color >> 16) & 0xff + (color >> 8) & 0xff) / 3;
+                if (lum < 150) darkPixels++;
+            }
+            // If more than 5% of row is dark, consider it part of a text line
+            if (darkPixels > width * 0.05) lineY.push(y);
+        }
+
+        // Check for vertical "jitter" or broken baselines in detected lines
+        let jitterCount = 0;
+        for (let i = 1; i < lineY.length; i++) {
+            const diff = lineY[i] - lineY[i-1];
+            // Unnatural gaps between lines that should be consistent
+            if (diff > 1 && diff < 5) jitterCount++;
+        }
+
+        if (jitterCount > 50) {
+            score -= 30;
+            misaligned_regions.push('Multiple inconsistent baseline shifts detected');
+        }
+
+        // Simple rotation check: compare left-side density vs right-side density of lines
+        // Forged text blocks pasted into scans often have slight rotation mismatches
+        let rotationJitter = 0;
+        for (let i = 0; i < lineY.length; i += 10) {
+            const y = lineY[i];
+            let leftDark = 0, rightDark = 0;
+            for (let x = 0; x < width/4; x++) {
+                const c = image.getPixelColor(x, y);
+                if (((c >> 24) & 0xff) < 150) leftDark++;
+            }
+            for (let x = (width*3)/4; x < width; x++) {
+                const c = image.getPixelColor(x, y);
+                if (((c >> 24) & 0xff) < 150) rightDark++;
+            }
+            if (Math.abs(leftDark - rightDark) > width * 0.1) rotationJitter++;
+        }
+
+        if (rotationJitter > 10) {
+            score -= 20;
+            misaligned_regions.push('Potential rotation mismatch detected in text blocks');
+        }
+
+        return { score: Math.max(0, score), suspicious: score < 65, misaligned_regions };
+    } catch (e) {
+        return { score: 100, suspicious: false, misaligned_regions: [] };
+    }
+}
+
+/**
  * Performs heuristic forensic analysis on an image to detect potential forgeries.
  * Uses pixel-level analysis via Jimp and basic tensor operations via TFJS.
  * @param {string} filePath - Absolute path to the image file.
@@ -76,6 +143,13 @@ async function analyzeImage(filePath) {
         report.font_consistency = Math.round(fontResult.score);
         if (fontResult.suspicious) {
             report.flags.push(`Inconsistent font texture detected (Score: ${report.font_consistency})`);
+        }
+
+        // OCR-F3: Alignment Check
+        const alignResult = await alignmentCheck(filePath);
+        report.alignment_score = Math.round(alignResult.score);
+        if (alignResult.suspicious) {
+            report.flags.push(...alignResult.misaligned_regions.map(r => `${r} (Score: ${report.alignment_score})`));
         }
 
         const image = await Jimp.read(filePath);
