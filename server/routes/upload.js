@@ -7,6 +7,7 @@ const db = require('../db/db');
 const hasher = require('../utils/hasher');
 const QRCode = require('qrcode');
 const ocr = require('../utils/ocr');
+const forensics = require('../utils/forensics');
 const crypto = require('crypto');
 
 // Configure multer
@@ -66,25 +67,30 @@ router.post('/', (req, res) => {
             const timestamp = new Date().toISOString();
             const blockHash = hasher.generateBlockHash(fileHash, prevHash, timestamp);
 
-            // 3.5 OCR logic for PNG/JPG
+            // 3.5 OCR & Forensics logic for PNG/JPG
             let ocrText = null;
             let ocrHash = null;
+            let forensicScore = null;
             const isImage = /png|jpg|jpeg/.test(fileType);
             
             if (isImage) {
+                // Perform OCR
                 ocrText = await ocr.extractText(filePath);
                 if (ocrText) {
                     ocrHash = crypto.createHash('sha256').update(ocrText).digest('hex');
                 }
+                // Perform Forensics
+                const forensicReport = await forensics.analyzeImage(filePath);
+                forensicScore = JSON.stringify(forensicReport);
             }
 
             // 4. Store in documents table
             const insertDoc = db.prepare(`
-                INSERT INTO documents (filename, file_type, uploaded_by, upload_timestamp, file_hash, prev_hash, block_hash, ocr_text, ocr_hash)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO documents (filename, file_type, uploaded_by, upload_timestamp, file_hash, prev_hash, block_hash, ocr_text, ocr_hash, forensic_score)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `);
             
-            const result = insertDoc.run(filePath, fileType, uploadedBy, timestamp, fileHash, prevHash, blockHash, ocrText, ocrHash);
+            const result = insertDoc.run(filePath, fileType, uploadedBy, timestamp, fileHash, prevHash, blockHash, ocrText, ocrHash, forensicScore);
             const documentId = result.lastInsertRowid;
 
             // 5. Log action in audit_log
@@ -105,7 +111,8 @@ router.post('/', (req, res) => {
                 block_hash: blockHash,
                 block_index: documentId, // In our schema, block_index is the PK/ID
                 qr_data: qrData,
-                qr_image_base64: qrImageBase64
+                qr_image_base64: qrImageBase64,
+                forensic_score: forensicScore ? JSON.parse(forensicScore) : null
             });
 
         } catch (error) {

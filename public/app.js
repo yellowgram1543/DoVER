@@ -234,13 +234,37 @@ function renderUpload(app) {
             const resultDiv = document.getElementById('upload-result');
             resultDiv.classList.remove('hidden');
             if (res.success) {
+                // Forensic UI logic
+                let forensicHtml = '';
+                if (res.forensic_score) {
+                    if (res.forensic_score.suspicious) {
+                        forensicHtml = `
+                            <div class="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                                <div class="flex items-center gap-2 mb-2 text-orange-700 font-bold text-xs uppercase tracking-wider">
+                                    <span class="material-symbols-outlined text-sm">forensics</span> Forensic Analysis: Suspicious Document
+                                </div>
+                                <ul class="space-y-1">
+                                    ${res.forensic_score.flags.map(f => `<li class="text-[10px] text-orange-800 flex items-center gap-1.5"><span class="w-1 h-1 rounded-full bg-orange-400"></span> ${f}</li>`).join('')}
+                                </ul>
+                            </div>
+                        `;
+                    } else {
+                        forensicHtml = `
+                            <div class="mt-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-700 text-[10px] font-extrabold uppercase">
+                                <span class="material-symbols-outlined text-xs">verified</span> Forensic Analysis: Clean
+                            </div>
+                        `;
+                    }
+                }
+
                 resultDiv.innerHTML = `<div class="result-card bg-green-50/50 border border-green-200 rounded-xl p-6 relative overflow-hidden fade-in">
                     <div class="flex items-center gap-3 mb-4"><span class="material-symbols-outlined text-green-600">verified</span><span class="text-xs font-bold text-green-700 uppercase tracking-widest">Upload Successful</span></div>
                     <div class="flex flex-col md:flex-row gap-6 items-start">
                         <div class="flex-1">
                             <h4 class="text-lg font-bold text-green-900 mb-2">Document Secured</h4>
                             <p class="text-sm text-green-800/70 mb-3">Block Index: <strong>#${res.block_index}</strong></p>
-                            <code class="hash-text bg-green-100 px-3 py-2 rounded block text-green-800 mb-4">${res.block_hash}</code>
+                            <code class="hash-text bg-green-100 px-3 py-2 rounded block text-green-800 mb-2">${res.block_hash}</code>
+                            ${forensicHtml}
                         </div>
                         <div class="bg-white p-2 rounded-lg shadow-sm border border-green-100">
                             <img src="${res.qr_image_base64}" class="w-32 h-32" alt="Verification QR"/>
