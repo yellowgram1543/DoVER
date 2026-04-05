@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const app = express();
 
 app.use(cors());
@@ -32,8 +33,6 @@ app.get('*', (req, res) => {
 const db = require('./db/db');
 const hasher = require('./utils/hasher');
 const { getBucket } = require('./db/mongodb');
-const fs = require('fs');
-const path = require('path');
 
 setInterval(async () => {
     const bucket = getBucket();
@@ -42,6 +41,9 @@ setInterval(async () => {
     try {
         const docs = db.prepare('SELECT block_index, filename, is_tampered FROM documents WHERE is_tampered = 0').all();
         for (const doc of docs) {
+            // Skip legacy local files that aren't valid MongoDB ObjectIds (24 hex chars)
+            if (!/^[0-9a-fA-F]{24}$/.test(doc.filename)) continue;
+
             let tmpPath = path.resolve('tmp', `bg_verify_${doc.block_index}`);
             try {
                 // Reconstruct from GridFS
