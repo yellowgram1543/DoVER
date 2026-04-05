@@ -12,4 +12,19 @@ router.get('/', (req, res) => {
     }
 });
 
+router.get('/audit', (req, res) => {
+    try {
+        const auditLogs = db.prepare(`
+            SELECT a.document_id, d.filename, a.action, a.actor, a.timestamp, a.details
+            FROM audit_log a
+            JOIN documents d ON a.document_id = d.block_index
+            ORDER BY a.timestamp DESC
+        `).all();
+        res.json(auditLogs);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, error: 'Failed to retrieve audit logs' });
+    }
+});
+
 module.exports = router;

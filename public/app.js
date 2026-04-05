@@ -7,7 +7,8 @@ const API = {
     },
     async verify(formData) {
         return (await fetch('/api/verify', { method: 'POST', body: formData })).json();
-    }
+    },
+    async getAudit() { return (await fetch('/api/chain/audit')).json(); }
 };
 
 // ── Router ──
@@ -22,6 +23,7 @@ function navigate() {
         case 'upload': renderUpload(app); break;
         case 'verify': renderVerify(app); break;
         case 'chain':  renderChain(app); break;
+        case 'audit':  renderAudit(app); break;
         default:       renderDashboard(app); break;
     }
 }
@@ -428,5 +430,67 @@ function loadChain() {
         document.getElementById('chain-count').textContent = `Showing ${chain.length} entries`;
     }).catch(() => {
         body.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-red-400">Failed to load chain data.</td></tr>';
+    });
+}
+
+// ── Audit Log Page ──
+function renderAudit(app) {
+    document.getElementById('page-title').textContent = 'Audit Log';
+    const wrap = document.createElement('div');
+    wrap.className = 'max-w-7xl mx-auto space-y-8 fade-in';
+    wrap.innerHTML = `
+        <div class="flex flex-col md:flex-row md:items-end justify-between mb-2 gap-6">
+            <div class="space-y-2"><h1 class="text-4xl font-extrabold tracking-tight text-primary">System Audit</h1>
+            <p class="text-on-surface-variant max-w-lg">Complete history of all document interactions, modifications, and system events.</p></div>
+        </div>`;
+    
+    const tableWrap = document.createElement('div');
+    tableWrap.className = 'bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm';
+    tableWrap.innerHTML = `
+        <div class="px-6 py-5 border-b border-surface-container flex items-center justify-between">
+            <h3 class="text-lg font-bold text-primary">Audit Events</h3>
+            <button id="refresh-audit" class="text-xs font-bold text-white bg-primary px-3 py-1.5 rounded-lg shadow-lg shadow-primary/20 active:scale-95 transition-all">Refresh Audit</button>
+        </div>
+        <div class="overflow-x-auto"><table class="w-full text-left border-collapse"><thead><tr class="bg-surface-container-low">
+            <th class="px-6 py-4 text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Time</th>
+            <th class="px-6 py-4 text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">File</th>
+            <th class="px-6 py-4 text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Action</th>
+            <th class="px-6 py-4 text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Actor</th>
+            <th class="px-6 py-4 text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Details</th>
+        </tr></thead><tbody id="audit-body" class="divide-y divide-surface-container"></tbody></table></div>`;
+    wrap.appendChild(tableWrap);
+    app.appendChild(wrap);
+
+    loadAudit();
+    document.getElementById('refresh-audit').addEventListener('click', loadAudit);
+}
+
+function loadAudit(silent = false) {
+    const body = document.getElementById('audit-body');
+    if (!body) return;
+    if (!silent) body.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-slate-400">Loading audit logs...</td></tr>';
+    API.getAudit().then(logs => {
+        if (!logs.length) {
+            body.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-slate-400">No audit events recorded.</td></tr>';
+            return;
+        }
+        body.innerHTML = logs.map(log => {
+            const fname = log.filename.split(/[/\\]/).pop();
+            const isTamper = log.action.includes('TAMPER');
+            const rowClass = isTamper ? 'bg-red-50 text-red-900' : 'hover:bg-slate-50/50';
+            const actionBadge = isTamper 
+                ? `<span class="px-2 py-0.5 rounded-full bg-red-600 text-white text-[9px] font-black uppercase">TAMPER DETECTED</span>`
+                : `<span class="px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 text-[9px] font-bold uppercase">${log.action}</span>`;
+            
+            return `<tr class="${rowClass} transition-colors">
+                <td class="px-6 py-5 text-xs font-medium">${new Date(log.timestamp).toLocaleString()}</td>
+                <td class="px-6 py-5 text-xs font-bold">${fname} <span class="text-[10px] text-slate-400 font-normal ml-1">#${log.document_id}</span></td>
+                <td class="px-6 py-5">${actionBadge}</td>
+                <td class="px-6 py-5 text-xs font-semibold">${log.actor}</td>
+                <td class="px-6 py-5 text-xs text-on-surface-variant leading-relaxed">${log.details}</td>
+            </tr>`;
+        }).join('');
+    }).catch(() => {
+        body.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-red-400">Failed to load audit data.</td></tr>';
     });
 }

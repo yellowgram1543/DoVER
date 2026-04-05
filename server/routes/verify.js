@@ -34,6 +34,15 @@ router.post('/', upload.single('file'), (req, res) => {
         
         if (!verification.valid) {
             db.prepare('UPDATE documents SET is_tampered = 1 WHERE block_index = ?').run(doc.block_index);
+            db.prepare(`
+                INSERT INTO audit_log (document_id, action, actor, details)
+                VALUES (?, ?, ?, ?)
+            `).run(doc.block_index, 'TAMPER_DETECTED', 'SYSTEM_VERIFIER', `Verification failed for document. Stored hash does not match file content.`);
+        } else {
+             db.prepare(`
+                INSERT INTO audit_log (document_id, action, actor, details)
+                VALUES (?, ?, ?, ?)
+            `).run(doc.block_index, 'VERIFIED', 'SYSTEM_VERIFIER', `Document verified successfully.`);
         }
 
         res.json({
