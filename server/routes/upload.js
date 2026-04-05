@@ -31,6 +31,11 @@ router.post('/', upload.single('file'), (req, res) => {
             return res.status(400).json({ success: false, error: 'No file uploaded' });
         }
 
+        if (req.file.size === 0) {
+            fs.unlinkSync(req.file.path);
+            return res.status(400).json({ success: false, error: 'Empty file not allowed' });
+        }
+
         const filePath = path.resolve(req.file.path);
         const filename = req.file.filename;
         const fileType = req.file.mimetype;
