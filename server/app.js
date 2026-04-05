@@ -10,9 +10,9 @@ const uploadRoutes = require('./routes/upload');
 const verifyRoutes = require('./routes/verify');
 const chainRoutes = require('./routes/chain');
 
-app.use('/upload', uploadRoutes);
-app.use('/verify', verifyRoutes);
-app.use('/chain', chainRoutes);
+app.use('/api/upload', uploadRoutes);
+app.use('/api/verify', verifyRoutes);
+app.use('/api/chain', chainRoutes);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
