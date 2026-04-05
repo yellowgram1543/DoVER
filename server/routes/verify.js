@@ -4,10 +4,17 @@ const multer = require('multer');
 const db = require('../db/db');
 const hasher = require('../utils/hasher');
 
+const fs = require('fs');
+if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
+
 const upload = multer({ dest: 'uploads/' });
 
 router.post('/', upload.single('file'), (req, res) => {
     try {
+        if (!req.body.document_id && !req.file) {
+            return res.status(400).json({ success: false, error: 'Provide a document ID or file' });
+        }
+
         let doc;
         if (req.body.document_id) {
             doc = db.prepare('SELECT * FROM documents WHERE block_index = ?').get(req.body.document_id);

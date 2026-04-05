@@ -196,8 +196,13 @@ function renderUpload(app) {
     const submitBtn = document.getElementById('submit-btn');
     const browseBtn = document.getElementById('browse-btn');
 
-    browseBtn.addEventListener('click', () => fileInput.click());
-    dropZone.addEventListener('click', (e) => { if (e.target === dropZone || e.target.closest('.drop-zone')) fileInput.click(); });
+    browseBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        fileInput.click();
+    });
+    dropZone.addEventListener('click', (e) => { 
+        if (e.target === dropZone || e.target.closest('.drop-zone')) fileInput.click(); 
+    });
     dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
     dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
     dropZone.addEventListener('drop', e => {
@@ -228,9 +233,17 @@ function renderUpload(app) {
             if (res.success) {
                 resultDiv.innerHTML = `<div class="result-card bg-green-50/50 border border-green-200 rounded-xl p-6 relative overflow-hidden fade-in">
                     <div class="flex items-center gap-3 mb-4"><span class="material-symbols-outlined text-green-600">verified</span><span class="text-xs font-bold text-green-700 uppercase tracking-widest">Upload Successful</span></div>
-                    <h4 class="text-lg font-bold text-green-900 mb-2">Document Secured</h4>
-                    <p class="text-sm text-green-800/70 mb-3">Block Index: <strong>#${res.block_index}</strong></p>
-                    <code class="hash-text bg-green-100 px-3 py-2 rounded block text-green-800">${res.block_hash}</code>
+                    <div class="flex flex-col md:flex-row gap-6 items-start">
+                        <div class="flex-1">
+                            <h4 class="text-lg font-bold text-green-900 mb-2">Document Secured</h4>
+                            <p class="text-sm text-green-800/70 mb-3">Block Index: <strong>#${res.block_index}</strong></p>
+                            <code class="hash-text bg-green-100 px-3 py-2 rounded block text-green-800 mb-4">${res.block_hash}</code>
+                        </div>
+                        <div class="bg-white p-2 rounded-lg shadow-sm border border-green-100">
+                            <img src="${res.qr_image_base64}" class="w-32 h-32" alt="Verification QR"/>
+                            <p class="text-[10px] text-center mt-1 text-green-600 font-bold">SCAN TO VERIFY</p>
+                        </div>
+                    </div>
                 </div>`;
             } else {
                 resultDiv.innerHTML = `<div class="result-card bg-red-50/50 border border-red-200 rounded-xl p-6 fade-in">

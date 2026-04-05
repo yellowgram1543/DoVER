@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const db = require('../db/db');
 const hasher = require('../utils/hasher');
+const QRCode = require('qrcode');
 
 // Configure multer
 const storage = multer.diskStorage({
@@ -22,17 +23,23 @@ const storage = multer.diskStorage({
 
 const upload = multer({ 
     storage: storage,
-    limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+    fileFilter: (req, file, cb) => {
+        const allowed = /pdf|docx|png|jpg|jpeg/;
+        const ext = allowed.test(path.extname(file.originalname).toLowerCase());
+        const mime = allowed.test(file.mimetype);
+        cb(ext && mime ? null : new Error('Invalid file type'), ext && mime);
+    }
 });
 
-router.post('/', upload.single('file'), (req, res) => {
+router.post('/', upload.single('file'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ success: false, error: 'No file uploaded' });
         }
 
         if (req.file.size === 0) {
-            fs.unlinkSync(req.file.path);
+            if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
             return res.status(400).json({ success: false, error: 'Empty file not allowed' });
         }
 
@@ -68,7 +75,8 @@ router.post('/', upload.single('file'), (req, res) => {
         insertAudit.run(documentId, 'UPLOAD', uploadedBy, `File ${filename} uploaded and hashed`);
 
         // 6. Generate QR code string
-        const qrData = JSON.stringify({ id: documentId, block_hash: blockHash });
+        const qrData = JSON.stringify({ document_id: documentId, block_hash: blockHash, filename: filename, timestamp: timestamp });
+        const qrImageBase64 = await QRCode.toDataURL(qrData);
 
         // 7. Return response
         res.json({
@@ -76,7 +84,8 @@ router.post('/', upload.single('file'), (req, res) => {
             document_id: documentId,
             block_hash: blockHash,
             block_index: documentId, // In our schema, block_index is the PK/ID
-            qr_data: qrData
+            qr_data: qrData,
+            qr_image_base64: qrImageBase64
         });
 
     } catch (error) {
