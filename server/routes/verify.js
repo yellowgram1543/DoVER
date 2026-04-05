@@ -7,11 +7,15 @@ const ocr = require('../utils/ocr');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const { getGfs } = require('../db/mongodb');
 
 if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
-const upload = multer({ dest: 'uploads/' });
+if (!fs.existsSync('tmp')) fs.mkdirSync('tmp');
+
+const upload = multer({ dest: 'tmp/' });
 
 router.post('/', upload.single('file'), async (req, res) => {
+    let tmpPath = '';
     try {
         if (!req.body.document_id && !req.file) {
             return res.status(400).json({ success: false, error: 'Provide a document ID or file' });
@@ -26,13 +30,25 @@ router.post('/', upload.single('file'), async (req, res) => {
             if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
         }
 
-        if (!doc) {
-            return res.status(404).json({ success: false, error: 'Document not found' });
-        }
+        if (!doc) return res.status(404).json({ success: false, error: 'Document not found' });
 
-        const verification = hasher.verifyDocument(doc.block_index, db);
+        // 1. Reconstruct temp file from GridFS for deep analysis
+        const gfs = getGfs();
+        const fileId = doc.filename; // We store fileId in filename column now
+        tmpPath = path.resolve('tmp', `verify_${Date.now()}_${fileId}`);
         
-        // OCR-4: Implementation
+        const readStream = gfs.createReadStream({ _id: fileId });
+        const writeStream = fs.createWriteStream(tmpPath);
+        readStream.pipe(writeStream);
+
+        await new Promise((resolve, reject) => {
+            writeStream.on('finish', resolve);
+            writeStream.on('error', reject);
+        });
+
+        // 2. Run standard file verification (using temp path)
+        const verification = hasher.verifyDocument(doc.block_index, db, tmpPath);
+
         let ocr_valid = null;
         let ocr_tampered = null;
         let ocr_change_detected = null;
@@ -40,22 +56,17 @@ router.post('/', upload.single('file'), async (req, res) => {
         let stored_ocr_text = doc.ocr_text;
 
         if (doc.ocr_hash) {
-            let targetPath = doc.filename;
-            if (!path.isAbsolute(targetPath)) {
-                targetPath = path.resolve(__dirname, '..', '..', 'uploads', targetPath);
-            }
-
-            if (fs.existsSync(targetPath)) {
-                ocr_text = await ocr.extractText(targetPath);
-                const currentOcrHash = crypto.createHash('sha256').update(ocr_text).digest('hex');
-                
-                ocr_valid = (currentOcrHash.trim() === doc.ocr_hash.trim());
-                ocr_tampered = !ocr_valid;
-                ocr_change_detected = !ocr_valid;
-            }
+            ocr_text = await ocr.extractText(tmpPath);
+            const currentOcrHash = crypto.createHash('sha256').update(ocr_text).digest('hex');
+            ocr_valid = (currentOcrHash.trim() === doc.ocr_hash.trim());
+            ocr_tampered = !ocr_valid;
+            ocr_change_detected = !ocr_valid;
         }
 
-        // Final status and logging
+        // Cleanup immediately
+        if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+
+        // 3. Final status and logging
         if (!verification.valid || ocr_tampered) {
             db.prepare('UPDATE documents SET is_tampered = 1 WHERE block_index = ?').run(doc.block_index);
             const detail = ocr_tampered ? 'OCR content mismatch detected.' : 'File hash mismatch detected.';
@@ -87,6 +98,7 @@ router.post('/', upload.single('file'), async (req, res) => {
 
     } catch (error) {
         console.error(error);
+        if (tmpPath && fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
         res.status(500).json({ success: false, error: 'Verification failed' });
     }
 });

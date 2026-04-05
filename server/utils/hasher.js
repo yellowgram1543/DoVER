@@ -16,15 +16,16 @@ function getLastBlockHash(db) {
     return row ? row.block_hash : '0000000000000000';
 }
 
-function verifyDocument(documentId, db) {
+function verifyDocument(documentId, db, manualFilePath = null) {
     const doc = db.prepare('SELECT * FROM documents WHERE block_index = ?').get(documentId);
     if (!doc) return { valid: false, details: 'Document not found' };
 
-    // Resolve filename (might be old relative path or new absolute path)
+    // Resolve filename (might be old relative path, new absolute path, or manual temp path)
     const fs = require('fs');
     const path = require('path');
-    let targetPath = doc.filename;
-    if (!path.isAbsolute(targetPath)) {
+    let targetPath = manualFilePath || doc.filename;
+    
+    if (!manualFilePath && !path.isAbsolute(targetPath)) {
         targetPath = path.resolve(__dirname, '..', '..', 'uploads', targetPath);
     }
 
