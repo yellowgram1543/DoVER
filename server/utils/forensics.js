@@ -3,6 +3,58 @@ const tf = require('@tensorflow/tfjs');
 const fs = require('fs');
 
 /**
+ * Analyzes pixel variance across a 10x10 grid to detect font inconsistencies.
+ * @param {string} filePath - Absolute path to the image file.
+ * @returns {Promise<Object>} - { score: 0-100, suspicious: bool }
+ */
+async function fontConsistencyCheck(filePath) {
+    try {
+        const image = await Jimp.read(filePath);
+        image.greyscale();
+        const { width, height } = image.bitmap;
+        const cellW = Math.floor(width / 10);
+        const cellH = Math.floor(height / 10);
+        const variances = [];
+
+        for (let row = 0; row < 10; row++) {
+            for (let col = 0; col < 10; col++) {
+                const pixels = [];
+                for (let y = row * cellH; y < (row + 1) * cellH; y += Math.max(1, Math.floor(cellH/5))) {
+                    for (let x = col * cellW; x < (col + 1) * cellW; x += Math.max(1, Math.floor(cellW/5))) {
+                        const color = image.getPixelColor(x, y);
+                        pixels.push(((color >> 24) & 0xff + (color >> 16) & 0xff + (color >> 8) & 0xff) / 3);
+                    }
+                }
+                
+                if (pixels.length > 1) {
+                    const t = tf.tensor1d(pixels);
+                    const m = t.mean();
+                    const v = t.sub(m).square().mean();
+                    variances.push((await v.data())[0]);
+                    t.dispose(); m.dispose(); v.dispose();
+                }
+            }
+        }
+
+        const vTensor = tf.tensor1d(variances);
+        const vMean = vTensor.mean();
+        const vStd = vTensor.sub(vMean).square().mean().sqrt();
+        const stdVal = (await vStd.data())[0];
+        const meanVal = (await vMean.data())[0];
+        
+        vTensor.dispose(); vMean.dispose(); vStd.dispose();
+
+        // High relative standard deviation indicates inconsistent texture/fonts
+        const relStd = (stdVal / (meanVal + 1)) * 100;
+        let score = Math.max(0, 100 - relStd);
+        
+        return { score, suspicious: score < 60 };
+    } catch (e) {
+        return { score: 100, suspicious: false };
+    }
+}
+
+/**
  * Performs heuristic forensic analysis on an image to detect potential forgeries.
  * Uses pixel-level analysis via Jimp and basic tensor operations via TFJS.
  * @param {string} filePath - Absolute path to the image file.
@@ -18,6 +70,13 @@ async function analyzeImage(filePath) {
 
     try {
         if (!fs.existsSync(filePath)) return report;
+
+        // OCR-F2: Font Consistency Check
+        const fontResult = await fontConsistencyCheck(filePath);
+        report.font_consistency = Math.round(fontResult.score);
+        if (fontResult.suspicious) {
+            report.flags.push(`Inconsistent font texture detected (Score: ${report.font_consistency})`);
+        }
 
         const image = await Jimp.read(filePath);
         const { width, height } = image.bitmap;
