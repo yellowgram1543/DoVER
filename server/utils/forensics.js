@@ -23,18 +23,19 @@ async function analyzeImage(filePath) {
         const { width, height } = image.bitmap;
 
         // 1. Noise/Compression Analysis (Heuristic for Digital Alterations)
-        const samples = 100;
+        // Use fixed grid sampling for 100% deterministic results
         const pixels = [];
-        for (let i = 0; i < samples; i++) {
-            const x = Math.floor(Math.random() * width);
-            const y = Math.floor(Math.random() * height);
-            const color = image.getPixelColor(x, y);
-            
-            // Latest Jimp uses 0xRRGGBBAA
-            const r = (color >> 24) & 0xff;
-            const g = (color >> 16) & 0xff;
-            const b = (color >> 8) & 0xff;
-            pixels.push((r + g + b) / 3);
+        const stepX = Math.max(1, Math.floor(width / 10));
+        const stepY_noise = Math.max(1, Math.floor(height / 10));
+        
+        for (let y = 0; y < height; y += stepY_noise) {
+            for (let x = 0; x < width; x += stepX) {
+                const color = image.getPixelColor(x, y);
+                const r = (color >> 24) & 0xff;
+                const g = (color >> 16) & 0xff;
+                const b = (color >> 8) & 0xff;
+                pixels.push((r + g + b) / 3);
+            }
         }
 
         // Use TFJS to calculate variance (standard deviation) of samples
