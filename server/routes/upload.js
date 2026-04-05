@@ -6,6 +6,8 @@ const fs = require('fs');
 const db = require('../db/db');
 const hasher = require('../utils/hasher');
 const QRCode = require('qrcode');
+const ocr = require('../utils/ocr');
+const crypto = require('crypto');
 
 // Configure multer
 const storage = multer.diskStorage({
@@ -64,13 +66,25 @@ router.post('/', (req, res) => {
             const timestamp = new Date().toISOString();
             const blockHash = hasher.generateBlockHash(fileHash, prevHash, timestamp);
 
+            // 3.5 OCR logic for PNG/JPG
+            let ocrText = null;
+            let ocrHash = null;
+            const isImage = /png|jpg|jpeg/.test(fileType);
+            
+            if (isImage) {
+                ocrText = await ocr.extractText(filePath);
+                if (ocrText) {
+                    ocrHash = crypto.createHash('sha256').update(ocrText).digest('hex');
+                }
+            }
+
             // 4. Store in documents table
             const insertDoc = db.prepare(`
-                INSERT INTO documents (filename, file_type, uploaded_by, upload_timestamp, file_hash, prev_hash, block_hash)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO documents (filename, file_type, uploaded_by, upload_timestamp, file_hash, prev_hash, block_hash, ocr_text, ocr_hash)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             `);
             
-            const result = insertDoc.run(filePath, fileType, uploadedBy, timestamp, fileHash, prevHash, blockHash);
+            const result = insertDoc.run(filePath, fileType, uploadedBy, timestamp, fileHash, prevHash, blockHash, ocrText, ocrHash);
             const documentId = result.lastInsertRowid;
 
             // 5. Log action in audit_log

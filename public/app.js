@@ -8,7 +8,8 @@ const API = {
     async verify(formData) {
         return (await fetch('/api/verify', { method: 'POST', body: formData })).json();
     },
-    async getAudit() { return (await fetch('/api/chain/audit')).json(); }
+    async getAudit() { return (await fetch('/api/chain/audit')).json(); },
+    async getDocumentHistory(id) { return (await fetch(`/api/chain/document/${id}/history`)).json(); }
 };
 
 // ── Router ──
@@ -346,16 +347,41 @@ function renderVerify(app) {
                     <div class="flex items-center gap-3 mb-4"><span class="material-symbols-outlined text-green-600">verified</span><span class="text-xs font-bold text-green-700 uppercase tracking-widest">Status: Valid</span></div>
                     <h4 class="text-lg font-bold text-green-900 mb-2">Original Document</h4>
                     <p class="text-sm text-green-800/70 leading-relaxed">Hash matches the registry. Uploaded by <strong>${res.uploaded_by}</strong> on ${new Date(res.timestamp).toLocaleDateString()}.</p>
-                    <code class="hash-text bg-green-100 px-3 py-2 rounded block mt-3 text-green-800">${res.original_hash}</code></div>`;
+                    <code class="hash-text bg-green-100 px-3 py-2 rounded block mt-3 text-green-800 mb-4">${res.original_hash}</code>
+                    ${res.ocr_valid ? '<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-700 text-[10px] font-extrabold uppercase"><span class="material-symbols-outlined text-xs">description</span>Text Content Verified</div>' : ''}
+                </div>`;
             } else if (res.error) {
                 r.innerHTML = `<div class="result-card bg-yellow-50/50 border border-yellow-200 rounded-xl p-6 fade-in">
                     <div class="flex items-center gap-3 mb-2"><span class="material-symbols-outlined text-yellow-600">search_off</span><span class="text-xs font-bold text-yellow-700 uppercase">Not Found</span></div>
                     <p class="text-sm text-yellow-800/70">${res.error}</p></div>`;
             } else {
+                let ocrDisplay = '';
+                if (res.ocr_change_detected) {
+                    ocrDisplay = `
+                        <div class="mt-6 p-4 bg-orange-50 border border-orange-200 rounded-xl">
+                            <div class="flex items-center gap-2 mb-3 text-orange-700 font-bold text-xs uppercase tracking-wider">
+                                <span class="material-symbols-outlined text-sm">warning</span> Text Content Change Detected via OCR
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="bg-white p-3 rounded border border-orange-100">
+                                    <p class="text-[9px] font-black text-slate-400 uppercase mb-2">Stored Registry Content</p>
+                                    <pre class="text-[10px] text-slate-600 whitespace-pre-wrap font-mono leading-relaxed">${res.stored_ocr_text || 'None'}</pre>
+                                </div>
+                                <div class="bg-orange-100/50 p-3 rounded border border-orange-200">
+                                    <p class="text-[9px] font-black text-orange-600 uppercase mb-2">Current File Content</p>
+                                    <pre class="text-[10px] text-orange-900 whitespace-pre-wrap font-mono leading-relaxed font-bold">${res.ocr_text || 'None'}</pre>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
                 r.innerHTML = `<div class="result-card bg-red-50/50 border border-red-200 rounded-xl p-6 relative overflow-hidden fade-in">
                     <div class="flex items-center gap-3 mb-4"><span class="material-symbols-outlined text-red-600">error</span><span class="text-xs font-bold text-red-700 uppercase tracking-widest">Status: Tampered</span></div>
                     <h4 class="text-lg font-bold text-red-900 mb-2">Verification Failed</h4>
-                    <p class="text-sm text-red-800/70 leading-relaxed">Document data has been modified since issuance.</p></div>`;
+                    <p class="text-sm text-red-800/70 leading-relaxed">Document data has been modified since issuance.</p>
+                    ${ocrDisplay}
+                </div>`;
             }
         } catch (err) {
             const r = document.getElementById('verify-result'); r.classList.remove('hidden');
@@ -442,13 +468,18 @@ function renderAudit(app) {
         <div class="flex flex-col md:flex-row md:items-end justify-between mb-2 gap-6">
             <div class="space-y-2"><h1 class="text-4xl font-extrabold tracking-tight text-primary">System Audit</h1>
             <p class="text-on-surface-variant max-w-lg">Complete history of all document interactions, modifications, and system events.</p></div>
+            <div id="audit-filter-ui" class="hidden">
+                <button id="clear-audit-filter" class="flex items-center gap-2 px-4 py-2 bg-slate-200 text-slate-700 rounded-lg font-bold text-xs hover:bg-slate-300 transition-all">
+                    <span class="material-symbols-outlined text-sm">close</span> Clear Filter
+                </button>
+            </div>
         </div>`;
     
     const tableWrap = document.createElement('div');
     tableWrap.className = 'bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm';
     tableWrap.innerHTML = `
         <div class="px-6 py-5 border-b border-surface-container flex items-center justify-between">
-            <h3 class="text-lg font-bold text-primary">Audit Events</h3>
+            <h3 class="text-lg font-bold text-primary" id="audit-title">Audit Events</h3>
             <button id="refresh-audit" class="text-xs font-bold text-white bg-primary px-3 py-1.5 rounded-lg shadow-lg shadow-primary/20 active:scale-95 transition-all">Refresh Audit</button>
         </div>
         <div class="overflow-x-auto"><table class="w-full text-left border-collapse"><thead><tr class="bg-surface-container-low">
@@ -457,21 +488,44 @@ function renderAudit(app) {
             <th class="px-6 py-4 text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Action</th>
             <th class="px-6 py-4 text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Actor</th>
             <th class="px-6 py-4 text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Details</th>
+            <th class="px-6 py-4 text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">History</th>
         </tr></thead><tbody id="audit-body" class="divide-y divide-surface-container"></tbody></table></div>`;
     wrap.appendChild(tableWrap);
     app.appendChild(wrap);
 
     loadAudit();
-    document.getElementById('refresh-audit').addEventListener('click', loadAudit);
+    document.getElementById('refresh-audit').addEventListener('click', () => {
+        const filterId = document.getElementById('audit-filter-ui').dataset.id;
+        loadAudit(false, filterId);
+    });
+    document.getElementById('clear-audit-filter').addEventListener('click', () => {
+        loadAudit(false, null);
+    });
 }
 
-function loadAudit(silent = false) {
+function loadAudit(silent = false, documentId = null) {
     const body = document.getElementById('audit-body');
+    const filterUi = document.getElementById('audit-filter-ui');
+    const title = document.getElementById('audit-title');
     if (!body) return;
-    if (!silent) body.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-slate-400">Loading audit logs...</td></tr>';
-    API.getAudit().then(logs => {
+
+    if (documentId) {
+        filterUi.classList.remove('hidden');
+        filterUi.dataset.id = documentId;
+        title.textContent = `History for Block #${documentId}`;
+    } else {
+        filterUi.classList.add('hidden');
+        delete filterUi.dataset.id;
+        title.textContent = `Audit Events`;
+    }
+
+    if (!silent) body.innerHTML = '<tr><td colspan="6" class="px-6 py-8 text-center text-slate-400">Loading audit logs...</td></tr>';
+    
+    const fetchCall = documentId ? API.getDocumentHistory(documentId) : API.getAudit();
+    
+    fetchCall.then(logs => {
         if (!logs.length) {
-            body.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-slate-400">No audit events recorded.</td></tr>';
+            body.innerHTML = '<tr><td colspan="6" class="px-6 py-8 text-center text-slate-400">No audit events recorded.</td></tr>';
             return;
         }
         body.innerHTML = logs.map(log => {
@@ -488,9 +542,12 @@ function loadAudit(silent = false) {
                 <td class="px-6 py-5">${actionBadge}</td>
                 <td class="px-6 py-5 text-xs font-semibold">${log.actor}</td>
                 <td class="px-6 py-5 text-xs text-on-surface-variant leading-relaxed">${log.details}</td>
+                <td class="px-6 py-5 text-xs">
+                    ${!documentId ? `<button onclick="loadAudit(false, ${log.document_id})" class="text-secondary font-bold hover:underline">View History</button>` : ''}
+                </td>
             </tr>`;
         }).join('');
     }).catch(() => {
-        body.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-red-400">Failed to load audit data.</td></tr>';
+        body.innerHTML = '<tr><td colspan="6" class="px-6 py-8 text-center text-red-400">Failed to load audit data.</td></tr>';
     });
 }

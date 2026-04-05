@@ -27,4 +27,20 @@ router.get('/audit', (req, res) => {
     }
 });
 
+router.get('/document/:id/history', (req, res) => {
+    try {
+        const history = db.prepare(`
+            SELECT a.document_id, d.filename, a.action, a.actor, a.timestamp, a.details
+            FROM audit_log a
+            JOIN documents d ON a.document_id = d.block_index
+            WHERE a.document_id = ?
+            ORDER BY a.timestamp DESC
+        `).all(req.params.id);
+        res.json(history);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, error: 'Failed to retrieve document history' });
+    }
+});
+
 module.exports = router;

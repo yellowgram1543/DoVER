@@ -7,7 +7,9 @@ CREATE TABLE IF NOT EXISTS documents (
     file_hash TEXT NOT NULL,
     prev_hash TEXT NOT NULL,
     block_hash TEXT NOT NULL,
-    is_tampered BOOLEAN DEFAULT 0
+    is_tampered BOOLEAN DEFAULT 0,
+    ocr_text TEXT,
+    ocr_hash TEXT
 );
 
 CREATE TABLE IF NOT EXISTS audit_log (

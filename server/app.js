@@ -46,9 +46,7 @@ setInterval(() => {
                 console.log(`[BG_WATCHER] Tampering detected on document #${doc.block_index}`);
             }
         });
-    } catch (e) {
-        console.error('[BG_WATCHER] Error during integrity sweep:', e.message);
-    }
+    } catch (e) {}
 }, 10000);
 
 const PORT = process.env.PORT || 3000;
