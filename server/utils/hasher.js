@@ -20,8 +20,21 @@ function verifyDocument(documentId, db) {
     const doc = db.prepare('SELECT * FROM documents WHERE block_index = ?').get(documentId);
     if (!doc) return { valid: false, details: 'Document not found' };
 
-    // Recompute file hash (stored filename is now absolute path)
-    const currentFileHash = generateFileHash(doc.filename);
+    // Resolve filename (might be old relative path or new absolute path)
+    const fs = require('fs');
+    const path = require('path');
+    let targetPath = doc.filename;
+    if (!path.isAbsolute(targetPath)) {
+        targetPath = path.resolve(__dirname, '..', '..', 'uploads', targetPath);
+    }
+
+    // Check if file exists before hashing
+    if (!fs.existsSync(targetPath)) {
+        return { valid: false, details: 'File missing on disk' };
+    }
+
+    // Recompute file hash
+    const currentFileHash = generateFileHash(targetPath);
     const recomputedBlockHash = generateBlockHash(currentFileHash, doc.prev_hash, doc.upload_timestamp);
 
     const isValid = (currentFileHash.trim() === doc.file_hash.trim()) && (recomputedBlockHash.trim() === doc.block_hash.trim());
