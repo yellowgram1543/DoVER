@@ -1,20 +1,20 @@
 const mongoose = require('mongoose');
-const Grid = require('gridfs-stream');
 require('dotenv').config();
 
 const conn = mongoose.createConnection(process.env.MONGODB_URI || 'mongodb://localhost:27017/docvault');
 
-let gfs;
+let bucket;
 
 conn.once('open', () => {
-    // Initialize stream
-    gfs = Grid(conn.db, mongoose.mongo);
-    gfs.collection('uploads');
-    console.log('MongoDB GridFS Connected');
+    // Initialize official GridFSBucket
+    bucket = new mongoose.mongo.GridFSBucket(conn.db, {
+        bucketName: 'uploads'
+    });
+    console.log('MongoDB GridFS Bucket Connected');
 });
 
 module.exports = {
-    getGfs: () => gfs,
+    getBucket: () => bucket,
     getConn: () => conn,
     mongoose: mongoose
 };

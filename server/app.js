@@ -28,26 +28,50 @@ app.get('*', (req, res) => {
 });
 
 // ── Background Integrity Watcher ──
-// Automatically checks files every 10 seconds to detect tampering
+// Automatically checks files every 30 seconds to detect tampering
 const db = require('./db/db');
 const hasher = require('./utils/hasher');
-setInterval(() => {
+const { getBucket } = require('./db/mongodb');
+const fs = require('fs');
+const path = require('path');
+
+setInterval(async () => {
+    const bucket = getBucket();
+    if (!bucket) return; // Wait for connection
+
     try {
-        const docs = db.prepare('SELECT block_index, is_tampered FROM documents').all();
-        docs.forEach(doc => {
-            const verification = hasher.verifyDocument(doc.block_index, db);
-            if (!verification.valid && !doc.is_tampered) {
-                // System discovered tampering during background sweep
-                db.prepare('UPDATE documents SET is_tampered = 1 WHERE block_index = ?').run(doc.block_index);
-                db.prepare(`
-                    INSERT INTO audit_log (document_id, action, actor, details)
-                    VALUES (?, ?, ?, ?)
-                `).run(doc.block_index, 'TAMPER_DETECTED', 'BG_WATCHER', `Automated sweep detected file modification.`);
-                console.log(`[BG_WATCHER] Tampering detected on document #${doc.block_index}`);
+        const docs = db.prepare('SELECT block_index, filename, is_tampered FROM documents WHERE is_tampered = 0').all();
+        for (const doc of docs) {
+            let tmpPath = path.resolve('tmp', `bg_verify_${doc.block_index}`);
+            try {
+                // Reconstruct from GridFS
+                const downloadStream = bucket.openDownloadStream(new (require('mongoose')).Types.ObjectId(doc.filename));
+                const writeStream = fs.createWriteStream(tmpPath);
+                downloadStream.pipe(writeStream);
+
+                await new Promise((resolve, reject) => {
+                    writeStream.on('finish', resolve);
+                    writeStream.on('error', reject);
+                });
+
+                const verification = hasher.verifyDocument(doc.block_index, db, tmpPath);
+                if (!verification.valid) {
+                    db.prepare('UPDATE documents SET is_tampered = 1 WHERE block_index = ?').run(doc.block_index);
+                    db.prepare(`INSERT INTO audit_log (document_id, action, actor, details) VALUES (?, ?, ?, ?)`)
+                      .run(doc.block_index, 'TAMPER_DETECTED', 'BG_WATCHER', `Automated sweep detected file modification.`);
+                }
+                
+                if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+            } catch (err) {
+                // If file is missing in GridFS, it's a real tamper/deletion
+                console.error(`[BG_WATCHER] Error verifying block #${doc.block_index}:`, err.message);
+                if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
             }
-        });
-    } catch (e) {}
-}, 10000);
+        }
+    } catch (e) {
+        // Silently handle database busy errors
+    }
+}, 30000); // Increased to 30s to reduce load
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

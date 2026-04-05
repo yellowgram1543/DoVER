@@ -7,7 +7,7 @@ const ocr = require('../utils/ocr');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const { getGfs } = require('../db/mongodb');
+const { getBucket, mongoose } = require('../db/mongodb');
 
 if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
 if (!fs.existsSync('tmp')) fs.mkdirSync('tmp');
@@ -33,17 +33,17 @@ router.post('/', upload.single('file'), async (req, res) => {
         if (!doc) return res.status(404).json({ success: false, error: 'Document not found' });
 
         // 1. Reconstruct temp file from GridFS for deep analysis
-        const gfs = getGfs();
+        const bucket = getBucket();
         const fileId = doc.filename; // We store fileId in filename column now
         tmpPath = path.resolve('tmp', `verify_${Date.now()}_${fileId}`);
         
-        const readStream = gfs.createReadStream({ _id: fileId });
+        const downloadStream = bucket.openDownloadStream(new mongoose.Types.ObjectId(fileId));
         const writeStream = fs.createWriteStream(tmpPath);
-        readStream.pipe(writeStream);
 
         await new Promise((resolve, reject) => {
-            writeStream.on('finish', resolve);
-            writeStream.on('error', reject);
+            downloadStream.pipe(writeStream)
+                .on('error', (e) => reject(new Error('GridFS Download Error: ' + e.message)))
+                .on('finish', resolve);
         });
 
         // 2. Run standard file verification (using temp path)
