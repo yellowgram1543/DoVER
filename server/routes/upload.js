@@ -31,7 +31,7 @@ router.post('/', upload.single('file'), (req, res) => {
             return res.status(400).json({ success: false, error: 'No file uploaded' });
         }
 
-        const filePath = req.file.path;
+        const filePath = path.resolve(req.file.path);
         const filename = req.file.filename;
         const fileType = req.file.mimetype;
         const uploadedBy = req.body.user || 'anonymous';
@@ -52,7 +52,7 @@ router.post('/', upload.single('file'), (req, res) => {
             VALUES (?, ?, ?, ?, ?, ?, ?)
         `);
         
-        const result = insertDoc.run(filename, fileType, uploadedBy, timestamp, fileHash, prevHash, blockHash);
+        const result = insertDoc.run(filePath, fileType, uploadedBy, timestamp, fileHash, prevHash, blockHash);
         const documentId = result.lastInsertRowid;
 
         // 5. Log action in audit_log

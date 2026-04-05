@@ -12,8 +12,9 @@ router.post('/', upload.single('file'), (req, res) => {
         if (req.body.document_id) {
             doc = db.prepare('SELECT * FROM documents WHERE block_index = ?').get(req.body.document_id);
         } else if (req.file) {
-            const fileHash = hasher.generateFileHash(req.file.path);
-            doc = db.prepare('SELECT * FROM documents WHERE file_hash = ?').get(fileHash);
+            const fileHash = hasher.generateFileHash(req.file.path).trim();
+            // Using TRIM in SQL ensures we find it even if the DB has whitespace
+            doc = db.prepare('SELECT * FROM documents WHERE trim(file_hash) = ?').get(fileHash);
             // We don't need the uploaded file anymore for this specific comparison logic
             require('fs').unlinkSync(req.file.path);
         }

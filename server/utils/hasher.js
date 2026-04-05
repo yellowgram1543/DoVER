@@ -7,7 +7,7 @@ function generateFileHash(filePath) {
 }
 
 function generateBlockHash(fileHash, prevHash, timestamp) {
-    const data = fileHash + prevHash + timestamp;
+    const data = fileHash.trim() + prevHash.trim() + timestamp;
     return crypto.createHash('sha256').update(data).digest('hex');
 }
 
@@ -17,15 +17,14 @@ function getLastBlockHash(db) {
 }
 
 function verifyDocument(documentId, db) {
-    const doc = db.prepare('SELECT * FROM documents WHERE block_index = ?').get();
+    const doc = db.prepare('SELECT * FROM documents WHERE block_index = ?').get(documentId);
     if (!doc) return { valid: false, details: 'Document not found' };
 
-    // Recompute file hash (requires access to the file path, assuming same filename in uploads/)
-    // Note: The prompt asks to recompute from original file.
-    const currentFileHash = generateFileHash(`uploads/${doc.filename}`);
+    // Recompute file hash (stored filename is now absolute path)
+    const currentFileHash = generateFileHash(doc.filename);
     const recomputedBlockHash = generateBlockHash(currentFileHash, doc.prev_hash, doc.upload_timestamp);
 
-    const isValid = (currentFileHash === doc.file_hash) && (recomputedBlockHash === doc.block_hash);
+    const isValid = (currentFileHash.trim() === doc.file_hash.trim()) && (recomputedBlockHash.trim() === doc.block_hash.trim());
 
     return {
         valid: isValid,
