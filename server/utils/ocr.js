@@ -22,7 +22,7 @@ async function extractText(filePath) {
         image.normalize();
         image.scale(2);
         
-        tempPath = path.join(path.dirname(filePath), 'temp_ocr_' + path.basename(filePath));
+        tempPath = path.join(path.dirname(filePath), 'temp_ocr_' + Date.now() + '_' + path.basename(filePath));
         await image.write(tempPath);
 
         // Perform OCR on the cleaned image

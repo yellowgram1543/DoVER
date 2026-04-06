@@ -41,12 +41,7 @@ async function hackAnything(blockIndex) {
         });
         await image.write(tmpPath);
         console.log('✅ Image forged (pixel modification).');
-    }
-        let content = fs.readFileSync(tmpPath, 'utf8');
-        content = "FORGED CONTENT: " + content.toUpperCase();
-        fs.writeFileSync(tmpPath, content);
-        console.log('✅ Text forged (content modification).');
-    } else {
+    } else if (isText) {
         // PDF/DOCX: Just append "corrupted" bytes to break the hash
         fs.appendFileSync(tmpPath, "\n--TAMPERED--");
         console.log('✅ Binary file forged (hash broken).');
