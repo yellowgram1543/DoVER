@@ -13,7 +13,7 @@ html.dark {
     --text-primary: #D6E3FF;
     --text-secondary: #94a3b8;
     --accent: #E9C176;
-    --border: #2D3D5A; /* Muted neutral border */
+    --border: #2D3D5A; 
 }
 
 body { 
@@ -33,7 +33,7 @@ body {
 .drop-zone { 
     transition: all 0.3s ease; 
     border-color: var(--border); 
-    background: rgba(148, 163, 184, 0.03); /* Muted neutral drop zone */
+    background: rgba(148, 163, 184, 0.03);
 }
 .drop-zone.dragover { 
     border-color: var(--accent); 
@@ -67,6 +67,31 @@ html.dark .border-surface-container { border-color: var(--border) !important; }
 html.dark .text-on-surface-variant { color: var(--text-secondary) !important; }
 html.dark .bg-slate-100 { background-color: var(--bg-surface) !important; }
 html.dark .bg-slate-50\/80 { background-color: rgba(10, 25, 47, 0.8) !important; }
+
+/* Soft status colors for Audit Logs and Verify results in dark mode */
+html.dark .bg-red-50 { background-color: rgba(139, 69, 19, 0.15) !important; } /* Muted reddish brown */
+html.dark .text-red-900 { color: #E5A585 !important; }
+html.dark .bg-green-50\/50 { background-color: rgba(46, 125, 50, 0.1) !important; } /* Muted forest green */
+html.dark .text-green-900 { color: #A5D6A7 !important; }
+html.dark .text-green-800\/70 { color: rgba(165, 214, 167, 0.8) !important; }
+html.dark .text-emerald-600 { color: #81C784 !important; } /* Highlighting compared against text */
+
+/* targeted input/select overrides for dark mode readability */
+html.dark input, 
+html.dark select, 
+html.dark .bg-slate-100.rounded-xl { 
+    background-color: #0F1B33 !important; 
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border) !important;
+}
+
+html.dark .material-symbols-outlined {
+    color: var(--text-secondary);
+}
+
+html.dark input::placeholder {
+    color: #4B5563;
+}
 
 /* Primary Button Overrides in Dark Mode (Gold Accent) */
 html.dark .bg-primary { background-color: var(--accent) !important; color: #0A192F !important; }
