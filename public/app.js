@@ -21,11 +21,13 @@ function navigate() {
     const app = document.getElementById('app');
     app.innerHTML = '';
     switch (page) {
-        case 'upload': renderUpload(app); break;
-        case 'verify': renderVerify(app); break;
-        case 'chain':  renderChain(app); break;
-        case 'audit':  renderAudit(app); break;
-        default:       renderDashboard(app); break;
+        case 'upload':   renderUpload(app); break;
+        case 'verify':   renderVerify(app); break;
+        case 'chain':    renderChain(app); break;
+        case 'audit':    renderAudit(app); break;
+        case 'settings': renderSettings(app); break;
+        case 'help':     renderHelp(app); break;
+        default:         renderDashboard(app); break;
     }
 }
 window.addEventListener('hashchange', navigate);
@@ -473,6 +475,7 @@ function renderChain(app) {
             <th class="px-6 py-4 text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Block</th>
             <th class="px-6 py-4 text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Filename</th>
             <th class="px-6 py-4 text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Hash (SHA-256)</th>
+            <th class="px-6 py-4 text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Uploaded By</th>
             <th class="px-6 py-4 text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Timestamp</th>
             <th class="px-6 py-4 text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Status</th>
         </tr></thead><tbody id="chain-body" class="divide-y divide-surface-container"></tbody></table></div>
@@ -484,13 +487,13 @@ function renderChain(app) {
     document.getElementById('refresh-chain').addEventListener('click', loadChain);
 }
 
-function loadChain() {
+function loadChain(silent = false) {
     const body = document.getElementById('chain-body');
     if (!body) return;
-    body.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-slate-400">Loading chain...</td></tr>';
+    if (!silent) body.innerHTML = '<tr><td colspan="6" class="px-6 py-8 text-center text-slate-400">Loading chain...</td></tr>';
     API.getChain().then(chain => {
         if (!chain.length) {
-            body.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-slate-400">No blocks yet. Upload a document to begin.</td></tr>';
+            body.innerHTML = '<tr><td colspan="6" class="px-6 py-8 text-center text-slate-400">No blocks yet. Upload a document to begin.</td></tr>';
             document.getElementById('chain-count').textContent = '0 entries';
             return;
         }
@@ -503,13 +506,14 @@ function loadChain() {
             return `<tr class="${i%2===0?'':'bg-surface-container-lowest'} hover:bg-slate-50/50 transition-colors">
                 <td class="px-6 py-5 text-sm font-bold text-secondary">#${d.block_index}</td>
                 <td class="px-6 py-5 text-sm font-semibold text-primary">${fname}</td>
-                <td class="px-6 py-5"><code class="text-[11px] font-mono bg-slate-100 px-2 py-1 rounded text-slate-600">${d.block_hash}</code></td>
+                <td class="px-6 py-5"><code class="text-[11px] font-mono bg-slate-100 px-2 py-1 rounded text-slate-600">${d.block_hash.slice(0,16)}...</code></td>
+                <td class="px-6 py-5 text-xs font-semibold text-slate-600">${d.uploaded_by || 'Anonymous'}</td>
                 <td class="px-6 py-5 text-xs text-on-surface-variant font-medium">${new Date(d.upload_timestamp).toLocaleString()}</td>
                 <td class="px-6 py-5">${status}</td></tr>`;
         }).join('');
         document.getElementById('chain-count').textContent = `Showing ${chain.length} entries`;
     }).catch(() => {
-        body.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-red-400">Failed to load chain data.</td></tr>';
+        body.innerHTML = '<tr><td colspan="6" class="px-6 py-8 text-center text-red-400">Failed to load chain data.</td></tr>';
     });
 }
 
@@ -604,4 +608,90 @@ function loadAudit(silent = false, documentId = null) {
     }).catch(() => {
         body.innerHTML = '<tr><td colspan="6" class="px-6 py-8 text-center text-red-400">Failed to load audit data.</td></tr>';
     });
+}
+
+// ── Settings Page ──
+function renderSettings(app) {
+    app.innerHTML = '';
+    document.getElementById('page-title').textContent = 'System Settings';
+    const wrap = document.createElement('div');
+    wrap.className = 'max-w-2xl mx-auto space-y-8 fade-in';
+    const isDark = document.documentElement.classList.contains('dark');
+    
+    wrap.innerHTML = `
+        <div class="space-y-2"><h1 class="text-4xl font-extrabold tracking-tight text-primary">Preferences</h1>
+        <p class="text-on-surface-variant">Configure your local workspace and visual identity.</p></div>
+        
+        <div class="bg-surface-container-lowest rounded-2xl p-8 shadow-sm border border-surface-container">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="font-bold text-lg text-primary">Dark Interface</h3>
+                    <p class="text-sm text-slate-500">Enable high-contrast dark theme for low light environments.</p>
+                </div>
+                <button id="theme-toggle" class="w-14 h-8 rounded-full bg-slate-200 dark:bg-emerald-500 relative transition-colors">
+                    <div class="w-6 h-6 rounded-full bg-white absolute top-1 left-1 dark:left-7 transition-all shadow-sm"></div>
+                </button>
+            </div>
+        </div>
+    `;
+    app.appendChild(wrap);
+
+    document.getElementById('theme-toggle').addEventListener('click', () => {
+        const doc = document.documentElement;
+        if (doc.classList.contains('dark')) {
+            doc.classList.remove('dark');
+            localStorage.setItem('theme', 'light');
+        } else {
+            doc.classList.add('dark');
+            localStorage.setItem('theme', 'dark');
+        }
+        renderSettings(app); // Re-render to update toggle state
+    });
+}
+
+// ── Help Guide Page ──
+function renderHelp(app) {
+    document.getElementById('page-title').textContent = 'User Guide';
+    const wrap = document.createElement('div');
+    wrap.className = 'max-w-4xl mx-auto space-y-12 fade-in';
+    
+    wrap.innerHTML = `
+        <div class="text-center space-y-4">
+            <h1 class="text-5xl font-black text-primary tracking-tight">How <span class="text-secondary">DoVER</span> Works</h1>
+            <p class="text-on-surface-variant text-lg">A simple guide to decentralized document integrity.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm space-y-4">
+                <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center"><span class="material-symbols-outlined text-3xl">upload_file</span></div>
+                <h3 class="text-xl font-bold text-primary">1. Digital Registration</h3>
+                <p class="text-sm text-slate-500 leading-relaxed">Upload any PDF, DOCX, or Image. The system creates a unique SHA-256 fingerprint and chains it to the previous record, ensuring permanent immutability.</p>
+            </div>
+
+            <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm space-y-4">
+                <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center"><span class="material-symbols-outlined text-3xl">fact_check</span></div>
+                <h3 class="text-xl font-bold text-primary">2. Secure Verification</h3>
+                <p class="text-sm text-slate-500 leading-relaxed">Enter a Block ID or upload a copy of the document. The system re-hashes the file and compares it against the secure registry record instantly.</p>
+            </div>
+
+            <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm space-y-4">
+                <div class="w-12 h-12 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center"><span class="material-symbols-outlined text-3xl">visibility</span></div>
+                <h3 class="text-xl font-bold text-primary">3. Deep Analysis</h3>
+                <p class="text-sm text-slate-500 leading-relaxed">Our system uses OCR and Forensic heuristics to detect if text has been edited in Paint or Photoshop, even if the file format looks original.</p>
+            </div>
+
+            <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm space-y-4">
+                <div class="w-12 h-12 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center"><span class="material-symbols-outlined text-3xl">history_edu</span></div>
+                <h3 class="text-xl font-bold text-primary">4. Registry Audit</h3>
+                <p class="text-sm text-slate-500 leading-relaxed">Every verification and tamper event is logged. You can view the complete "Chain of Custody" for any document identity in the Audit Log.</p>
+            </div>
+        </div>
+
+        <div class="bg-primary p-10 rounded-[3rem] text-white text-center space-y-6 shadow-2xl shadow-primary/30">
+            <h2 class="text-3xl font-black">Ready to secure your first record?</h2>
+            <p class="opacity-80 max-w-md mx-auto">Click the button below to head to the registration gateway.</p>
+            <a href="#upload" class="inline-flex bg-white text-primary px-8 py-4 rounded-2xl font-black hover:scale-105 transition-transform">Get Started</a>
+        </div>
+    `;
+    app.appendChild(wrap);
 }
