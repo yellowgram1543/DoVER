@@ -34,10 +34,10 @@ router.post('/', upload.single('file'), async (req, res) => {
 
         // 1. Reconstruct temp file from GridFS for deep analysis
         const bucket = getBucket();
-        const fileId = doc.filename; // We store fileId in filename column now
-        tmpPath = path.resolve('tmp', `verify_${Date.now()}_${fileId}`);
+        const storageId = doc.storage_id || doc.filename; // Fallback for old records
+        tmpPath = path.resolve('tmp', `verify_${Date.now()}_${storageId}`);
         
-        const downloadStream = bucket.openDownloadStream(new mongoose.Types.ObjectId(fileId));
+        const downloadStream = bucket.openDownloadStream(new mongoose.Types.ObjectId(storageId));
         const writeStream = fs.createWriteStream(tmpPath);
 
         await new Promise((resolve, reject) => {

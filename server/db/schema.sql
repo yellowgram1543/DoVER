@@ -11,7 +11,8 @@ CREATE TABLE IF NOT EXISTS documents (
     ocr_text TEXT,
     ocr_hash TEXT,
     forensic_score TEXT,
-    signature_score TEXT
+    signature_score TEXT,
+    storage_id TEXT
 );
 
 CREATE TABLE IF NOT EXISTS audit_log (

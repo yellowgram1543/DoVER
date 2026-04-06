@@ -120,10 +120,10 @@ router.post('/', (req, res) => {
 
             // 3. Store in SQL
             const insertDoc = db.prepare(`
-                INSERT INTO documents (filename, file_type, uploaded_by, upload_timestamp, file_hash, prev_hash, block_hash, ocr_text, ocr_hash, forensic_score, signature_score)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO documents (filename, file_type, uploaded_by, upload_timestamp, file_hash, prev_hash, block_hash, ocr_text, ocr_hash, forensic_score, signature_score, storage_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `);
-            const result = insertDoc.run(gridfsId, req.file.mimetype, req.body.user || 'anonymous', timestamp, fileHash, prevHash, blockHash, ocrText, ocrHash, forensicScore, signatureScore);
+            const result = insertDoc.run(req.file.originalname, req.file.mimetype, req.body.user || 'anonymous', timestamp, fileHash, prevHash, blockHash, ocrText, ocrHash, forensicScore, signatureScore, gridfsId);
             const documentId = result.lastInsertRowid;
 
             // 4. Log action in audit_log

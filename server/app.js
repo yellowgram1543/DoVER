@@ -39,15 +39,16 @@ setInterval(async () => {
     if (!bucket) return; // Wait for connection
 
     try {
-        const docs = db.prepare('SELECT block_index, filename, is_tampered FROM documents WHERE is_tampered = 0').all();
+        const docs = db.prepare('SELECT block_index, filename, storage_id, is_tampered FROM documents WHERE is_tampered = 0').all();
         for (const doc of docs) {
+            const storageId = doc.storage_id || doc.filename;
             // Skip legacy local files that aren't valid MongoDB ObjectIds (24 hex chars)
-            if (!/^[0-9a-fA-F]{24}$/.test(doc.filename)) continue;
+            if (!/^[0-9a-fA-F]{24}$/.test(storageId)) continue;
 
             let tmpPath = path.resolve('tmp', `bg_verify_${doc.block_index}`);
             try {
                 // Reconstruct from GridFS
-                const downloadStream = bucket.openDownloadStream(new (require('mongoose')).Types.ObjectId(doc.filename));
+                const downloadStream = bucket.openDownloadStream(new (require('mongoose')).Types.ObjectId(storageId));
                 const writeStream = fs.createWriteStream(tmpPath);
                 downloadStream.pipe(writeStream);
 
