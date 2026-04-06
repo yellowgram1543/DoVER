@@ -37,12 +37,12 @@ async function detectSignature(filePath) {
         const region = {
             x: 0,
             y: scanY,
-            w: width,
-            h: scanHeight
+            width: width,
+            height: scanHeight
         };
 
-        // In Jimp v1, scan uses an object for the region: ({x, y, w, h}, f)
-        image.scan(region, (x, y, idx) => {
+        // Jimp v1.6.0: scan uses positional args (x, y, w, h, callback)
+        image.scan(0, scanY, width, scanHeight, (x, y, idx) => {
             // Check every 2nd pixel to save performance
             if (x % 2 === 0 && y % 2 === 0) {
                 const lum = image.bitmap.data[idx + 0]; // R=G=B in greyscale

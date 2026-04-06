@@ -414,29 +414,67 @@ function renderVerify(app) {
                 let ocrDisplay = '';
                 if (res.ocr_change_detected) {
                     ocrDisplay = `
-                        <div class="mt-6 p-4 bg-orange-50 border border-orange-200 rounded-xl">
-                            <div class="flex items-center gap-2 mb-3 text-orange-700 font-bold text-xs uppercase tracking-wider">
+                        <div class="mt-6 p-4 bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800/30 rounded-xl">
+                            <div class="flex items-center gap-2 mb-3 text-orange-700 dark:text-orange-400 font-bold text-xs uppercase tracking-wider">
                                 <span class="material-symbols-outlined text-sm">warning</span> Text Content Change Detected via OCR
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div class="bg-white p-3 rounded border border-orange-100">
+                                <div class="bg-white dark:bg-slate-900/50 p-3 rounded border border-orange-100 dark:border-orange-800/20">
                                     <p class="text-[9px] font-black text-slate-400 uppercase mb-2">Stored Registry Content</p>
-                                    <pre class="text-[10px] text-slate-600 whitespace-pre-wrap font-mono leading-relaxed">${res.stored_ocr_text || 'None'}</pre>
+                                    <pre class="text-[10px] text-slate-600 dark:text-slate-400 whitespace-pre-wrap font-mono leading-relaxed">${res.stored_ocr_text || 'None'}</pre>
                                 </div>
-                                <div class="bg-orange-100/50 p-3 rounded border border-orange-200">
-                                    <p class="text-[9px] font-black text-orange-600 uppercase mb-2">Current File Content</p>
-                                    <pre class="text-[10px] text-orange-900 whitespace-pre-wrap font-mono leading-relaxed font-bold">${res.ocr_text || 'None'}</pre>
+                                <div class="bg-orange-100/50 dark:bg-orange-900/20 p-3 rounded border border-orange-200 dark:border-orange-800/20">
+                                    <p class="text-[9px] font-black text-orange-600 dark:text-orange-400 uppercase mb-2">Current File Content</p>
+                                    <pre class="text-[10px] text-orange-900 dark:text-orange-200 whitespace-pre-wrap font-mono leading-relaxed font-bold">${res.ocr_text || 'None'}</pre>
                                 </div>
                             </div>
                         </div>
                     `;
                 }
 
+                let forensicDiff = '';
+                if (res.forensic_comparison) {
+                    const fc = res.forensic_comparison;
+                    forensicDiff = `
+                        <div class="mt-4 p-4 bg-slate-100 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
+                            <div class="flex items-center gap-2 mb-2 text-slate-700 dark:text-slate-300 font-bold text-xs uppercase">
+                                <span class="material-symbols-outlined text-sm">analytics</span> Forensic Technical Comparison
+                            </div>
+                            <div class="flex gap-4 text-[10px] font-medium text-slate-500">
+                                <span>Font Score Diff: <strong class="${fc.font_diff>10?'text-orange-500':''}">${fc.font_diff}</strong></span>
+                                <span>Alignment Score Diff: <strong class="${fc.align_diff>10?'text-orange-500':''}">${fc.align_diff}</strong></span>
+                            </div>
+                            ${fc.new_flags.length ? `<p class="text-[9px] mt-2 text-red-500 font-bold uppercase">New Forensic Flags Detected: ${fc.new_flags.join(', ')}</p>` : ''}
+                        </div>
+                    `;
+                }
+
+                let signatureDiff = '';
+                if (res.signature_comparison) {
+                    const sc = res.signature_comparison;
+                    if (sc.status_change) {
+                        signatureDiff = `
+                            <div class="mt-4 p-4 bg-emerald-50 dark:bg-emerald-900/10 rounded-xl border border-emerald-200 dark:border-emerald-800/30">
+                                <div class="flex items-center gap-2 mb-2 text-emerald-700 dark:text-emerald-400 font-bold text-xs uppercase">
+                                    <span class="material-symbols-outlined text-sm">history_edu</span> Authorization Status Mismatch
+                                </div>
+                                <div class="text-[10px] text-emerald-800 dark:text-emerald-300">
+                                    <p>Registry: <strong>${sc.original_had_signature?'Signed':'No Signature'}</strong> | <strong>${sc.original_had_seal?'Sealed':'No Seal'}</strong></p>
+                                    <p>Current: <strong>${sc.current_has_signature?'Signed':'No Signature'}</strong> | <strong>${sc.current_has_seal?'Sealed':'No Seal'}</strong></p>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+
                 r.innerHTML = `<div class="result-card bg-red-50/50 border border-red-200 rounded-xl p-6 relative overflow-hidden fade-in">
                     <div class="flex items-center gap-3 mb-4"><span class="material-symbols-outlined text-red-600">error</span><span class="text-xs font-bold text-red-700 uppercase tracking-widest">Status: Tampered</span></div>
-                    <h4 class="text-lg font-bold text-red-900 mb-2">Verification Failed</h4>
-                    <p class="text-sm text-red-800/70 leading-relaxed">Document data has been modified since issuance.</p>
+                    <h4 class="text-lg font-bold text-red-900 mb-2">Deep Verification Failed</h4>
+                    <p class="text-[10px] font-black text-red-600 uppercase mb-2">Compared against: ${res.original_uploader}'s upload from ${new Date(res.original_upload_date).toLocaleDateString()}</p>
+                    <p class="text-sm text-red-800/70 leading-relaxed">System has detected unauthorized modifications via multi-layered analysis.</p>
                     ${ocrDisplay}
+                    ${forensicDiff}
+                    ${signatureDiff}
                 </div>`;
             }
         } catch (err) {

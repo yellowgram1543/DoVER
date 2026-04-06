@@ -109,7 +109,7 @@ router.post('/', (req, res) => {
                         w: Math.min(img.bitmap.width, r.width+(pad*2)), 
                         h: Math.min(img.bitmap.height, r.height+(pad*2))
                     });
-                    forensicThumbnail = await img.getBase64Async(Jimp.MIME_PNG);
+                    forensicThumbnail = img.getBase64("image/png");
                 }
 
                 if (!sigReport.signature_found) {

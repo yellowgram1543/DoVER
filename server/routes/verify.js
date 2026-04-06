@@ -33,7 +33,7 @@ router.post('/', upload.single('file'), async (req, res) => {
         } else if (req.file) {
             // DEEP IDENTITY CHECK: Find original record by filename
             const originalName = req.file.originalname;
-            
+
             if (compareWith) {
                 // Find specific uploader's version
                 doc = db.prepare('SELECT * FROM documents WHERE filename = ? AND uploaded_by = ? ORDER BY block_index ASC LIMIT 1').get(originalName, compareWith);
@@ -41,10 +41,9 @@ router.post('/', upload.single('file'), async (req, res) => {
                 // Default: Find the very first upload (Golden Record)
                 doc = db.prepare('SELECT * FROM documents WHERE filename = ? ORDER BY block_index ASC LIMIT 1').get(originalName);
             }
-            
+
             isComparisonVerify = true;
         }
-
         if (!doc) {
             if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
             return res.status(404).json({ success: false, error: 'No original record found for this document identity.' });
@@ -80,39 +79,69 @@ router.post('/', upload.single('file'), async (req, res) => {
             verificationResult = hasher.verifyDocument(doc.block_index, db, tmpPath);
         }
 
-        // 3. Deep Analysis (Text/OCR/Forensics)
+        // 3. Deep Analysis (Text/OCR/Forensics/Signatures)
         let ocr_valid = null;
         let ocr_tampered = null;
         let ocr_change_detected = null;
         let ocr_text = null;
         let stored_ocr_text = doc.ocr_text;
 
+        let forensic_comparison = null;
+        let signature_comparison = null;
+
         // If it's a text file, read content directly
         if (doc.file_type === 'text/plain' || doc.filename.endsWith('.txt')) {
             ocr_text = fs.readFileSync(tmpPath, 'utf8');
-            // Check if we have stored OCR text or if we need to compare against a missing field
-            // For .txt files, we treat the whole content as "ocr_text" for comparison logic
-            if (!stored_ocr_text) {
-                // If original didn't have ocr_text stored, we can't do deep text compare,
-                // but for demo purposes, we treat file_hash mismatch as enough.
-            } else {
+            if (stored_ocr_text) {
                 const currentOcrHash = crypto.createHash('sha256').update(ocr_text).digest('hex');
                 ocr_valid = (currentOcrHash.trim() === doc.ocr_hash.trim());
                 ocr_tampered = !ocr_valid;
                 ocr_change_detected = !ocr_valid;
             }
         } 
-        // Image Deep Check
-        else if (doc.ocr_hash && /png|jpg|jpeg/.test(doc.file_type)) {
+        // Image Deep Check (The 4-Step Verification)
+        else if (/png|jpg|jpeg/.test(doc.file_type)) {
+            // Step 1: Binary Hash (already handled in verificationResult)
+            
+            // Step 2: OCR Content Check
             ocr_text = await ocr.extractText(tmpPath);
-            const currentOcrHash = crypto.createHash('sha256').update(ocr_text).digest('hex');
-            ocr_valid = (currentOcrHash.trim() === doc.ocr_hash.trim());
-            ocr_tampered = !ocr_valid;
-            ocr_change_detected = !ocr_valid;
+            if (doc.ocr_hash) {
+                const currentOcrHash = crypto.createHash('sha256').update(ocr_text).digest('hex');
+                ocr_valid = (currentOcrHash.trim() === doc.ocr_hash.trim());
+                ocr_tampered = !ocr_valid;
+                ocr_change_detected = !ocr_valid;
+            }
+
+            // Step 3: Forensic Comparison
+            const currentForensic = await forensics.analyzeImage(tmpPath);
+            const storedForensic = doc.forensic_score ? JSON.parse(doc.forensic_score) : null;
+            if (storedForensic) {
+                forensic_comparison = {
+                    suspicious_change: (currentForensic.suspicious !== storedForensic.suspicious),
+                    font_diff: Math.abs(currentForensic.font_consistency - storedForensic.font_consistency),
+                    align_diff: Math.abs(currentForensic.alignment_score - storedForensic.alignment_score),
+                    new_flags: currentForensic.flags.filter(f => !storedForensic.flags.includes(f))
+                };
+            }
+
+            // Step 4: Signature Comparison
+            const currentSig = await signature.detectSignature(tmpPath);
+            const storedSig = doc.signature_score ? JSON.parse(doc.signature_score) : null;
+            if (storedSig) {
+                signature_comparison = {
+                    status_change: (currentSig.signature_found !== storedSig.signature_found || currentSig.seal_found !== storedSig.seal_found),
+                    original_had_signature: storedSig.signature_found,
+                    current_has_signature: currentSig.signature_found,
+                    original_had_seal: storedSig.seal_found,
+                    current_has_seal: currentSig.seal_found
+                };
+            }
         }
 
         // 4. Logging and Response
-        const isTampered = !verificationResult.valid || (ocr_tampered === true);
+        const forensicTamper = forensic_comparison && forensic_comparison.suspicious_change;
+        const signatureTamper = signature_comparison && signature_comparison.status_change;
+        const isTampered = !verificationResult.valid || (ocr_tampered === true) || forensicTamper || signatureTamper;
 
         if (isTampered) {
             db.prepare('UPDATE documents SET is_tampered = 1 WHERE block_index = ?').run(doc.block_index);
@@ -143,13 +172,15 @@ router.post('/', upload.single('file'), async (req, res) => {
             ocr_tampered,
             ocr_change_detected,
             ocr_text,
-            stored_ocr_text
+            stored_ocr_text,
+            forensic_comparison,
+            signature_comparison
         });
 
     } catch (error) {
-        console.error(error);
+        console.error('[VERIFY_ERROR]', error.message, error.stack);
         if (tmpPath && fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
-        res.status(500).json({ success: false, error: 'Verification failed' });
+        res.status(500).json({ success: false, error: 'Verification failed: ' + error.message });
     }
 });
 

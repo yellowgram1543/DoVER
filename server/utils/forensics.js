@@ -22,12 +22,12 @@ async function fontConsistencyCheck(filePath) {
                 const region = {
                     x: col * cellW,
                     y: row * cellH,
-                    w: cellW,
-                    h: cellH
+                    width: cellW,
+                    height: cellH
                 };
 
-                // In Jimp v1, scan uses an object for the region
-                image.scan(region, (x, y, idx) => {
+                // Jimp v1.6.0: scan uses positional args (x, y, w, h, callback)
+                image.scan(region.x, region.y, region.width, region.height, (x, y, idx) => {
                     // Sample every 5th pixel to save time
                     if (x % 5 === 0 && y % 5 === 0) {
                         const r = image.bitmap.data[idx + 0];
