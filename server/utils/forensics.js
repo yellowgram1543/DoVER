@@ -19,6 +19,7 @@ async function fontConsistencyCheck(filePath) {
         for (let row = 0; row < 10; row++) {
             for (let col = 0; col < 10; col++) {
                 const pixels = [];
+                // Fix: Jimp v1.6.0 requires object for region
                 const region = {
                     x: col * cellW,
                     y: row * cellH,
@@ -26,9 +27,7 @@ async function fontConsistencyCheck(filePath) {
                     height: cellH
                 };
 
-                // Jimp v1.6.0: scan uses positional args (x, y, w, h, callback)
-                image.scan(region.x, region.y, region.width, region.height, (x, y, idx) => {
-                    // Sample every 5th pixel to save time
+                image.scan(region, (x, y, idx) => {
                     if (x % 5 === 0 && y % 5 === 0) {
                         const r = image.bitmap.data[idx + 0];
                         const g = image.bitmap.data[idx + 1];
@@ -60,7 +59,7 @@ async function fontConsistencyCheck(filePath) {
         
         return { score, suspicious: score < 60 };
     } catch (e) {
-        console.error('[FONT_CHECK_ERROR]', e);
+        console.error('[FONT_CHECK_ERROR]', e.message);
         return { score: 100, suspicious: false };
     }
 }
@@ -81,9 +80,9 @@ async function alignmentCheck(filePath) {
         const lineY = [];
         for (let y = 0; y < height; y++) {
             let darkPixels = 0;
-            // Scan row
             for (let x = 0; x < width; x += 2) {
                 const color = image.getPixelColor(x, y);
+                // Manual bit extraction for speed/reliability in v1
                 const r = (color >> 24) & 0xff;
                 if (r < 150) darkPixels++;
             }
@@ -121,7 +120,7 @@ async function alignmentCheck(filePath) {
 
         return { score: Math.max(0, score), suspicious: score < 65, misaligned_regions };
     } catch (e) {
-        console.error('[ALIGN_CHECK_ERROR]', e);
+        console.error('[ALIGN_CHECK_ERROR]', e.message);
         return { score: 100, suspicious: false, misaligned_regions: [] };
     }
 }
@@ -189,7 +188,7 @@ async function analyzeImage(filePath) {
         tensor.dispose(); mean.dispose(); std.dispose();
         return report;
     } catch (error) {
-        console.error('[FORENSICS_ERROR]', error);
+        console.error('[FORENSICS_ERROR]', error.message);
         return report;
     }
 }

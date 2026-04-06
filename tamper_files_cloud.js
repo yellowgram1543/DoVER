@@ -34,7 +34,7 @@ async function hackAnything(blockIndex) {
     // 4. Perform Forgery based on type
     if (isImage) {
         const image = await Jimp.read(tmpPath);
-        image.scan(0, 0, 100, 100, function(x, y, idx) {
+        image.scan({ x: 0, y: 0, width: 100, height: 100 }, function(x, y, idx) {
             this.bitmap.data[idx + 0] = 0; // Black box
             this.bitmap.data[idx + 1] = 0;
             this.bitmap.data[idx + 2] = 0;

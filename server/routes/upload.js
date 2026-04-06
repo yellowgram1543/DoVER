@@ -11,6 +11,7 @@ const forensics = require('../utils/forensics');
 const signature = require('../utils/signature');
 const crypto = require('crypto');
 const { Jimp } = require('jimp');
+const { rgbaToInt } = require('@jimp/utils');
 const { getBucket } = require('../db/mongodb');
 
 // Configure multer for temp storage
@@ -56,7 +57,7 @@ router.post('/', (req, res) => {
                 return res.status(400).json({ success: false, error: 'Empty file not allowed' });
             }
 
-            // 1. Stream to GridFS using modern Bucket API
+            // 1. Stream to GridFS
             const uploadStream = bucket.openUploadStream(req.file.originalname, {
                 contentType: req.file.mimetype
             });
@@ -79,7 +80,6 @@ router.post('/', (req, res) => {
             let ocrHash = null;
             let forensicScore = null;
             let signatureScore = null;
-
             let forensicThumbnail = null;
 
             if (/png|jpg|jpeg/.test(req.file.mimetype)) {
@@ -95,21 +95,27 @@ router.post('/', (req, res) => {
                 if (sigReport.signature_found && sigReport.signature_region) {
                     const img = await Jimp.read(tmpFilePath);
                     const r = sigReport.signature_region;
-                    // Draw red bounding box
-                    img.scan(r.x, r.y, r.width, 2, function(x, y, idx) { this.bitmap.data[idx]=255; this.bitmap.data[idx+1]=0; this.bitmap.data[idx+2]=0; });
-                    img.scan(r.x, r.y+r.height, r.width, 2, function(x, y, idx) { this.bitmap.data[idx]=255; this.bitmap.data[idx+1]=0; this.bitmap.data[idx+2]=0; });
-                    img.scan(r.x, r.y, 2, r.height, function(x, y, idx) { this.bitmap.data[idx]=255; this.bitmap.data[idx+1]=0; this.bitmap.data[idx+2]=0; });
-                    img.scan(r.x+r.width, r.y, 2, r.height, function(x, y, idx) { this.bitmap.data[idx]=255; this.bitmap.data[idx+1]=0; this.bitmap.data[idx+2]=0; });
                     
-                    // Crop to region with some padding
+                    // Fix: Use strict object syntax for Jimp v1.6.0
+                    const red = rgbaToInt(255, 0, 0, 255);
+                    const drawRect = (x, y, w, h) => {
+                        img.scan({ x, y, width: w, height: 2 }, (sx, sy, idx) => img.setPixelColor(red, sx, sy));
+                        img.scan({ x, y: y + h, width: w, height: 2 }, (sx, sy, idx) => img.setPixelColor(red, sx, sy));
+                        img.scan({ x, y, width: 2, height: h }, (sx, sy, idx) => img.setPixelColor(red, sx, sy));
+                        img.scan({ x: x + w, y, width: 2, height: h }, (sx, sy, idx) => img.setPixelColor(red, sx, sy));
+                    };
+                    drawRect(r.x, r.y, r.width, r.height);
+                    
                     const pad = 20;
                     img.crop({
-                        x: Math.max(0, r.x-pad), 
-                        y: Math.max(0, r.y-pad), 
-                        w: Math.min(img.bitmap.width, r.width+(pad*2)), 
-                        h: Math.min(img.bitmap.height, r.height+(pad*2))
+                        x: Math.max(0, r.x - pad),
+                        y: Math.max(0, r.y - pad),
+                        width: Math.min(img.bitmap.width, r.width + (pad * 2)),
+                        height: Math.min(img.bitmap.height, r.height + (pad * 2))
                     });
-                    forensicThumbnail = img.getBase64("image/png");
+                    
+                    // Fix 3: getBase64 instead of getBase64Async (v1 compatibility)
+                    forensicThumbnail = await img.getBase64(Jimp.MIME_PNG);
                 }
 
                 if (!sigReport.signature_found) {

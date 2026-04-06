@@ -22,18 +22,16 @@ async function detectSignature(filePath) {
         image.greyscale();
         const { width, height } = image.bitmap;
 
-        // 1. Scan only the bottom 30% of the image
         const scanHeight = Math.floor(height * 0.3);
         const scanY = height - scanHeight;
         
-        // Settings for detection
-        const inkThreshold = 120; // Darkness level to be considered "ink"
-        const clusterMinPixels = 200; // Threshold from user request
+        const inkThreshold = 120;
+        const clusterMinPixels = 200;
         
         let totalInkPixels = 0;
         let bounds = { minX: width, maxX: 0, minY: height, maxY: 0 };
 
-        // 2. Simple density scan to find the main "ink cluster"
+        // Fix: Use strict object syntax for scan region in v1.6.0
         const region = {
             x: 0,
             y: scanY,
@@ -41,14 +39,11 @@ async function detectSignature(filePath) {
             height: scanHeight
         };
 
-        // Jimp v1.6.0: scan uses positional args (x, y, w, h, callback)
-        image.scan(0, scanY, width, scanHeight, (x, y, idx) => {
-            // Check every 2nd pixel to save performance
+        image.scan(region, (x, y, idx) => {
             if (x % 2 === 0 && y % 2 === 0) {
-                const lum = image.bitmap.data[idx + 0]; // R=G=B in greyscale
+                const lum = image.bitmap.data[idx + 0];
 
                 if (lum < inkThreshold) {
-                    // Exclude borders (10px) to avoid detecting scanner artifacts/frames
                     if (x > 10 && x < width - 10 && y > 10 && y < height - 10) {
                         totalInkPixels++;
                         if (x < bounds.minX) bounds.minX = x;
@@ -60,7 +55,6 @@ async function detectSignature(filePath) {
             }
         });
 
-        // 3. Analyze the cluster
         if (totalInkPixels > clusterMinPixels) {
             const clusterW = bounds.maxX - bounds.minX;
             const clusterH = bounds.maxY - bounds.minY;
@@ -68,8 +62,6 @@ async function detectSignature(filePath) {
             
             report.confidence = Math.min(100, Math.floor((totalInkPixels / 1000) * 100));
             
-            // Circular/Square-ish (aspect ratio near 1) = likely a seal
-            // Highly irregular/Wide (high aspect ratio) = likely a signature
             if (aspectRatio > 0.8 && aspectRatio < 1.5 && totalInkPixels > 1000) {
                 report.seal_found = true;
             } else {

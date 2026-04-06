@@ -31,7 +31,7 @@ async function hackCloud(blockIndex) {
     // 4. "Forge" the document using Jimp
     const image = await Jimp.read(tmpPath);
     // Draw a "forged" black box over the content
-    image.scan(10, 10, 200, 100, function(x, y, idx) {
+    image.scan({ x: 10, y: 10, width: 200, height: 100 }, function(x, y, idx) {
         this.bitmap.data[idx + 0] = 0; // Black out
         this.bitmap.data[idx + 1] = 0;
         this.bitmap.data[idx + 2] = 0;
