@@ -13,6 +13,7 @@ const crypto = require('crypto');
 const { Jimp } = require('jimp');
 const { rgbaToInt } = require('@jimp/utils');
 const { getBucket } = require('../db/mongodb');
+const documentQueue = require('../utils/queue');
 
 // Configure multer for temp storage
 const storage = multer.diskStorage({
@@ -162,6 +163,52 @@ router.post('/', (req, res) => {
             console.error('[UPLOAD_ERROR]', error);
             if (tmpFilePath && fs.existsSync(tmpFilePath)) fs.unlinkSync(tmpFilePath);
             res.status(500).json({ success: false, error: error.message || 'Internal server error' });
+        }
+    });
+});
+
+// ── Batch Upload (Queue-Based) ──
+router.post('/batch-upload', (req, res) => {
+    upload.array('files', 20)(req, res, async (err) => {
+        if (err) return res.status(400).json({ success: false, error: err.message });
+
+        try {
+            if (!req.files || req.files.length === 0) {
+                return res.status(400).json({ success: false, error: 'No files uploaded' });
+            }
+
+            const uploadedBy = req.body.user || 'anonymous';
+            const batchId = Date.now();
+            const jobIds = [];
+
+            for (const file of req.files) {
+                const filePath = path.resolve(file.path);
+                const job = await documentQueue.add({
+                    filePath,
+                    originalname: file.originalname,
+                    mimetype: file.mimetype,
+                    uploadedBy,
+                    batch_id: batchId
+                });
+                jobIds.push(job.id);
+            }
+
+            res.json({
+                batch_id: batchId,
+                total_files: req.files.length,
+                job_ids: jobIds,
+                status: 'queued'
+            });
+        } catch (error) {
+            console.error('[BATCH_UPLOAD_ERROR]', error);
+            // Cleanup any temp files on failure
+            if (req.files) {
+                req.files.forEach(f => {
+                    const p = path.resolve(f.path);
+                    if (fs.existsSync(p)) fs.unlinkSync(p);
+                });
+            }
+            res.status(500).json({ success: false, error: error.message || 'Batch upload failed' });
         }
     });
 });

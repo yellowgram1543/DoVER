@@ -76,6 +76,10 @@ setInterval(async () => {
     }
 }, 30000); // Increased to 30s to reduce load
 
+// ── Batch Queue Processor ──
+const { initProcessor } = require('./utils/processor');
+initProcessor();
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);

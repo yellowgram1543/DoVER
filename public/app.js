@@ -9,7 +9,13 @@ const API = {
         return (await fetch('/api/verify', { method: 'POST', body: formData })).json();
     },
     async getAudit() { return (await fetch('/api/chain/audit')).json(); },
-    async getDocumentHistory(id) { return (await fetch(`/api/chain/document/${id}/history`)).json(); }
+    async getDocumentHistory(id) { return (await fetch(`/api/chain/document/${id}/history`)).json(); },
+    async batchUpload(formData) {
+        return (await fetch('/api/upload/batch-upload', { method: 'POST', body: formData })).json();
+    },
+    async getBatchStatus(batchId) {
+        return (await fetch(`/api/chain/batch/${batchId}/status`)).json();
+    }
 };
 
 // ── Router ──
@@ -27,6 +33,7 @@ function navigate() {
         case 'audit':    renderAudit(app); break;
         case 'settings': renderSettings(app); break;
         case 'help':     renderHelp(app); break;
+        case 'batch':    renderBatch(app); break;
         default:         renderDashboard(app); break;
     }
 }
@@ -732,4 +739,207 @@ function renderHelp(app) {
         </div>
     `;
     app.appendChild(wrap);
+}
+
+// ── Batch Upload Page ──
+function renderBatch(app) {
+    document.getElementById('page-title').textContent = 'Batch Upload';
+    let pollInterval = null;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'max-w-5xl mx-auto space-y-8 fade-in';
+    wrap.innerHTML = `
+        <div class="mb-4">
+            <div class="inline-flex items-center gap-2 px-3 py-1 bg-secondary-fixed text-on-secondary-fixed-variant rounded-full text-xs font-bold mb-4 tracking-wider uppercase">Queue-Powered</div>
+            <h1 class="text-4xl font-extrabold tracking-tight text-primary mb-3">Batch Upload</h1>
+            <p class="text-on-surface-variant text-lg leading-relaxed">Upload up to 20 documents at once. Each file is queued and processed asynchronously.</p>
+        </div>
+
+        <div class="bg-surface-container-lowest rounded-2xl p-8 shadow-sm space-y-6">
+            <form id="batch-form">
+                <div id="batch-drop" class="drop-zone group relative flex flex-col items-center justify-center border-2 border-dashed border-outline-variant bg-surface-container-lowest rounded-xl p-12 transition-all hover:border-secondary hover:bg-blue-50/30 cursor-pointer mb-6">
+                    <div class="w-16 h-16 bg-secondary-fixed rounded-full flex items-center justify-center mb-4 transition-transform group-hover:scale-110">
+                        <span class="material-symbols-outlined text-secondary text-3xl">folder_open</span>
+                    </div>
+                    <h3 class="text-xl font-semibold text-primary mb-2" id="batch-drop-label">Drag & drop files here</h3>
+                    <p class="text-on-surface-variant text-sm mb-6">Up to 20 files • PDF, DOCX, PNG, JPG, TXT</p>
+                    <input type="file" id="batch-file-input" class="hidden" multiple accept=".pdf,.docx,.png,.jpg,.jpeg,.txt"/>
+                    <button type="button" id="batch-browse-btn" class="bg-gradient-to-r from-primary to-primary-container text-white px-8 py-3 rounded-xl font-semibold shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all">Browse Files</button>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="block text-sm font-semibold text-primary px-1">Uploaded By</label>
+                    <div class="relative flex items-center">
+                        <span class="material-symbols-outlined absolute left-3 text-outline text-lg">person</span>
+                        <input id="batch-user" class="w-full bg-surface pl-10 pr-4 py-3 rounded-xl border border-outline-variant/30 focus:ring-2 focus:ring-secondary/20 text-on-surface text-sm" placeholder="Full legal name" type="text"/>
+                    </div>
+                </div>
+
+                <button type="submit" id="batch-submit-btn" class="w-full mt-6 bg-gradient-to-r from-primary to-primary-container text-white px-10 py-4 rounded-xl font-bold shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all text-lg flex items-center justify-center gap-3 disabled:opacity-40" disabled>
+                    <span class="material-symbols-outlined">upload_file</span> Upload Batch
+                </button>
+            </form>
+        </div>
+
+        <div id="batch-dashboard" class="hidden space-y-6"></div>
+    `;
+    app.appendChild(wrap);
+
+    // Wire up drop zone
+    const dropZone = document.getElementById('batch-drop');
+    const fileInput = document.getElementById('batch-file-input');
+    const dropLabel = document.getElementById('batch-drop-label');
+    const submitBtn = document.getElementById('batch-submit-btn');
+
+    document.getElementById('batch-browse-btn').addEventListener('click', e => { e.stopPropagation(); fileInput.click(); });
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', e => {
+        e.preventDefault(); dropZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length) { fileInput.files = e.dataTransfer.files; onFilesSelected(); }
+    });
+    fileInput.addEventListener('change', onFilesSelected);
+
+    function onFilesSelected() {
+        const count = fileInput.files.length;
+        if (count > 0) {
+            dropLabel.textContent = `${count} file${count > 1 ? 's' : ''} selected`;
+            submitBtn.disabled = false;
+        }
+    }
+
+    // Submit
+    document.getElementById('batch-form').addEventListener('submit', async e => {
+        e.preventDefault();
+        if (!fileInput.files.length) return;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="material-symbols-outlined animate-spin">progress_activity</span> Queuing...';
+
+        const fd = new FormData();
+        for (const file of fileInput.files) fd.append('files', file);
+        fd.append('user', document.getElementById('batch-user').value || 'anonymous');
+
+        try {
+            const res = await API.batchUpload(fd);
+            if (!res.batch_id) throw new Error(res.error || 'Upload failed');
+            startDashboard(res);
+        } catch (err) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<span class="material-symbols-outlined">upload_file</span> Upload Batch';
+            alert('Error: ' + err.message);
+        }
+    });
+
+    function startDashboard(batch) {
+        // Hide form, show dashboard
+        document.getElementById('batch-form').classList.add('hidden');
+        const dash = document.getElementById('batch-dashboard');
+        dash.classList.remove('hidden');
+        dash.innerHTML = `
+            <div class="bg-surface-container-lowest rounded-2xl p-8 shadow-sm">
+                <div class="flex items-center justify-between mb-6">
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Batch ID: ${batch.batch_id}</p>
+                        <h2 class="text-2xl font-bold text-primary">Processing <span id="dash-completed">0</span> / ${batch.total_files} files</h2>
+                    </div>
+                    <span id="dash-badge" class="px-3 py-1 rounded-full text-xs font-black uppercase bg-blue-100 text-blue-700">QUEUED</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-3 mb-8 overflow-hidden">
+                    <div id="dash-overall-bar" class="h-3 rounded-full bg-gradient-to-r from-primary to-secondary transition-all duration-500" style="width:0%"></div>
+                </div>
+                <div id="dash-jobs" class="space-y-4"></div>
+            </div>
+        `;
+
+        // Seed placeholders immediately from job_ids
+        const jobsContainer = document.getElementById('dash-jobs');
+        batch.job_ids.forEach(id => {
+            jobsContainer.insertAdjacentHTML('beforeend', jobRowHTML({ job_id: id, filename: '...', status: 'queued', progress: 0, error: null, document_id: null }));
+        });
+
+        // Start polling
+        pollInterval = setInterval(() => pollStatus(batch.batch_id, batch.total_files), 2000);
+        pollStatus(batch.batch_id, batch.total_files);
+    }
+
+    async function pollStatus(batchId, total) {
+        try {
+            const data = await API.getBatchStatus(batchId);
+            if (!data.jobs) return;
+
+            // Update overall bar
+            const pct = Math.round((data.completed / data.total) * 100);
+            document.getElementById('dash-overall-bar').style.width = pct + '%';
+            document.getElementById('dash-completed').textContent = data.completed;
+
+            // Update badge
+            const badge = document.getElementById('dash-badge');
+            const allDone = (data.completed + data.failed) === data.total;
+            if (allDone && data.failed > 0) { badge.textContent = 'PARTIAL FAIL'; badge.className = 'px-3 py-1 rounded-full text-xs font-black uppercase bg-red-100 text-red-700'; }
+            else if (allDone) { badge.textContent = 'COMPLETE'; badge.className = 'px-3 py-1 rounded-full text-xs font-black uppercase bg-green-100 text-green-700'; }
+            else if (data.processing > 0) { badge.textContent = 'PROCESSING'; badge.className = 'px-3 py-1 rounded-full text-xs font-black uppercase bg-yellow-100 text-yellow-700'; }
+
+            // Update each job row
+            const container = document.getElementById('dash-jobs');
+            container.innerHTML = data.jobs.map(j => jobRowHTML(j)).join('');
+
+            // Stop polling when finished
+            if (allDone) {
+                clearInterval(pollInterval);
+                document.getElementById('dash-overall-bar').style.width = '100%';
+            }
+        } catch (err) {
+            // Silently retry on network error
+        }
+    }
+
+    function jobRowHTML(job) {
+        const statusColors = {
+            queued:     'bg-slate-100 text-slate-600',
+            processing: 'bg-yellow-100 text-yellow-700',
+            completed:  'bg-green-100 text-green-700',
+            failed:     'bg-red-100 text-red-700'
+        };
+        const barColors = {
+            queued:     'bg-slate-300',
+            processing: 'bg-yellow-400',
+            completed:  'bg-emerald-500',
+            failed:     'bg-red-500'
+        };
+        const icon = job.status === 'completed'
+            ? '<span class="material-symbols-outlined text-emerald-500 text-xl" style="font-variation-settings:\"FILL\" 1">check_circle</span>'
+            : job.status === 'failed'
+            ? '<span class="material-symbols-outlined text-red-500 text-xl" style="font-variation-settings:\"FILL\" 1">cancel</span>'
+            : job.status === 'processing'
+            ? '<span class="material-symbols-outlined text-yellow-500 text-xl animate-spin">progress_activity</span>'
+            : '<span class="material-symbols-outlined text-slate-400 text-xl">schedule</span>';
+
+        const docLink = job.document_id
+            ? `<span class="text-[10px] text-secondary font-bold">Block #${job.document_id}</span>`
+            : '';
+
+        const statusBadge = `<span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${statusColors[job.status] || statusColors.queued}">${job.status}</span>`;
+
+        return `
+            <div class="flex items-center gap-4 p-4 bg-surface-container rounded-xl">
+                <div class="flex-shrink-0">${icon}</div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="text-sm font-semibold text-primary truncate">${job.filename}</span>
+                        ${statusBadge}
+                        ${docLink}
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                        <div class="h-1.5 rounded-full transition-all duration-500 ${barColors[job.status] || barColors.queued}" style="width:${job.progress}%"></div>
+                    </div>
+                    ${job.error ? `<p class="text-[10px] text-red-500 font-bold mt-1">${job.error}</p>` : ''}
+                </div>
+                <span class="text-xs font-bold text-slate-400 flex-shrink-0">${job.progress}%</span>
+            </div>
+        `;
+    }
+
+    // Cleanup on page navigation
+    window.addEventListener('hashchange', () => { if (pollInterval) clearInterval(pollInterval); }, { once: true });
 }
