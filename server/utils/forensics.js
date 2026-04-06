@@ -19,12 +19,23 @@ async function fontConsistencyCheck(filePath) {
         for (let row = 0; row < 10; row++) {
             for (let col = 0; col < 10; col++) {
                 const pixels = [];
-                for (let y = row * cellH; y < (row + 1) * cellH; y += Math.max(1, Math.floor(cellH/5))) {
-                    for (let x = col * cellW; x < (col + 1) * cellW; x += Math.max(1, Math.floor(cellW/5))) {
-                        const color = image.getPixelColor(x, y);
-                        pixels.push(((color >> 24) & 0xff + (color >> 16) & 0xff + (color >> 8) & 0xff) / 3);
+                const region = {
+                    x: col * cellW,
+                    y: row * cellH,
+                    w: cellW,
+                    h: cellH
+                };
+
+                // In Jimp v1, scan uses an object for the region
+                image.scan(region, (x, y, idx) => {
+                    // Sample every 5th pixel to save time
+                    if (x % 5 === 0 && y % 5 === 0) {
+                        const r = image.bitmap.data[idx + 0];
+                        const g = image.bitmap.data[idx + 1];
+                        const b = image.bitmap.data[idx + 2];
+                        pixels.push((r + g + b) / 3);
                     }
-                }
+                });
                 
                 if (pixels.length > 1) {
                     const t = tf.tensor1d(pixels);
@@ -44,12 +55,12 @@ async function fontConsistencyCheck(filePath) {
         
         vTensor.dispose(); vMean.dispose(); vStd.dispose();
 
-        // High relative standard deviation indicates inconsistent texture/fonts
         const relStd = (stdVal / (meanVal + 1)) * 100;
         let score = Math.max(0, 100 - relStd);
         
         return { score, suspicious: score < 60 };
     } catch (e) {
+        console.error('[FONT_CHECK_ERROR]', e);
         return { score: 100, suspicious: false };
     }
 }
@@ -67,24 +78,21 @@ async function alignmentCheck(filePath) {
         const misaligned_regions = [];
         let score = 100;
 
-        // Detect "lines" by scanning pixel density horizontally
         const lineY = [];
         for (let y = 0; y < height; y++) {
             let darkPixels = 0;
-            for (let x = 0; x < width; x++) {
+            // Scan row
+            for (let x = 0; x < width; x += 2) {
                 const color = image.getPixelColor(x, y);
-                const lum = ((color >> 24) & 0xff + (color >> 16) & 0xff + (color >> 8) & 0xff) / 3;
-                if (lum < 150) darkPixels++;
+                const r = (color >> 24) & 0xff;
+                if (r < 150) darkPixels++;
             }
-            // If more than 5% of row is dark, consider it part of a text line
             if (darkPixels > width * 0.05) lineY.push(y);
         }
 
-        // Check for vertical "jitter" or broken baselines in detected lines
         let jitterCount = 0;
         for (let i = 1; i < lineY.length; i++) {
             const diff = lineY[i] - lineY[i-1];
-            // Unnatural gaps between lines that should be consistent
             if (diff > 1 && diff < 5) jitterCount++;
         }
 
@@ -93,19 +101,15 @@ async function alignmentCheck(filePath) {
             misaligned_regions.push('Multiple inconsistent baseline shifts detected');
         }
 
-        // Simple rotation check: compare left-side density vs right-side density of lines
-        // Forged text blocks pasted into scans often have slight rotation mismatches
         let rotationJitter = 0;
         for (let i = 0; i < lineY.length; i += 10) {
             const y = lineY[i];
             let leftDark = 0, rightDark = 0;
             for (let x = 0; x < width/4; x++) {
-                const c = image.getPixelColor(x, y);
-                if (((c >> 24) & 0xff) < 150) leftDark++;
+                if (((image.getPixelColor(x, y) >> 24) & 0xff) < 150) leftDark++;
             }
             for (let x = (width*3)/4; x < width; x++) {
-                const c = image.getPixelColor(x, y);
-                if (((c >> 24) & 0xff) < 150) rightDark++;
+                if (((image.getPixelColor(x, y) >> 24) & 0xff) < 150) rightDark++;
             }
             if (Math.abs(leftDark - rightDark) > width * 0.1) rotationJitter++;
         }
@@ -117,6 +121,7 @@ async function alignmentCheck(filePath) {
 
         return { score: Math.max(0, score), suspicious: score < 65, misaligned_regions };
     } catch (e) {
+        console.error('[ALIGN_CHECK_ERROR]', e);
         return { score: 100, suspicious: false, misaligned_regions: [] };
     }
 }
@@ -138,14 +143,12 @@ async function analyzeImage(filePath) {
     try {
         if (!fs.existsSync(filePath)) return report;
 
-        // OCR-F2: Font Consistency Check
         const fontResult = await fontConsistencyCheck(filePath);
         report.font_consistency = Math.round(fontResult.score);
         if (fontResult.suspicious) {
             report.flags.push(`Inconsistent font texture detected (Score: ${report.font_consistency})`);
         }
 
-        // OCR-F3: Alignment Check
         const alignResult = await alignmentCheck(filePath);
         report.alignment_score = Math.round(alignResult.score);
         if (alignResult.suspicious) {
@@ -155,8 +158,6 @@ async function analyzeImage(filePath) {
         const image = await Jimp.read(filePath);
         const { width, height } = image.bitmap;
 
-        // 1. Noise/Compression Analysis (Heuristic for Digital Alterations)
-        // Use fixed grid sampling for 100% deterministic results
         const pixels = [];
         const stepX = Math.max(1, Math.floor(width / 10));
         const stepY_noise = Math.max(1, Math.floor(height / 10));
@@ -171,7 +172,6 @@ async function analyzeImage(filePath) {
             }
         }
 
-        // Use TFJS to calculate variance (standard deviation) of samples
         const tensor = tf.tensor1d(pixels);
         const mean = tensor.mean();
         const std = tensor.sub(mean).square().mean().sqrt();
@@ -182,38 +182,14 @@ async function analyzeImage(filePath) {
             report.flags.push('Low pixel variance detected (possible flat digital edit)');
         }
 
-        // 2. Alignment Analysis (Heuristic)
-        let breaks = 0;
-        const stepY = Math.max(1, Math.floor(height/10));
-        for (let y = Math.floor(height/4); y < height; y += stepY) {
-            let lastLum = 0;
-            for (let x = 0; x < width; x += 10) {
-                const color = image.getPixelColor(x, y);
-                const r = (color >> 24) & 0xff;
-                const g = (color >> 16) & 0xff;
-                const b = (color >> 8) & 0xff;
-                const lum = (r + g + b) / 3;
-                if (Math.abs(lum - lastLum) > 50) breaks++;
-                lastLum = lum;
-            }
-        }
-
-        if (breaks > 100) {
-            report.alignment_score -= 20;
-            report.flags.push('Unnatural text alignment or edge jitter detected');
-        }
-
         if (report.font_consistency < 80 || report.alignment_score < 80) {
             report.suspicious = true;
         }
 
-        tensor.dispose();
-        mean.dispose();
-        std.dispose();
-
+        tensor.dispose(); mean.dispose(); std.dispose();
         return report;
     } catch (error) {
-        console.error('[FORENSICS_ERROR] Analysis failed:', error.message);
+        console.error('[FORENSICS_ERROR]', error);
         return report;
     }
 }

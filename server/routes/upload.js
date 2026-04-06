@@ -21,7 +21,7 @@ const storage = multer.diskStorage({
         cb(null, tmpPath);
     },
     filename: (req, file, cb) => {
-        cb(null, 'upload_' + Date.now() + '-' + file.originalname);
+        cb(null, file.originalname);
     }
 });
 
@@ -103,7 +103,12 @@ router.post('/', (req, res) => {
                     
                     // Crop to region with some padding
                     const pad = 20;
-                    img.crop(Math.max(0, r.x-pad), Math.max(0, r.y-pad), Math.min(img.bitmap.width, r.width+(pad*2)), Math.min(img.bitmap.height, r.height+(pad*2)));
+                    img.crop({
+                        x: Math.max(0, r.x-pad), 
+                        y: Math.max(0, r.y-pad), 
+                        w: Math.min(img.bitmap.width, r.width+(pad*2)), 
+                        h: Math.min(img.bitmap.height, r.height+(pad*2))
+                    });
                     forensicThumbnail = await img.getBase64Async(Jimp.MIME_PNG);
                 }
 

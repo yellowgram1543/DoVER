@@ -34,21 +34,31 @@ async function detectSignature(filePath) {
         let bounds = { minX: width, maxX: 0, minY: height, maxY: 0 };
 
         // 2. Simple density scan to find the main "ink cluster"
-        // In a real CCL we would label components, here we use a bounding box of dark pixels
-        for (let y = scanY; y < height; y += 2) {
-            for (let x = 0; x < width; x += 2) {
-                const color = image.getPixelColor(x, y);
-                const lum = (color >> 24) & 0xff; // Since it's greyscale, R=G=B=Lum
+        const region = {
+            x: 0,
+            y: scanY,
+            w: width,
+            h: scanHeight
+        };
+
+        // In Jimp v1, scan uses an object for the region: ({x, y, w, h}, f)
+        image.scan(region, (x, y, idx) => {
+            // Check every 2nd pixel to save performance
+            if (x % 2 === 0 && y % 2 === 0) {
+                const lum = image.bitmap.data[idx + 0]; // R=G=B in greyscale
 
                 if (lum < inkThreshold) {
-                    totalInkPixels++;
-                    if (x < bounds.minX) bounds.minX = x;
-                    if (x > bounds.maxX) bounds.maxX = x;
-                    if (y < bounds.minY) bounds.minY = y;
-                    if (y > bounds.maxY) bounds.maxY = y;
+                    // Exclude borders (10px) to avoid detecting scanner artifacts/frames
+                    if (x > 10 && x < width - 10 && y > 10 && y < height - 10) {
+                        totalInkPixels++;
+                        if (x < bounds.minX) bounds.minX = x;
+                        if (x > bounds.maxX) bounds.maxX = x;
+                        if (y < bounds.minY) bounds.minY = y;
+                        if (y > bounds.maxY) bounds.maxY = y;
+                    }
                 }
             }
-        }
+        });
 
         // 3. Analyze the cluster
         if (totalInkPixels > clusterMinPixels) {
@@ -56,10 +66,8 @@ async function detectSignature(filePath) {
             const clusterH = bounds.maxY - bounds.minY;
             const aspectRatio = clusterW / (clusterH || 1);
             
-            // Confidence based on pixel count relative to threshold
             report.confidence = Math.min(100, Math.floor((totalInkPixels / 1000) * 100));
             
-            // Heuristic for shape:
             // Circular/Square-ish (aspect ratio near 1) = likely a seal
             // Highly irregular/Wide (high aspect ratio) = likely a signature
             if (aspectRatio > 0.8 && aspectRatio < 1.5 && totalInkPixels > 1000) {
