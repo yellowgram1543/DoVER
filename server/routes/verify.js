@@ -19,6 +19,13 @@ const upload = multer({ dest: 'tmp/' });
 router.post('/', upload.single('file'), async (req, res) => {
     let tmpPath = '';
     try {
+        let newPath = null;
+        if (req.file) {
+            const ext = req.file.mimetype === 'image/png' ? '.png' : '.jpg';
+            newPath = req.file.path + ext;
+            fs.renameSync(req.file.path, newPath);
+        }
+
         if (!req.body.document_id && !req.file) {
             return res.status(400).json({ success: false, error: 'Provide a document ID or file' });
         }
@@ -41,7 +48,7 @@ router.post('/', upload.single('file'), async (req, res) => {
         }
 
         if (!doc) {
-            if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+            if (newPath && fs.existsSync(newPath)) fs.unlinkSync(newPath);
             return res.status(404).json({ success: false, error: 'No original record found for this document identity.' });
         }
 
@@ -50,12 +57,12 @@ router.post('/', upload.single('file'), async (req, res) => {
         let verificationResult;
 
         if (isComparisonVerify) {
-            currentFileHash = hasher.generateFileHash(req.file.path);
+            currentFileHash = hasher.generateFileHash(newPath);
             verificationResult = {
                 valid: (currentFileHash.trim() === doc.file_hash.trim()),
                 details: { computedFileHash: currentFileHash }
             };
-            tmpPath = req.file.path; // Keep uploaded file for analysis
+            tmpPath = newPath; // Keep uploaded file for analysis
         } else {
             const bucket = getBucket();
             const storageId = doc.storage_id || doc.filename;
@@ -64,7 +71,9 @@ router.post('/', upload.single('file'), async (req, res) => {
                 return res.status(400).json({ success: false, error: 'Invalid or legacy document ID' });
             }
 
-            tmpPath = path.resolve('tmp', `verify_${Date.now()}_${storageId}`);
+            const extMap = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/jpg': '.jpg', 'text/plain': '.txt' };
+            const ext = extMap[doc.file_type] || '';
+            tmpPath = path.resolve('tmp', `verify_${Date.now()}_${storageId}${ext}`);
             
             const downloadStream = bucket.openDownloadStream(new mongoose.Types.ObjectId(storageId));
             const writeStream = fs.createWriteStream(tmpPath);
@@ -78,17 +87,35 @@ router.post('/', upload.single('file'), async (req, res) => {
             verificationResult = hasher.verifyDocument(doc.block_index, db, tmpPath);
         }
 
+        // 1 & 2. Run extraction ONCE at the top and store in currentOcrText
+        let currentOcrText = '';
+        if (tmpPath && fs.existsSync(tmpPath)) {
+            console.log('Temp file path:', tmpPath);
+            console.log('File exists:', fs.existsSync(tmpPath));
+            console.log('File size:', fs.statSync(tmpPath).size);
+
+            if (/png|jpg|jpeg/.test(doc.file_type)) {
+                currentOcrText = await ocr.extractText(tmpPath);
+                console.log('Raw OCR output:', currentOcrText);
+            } else if (doc.file_type === 'text/plain' || doc.filename.endsWith('.txt')) {
+                currentOcrText = fs.readFileSync(tmpPath, 'utf8');
+            }
+        }
+
+        let current_ocr_text = (!currentOcrText || currentOcrText.trim().length === 0) ? 'extraction_failed' : currentOcrText.trim();
+
         // 3. Deep Analysis
         let ocr_valid = null;
         let ocr_tampered = null;
         let ocr_change_detected = null;
-        let ocr_text = null;
+        
+        // Pass currentOcrText directly into deep analysis
+        let ocr_text = currentOcrText;
         let stored_ocr_text = doc.ocr_text;
         let forensic_comparison = null;
         let signature_comparison = null;
 
         if (doc.file_type === 'text/plain' || doc.filename.endsWith('.txt')) {
-            ocr_text = fs.readFileSync(tmpPath, 'utf8');
             if (stored_ocr_text) {
                 const currentOcrHash = crypto.createHash('sha256').update(ocr_text).digest('hex');
                 ocr_valid = (currentOcrHash.trim() === doc.ocr_hash.trim());
@@ -97,9 +124,6 @@ router.post('/', upload.single('file'), async (req, res) => {
             }
         } 
         else if (/png|jpg|jpeg/.test(doc.file_type)) {
-            // Fix 5: Ensure OCR extraction happens before temp file deletion
-            ocr_text = await ocr.extractText(tmpPath);
-            
             if (doc.ocr_hash) {
                 const currentOcrHash = crypto.createHash('sha256').update(ocr_text).digest('hex');
                 ocr_valid = (currentOcrHash.trim() === doc.ocr_hash.trim());
@@ -165,6 +189,7 @@ router.post('/', upload.single('file'), async (req, res) => {
             ocr_change_detected,
             ocr_text,
             stored_ocr_text,
+            current_ocr_text,
             forensic_comparison,
             signature_comparison
         });
@@ -172,6 +197,7 @@ router.post('/', upload.single('file'), async (req, res) => {
     } catch (error) {
         console.error('[VERIFY_ERROR]', error);
         if (tmpPath && fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+        if (newPath && tmpPath !== newPath && fs.existsSync(newPath)) fs.unlinkSync(newPath);
         res.status(500).json({ success: false, error: 'Verification failed: ' + error.message });
     }
 });
