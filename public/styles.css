@@ -13,7 +13,7 @@ html.dark {
     --text-primary: #D6E3FF;
     --text-secondary: #94a3b8;
     --accent: #E9C176;
-    --border: #334155;
+    --border: #2D3D5A; /* Muted neutral border */
 }
 
 body { 
@@ -27,11 +27,19 @@ body {
 
 .nav-link { color: var(--text-secondary); }
 .nav-link:hover { background: var(--border); }
-.nav-link.active { background: rgba(233, 193, 118, 0.15); color: var(--accent); }
+.nav-link.active { background: rgba(233, 193, 118, 0.1); color: var(--accent); }
 .nav-link.active .material-symbols-outlined { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
 
-.drop-zone { transition: all 0.3s ease; border-color: var(--border); }
-.drop-zone.dragover { border-color: var(--accent); background: rgba(233, 193, 118, 0.05); transform: scale(1.01); }
+.drop-zone { 
+    transition: all 0.3s ease; 
+    border-color: var(--border); 
+    background: rgba(148, 163, 184, 0.03); /* Muted neutral drop zone */
+}
+.drop-zone.dragover { 
+    border-color: var(--accent); 
+    background: rgba(233, 193, 118, 0.05); 
+    transform: scale(1.01); 
+}
 
 .fade-in { animation: fadeIn 0.3s ease-out; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
@@ -51,11 +59,18 @@ body {
 
 .hash-text { word-break: break-all; font-family: 'Courier New', monospace; font-size: 11px; }
 
-/* Dark mode specific button overrides */
-html.dark .bg-primary { background-color: var(--accent) !important; color: #0A192F !important; }
-html.dark .text-primary { color: var(--text-primary) !important; }
+/* Dark mode specific overrides for a softer feel */
+html.dark .bg-surface-container-low { background-color: #16243a !important; }
+html.dark .bg-surface-container-low\/30 { background-color: rgba(22, 36, 58, 0.3) !important; }
 html.dark .bg-surface-container-lowest { background-color: var(--bg-surface) !important; }
 html.dark .border-surface-container { border-color: var(--border) !important; }
+html.dark .text-on-surface-variant { color: var(--text-secondary) !important; }
+html.dark .bg-slate-100 { background-color: var(--bg-surface) !important; }
+html.dark .bg-slate-50\/80 { background-color: rgba(10, 25, 47, 0.8) !important; }
+
+/* Primary Button Overrides in Dark Mode (Gold Accent) */
+html.dark .bg-primary { background-color: var(--accent) !important; color: #0A192F !important; }
+html.dark .text-primary { color: var(--text-primary) !important; }
 
 @media (max-width: 768px) {
     #sidebar.mobile-open { display: flex !important; }

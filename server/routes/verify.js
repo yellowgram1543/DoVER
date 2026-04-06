@@ -118,6 +118,10 @@ router.post('/', upload.single('file'), async (req, res) => {
             db.prepare('UPDATE documents SET is_tampered = 1 WHERE block_index = ?').run(doc.block_index);
             db.prepare(`INSERT INTO audit_log (document_id, action, actor, details) VALUES (?, ?, ?, ?)`)
               .run(doc.block_index, 'TAMPER_DETECTED', 'SYSTEM_VERIFIER', `Comparison verify failed for ${doc.filename}.`);
+        } else {
+            // Log successful verification
+            db.prepare(`INSERT INTO audit_log (document_id, action, actor, details) VALUES (?, ?, ?, ?)`)
+              .run(doc.block_index, 'VERIFIED', 'SYSTEM_VERIFIER', `Document verified successfully as original.`);
         }
 
         // Cleanup
