@@ -16,26 +16,20 @@ function getLastBlockHash(db) {
     return row ? row.block_hash : '0000000000000000';
 }
 
-function verifyDocument(documentId, db, manualFilePath = null) {
+function verifyDocument(documentId, db, manualFilePath) {
+    if (!manualFilePath) {
+        throw new Error("GridFS migration complete - manualFilePath required");
+    }
     const doc = db.prepare('SELECT * FROM documents WHERE block_index = ?').get(documentId);
     if (!doc) return { valid: false, details: 'Document not found' };
 
-    // Resolve filename (might be old relative path, new absolute path, or manual temp path)
-    const fs = require('fs');
-    const path = require('path');
-    let targetPath = manualFilePath || doc.filename;
-    
-    if (!manualFilePath && !path.isAbsolute(targetPath)) {
-        targetPath = path.resolve(__dirname, '..', '..', 'uploads', targetPath);
-    }
-
     // Check if file exists before hashing
-    if (!fs.existsSync(targetPath)) {
+    if (!fs.existsSync(manualFilePath)) {
         return { valid: false, details: 'File missing on disk' };
     }
 
     // Recompute file hash
-    const currentFileHash = generateFileHash(targetPath);
+    const currentFileHash = generateFileHash(manualFilePath);
     const recomputedBlockHash = generateBlockHash(currentFileHash, doc.prev_hash, doc.upload_timestamp);
 
     const isValid = (currentFileHash.trim() === doc.file_hash.trim()) && (recomputedBlockHash.trim() === doc.block_hash.trim());
