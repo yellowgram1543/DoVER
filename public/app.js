@@ -340,8 +340,9 @@ function renderVerify(app) {
                             <p class="text-sm font-medium text-on-surface-variant" id="verify-drop-label">Drag and drop document, or <span class="text-secondary underline underline-offset-4">browse</span></p>
                             <input type="file" id="verify-file" class="hidden"/>
                         </div>
-                        <button type="submit" id="verify-btn" class="w-full h-14 bg-gradient-to-r from-primary to-primary-container text-white rounded-xl font-bold text-lg flex items-center justify-center gap-3 shadow-lg shadow-primary/20 hover:opacity-90 active:scale-[0.98] transition-all">
-                            <span>Verify Authenticity</span><span class="material-symbols-outlined">shield_with_heart</span>
+                        <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 px-1">Compare with (Legal Name)</label>
+                        <input id="verify-compare" class="w-full bg-surface-container-low border-none rounded-xl px-6 py-4 text-sm focus:ring-2 focus:ring-secondary/20 placeholder:text-slate-300" placeholder="Leave blank for first upload" type="text"/></div>
+                        <button type="submit" id="verify-btn" class="w-full h-14 bg-gradient-to-r from-primary to-primary-container text-white rounded-xl font-bold text-lg flex items-center justify-center gap-3 shadow-lg shadow-primary/20 hover:opacity-90 active:scale-[0.98] transition-all">                            <span>Verify Authenticity</span><span class="material-symbols-outlined">shield_with_heart</span>
                         </button>
                     </form>
                 </div>
@@ -386,8 +387,10 @@ function renderVerify(app) {
         btn.innerHTML = '<span class="material-symbols-outlined animate-spin">progress_activity</span> Verifying...';
         const fd = new FormData();
         const docId = document.getElementById('verify-id').value.trim();
+        const compareWith = document.getElementById('verify-compare')?.value.trim();
         if (docId) fd.append('document_id', docId);
         if (verifyFile.files.length) fd.append('file', verifyFile.files[0]);
+        if (compareWith) fd.append('compare_with', compareWith);
         try {
             const res = await API.verify(fd);
             const r = document.getElementById('verify-result');
@@ -396,7 +399,8 @@ function renderVerify(app) {
                 r.innerHTML = `<div class="result-card bg-green-50/50 border border-green-200 rounded-xl p-6 relative overflow-hidden fade-in">
                     <div class="flex items-center gap-3 mb-4"><span class="material-symbols-outlined text-green-600">verified</span><span class="text-xs font-bold text-green-700 uppercase tracking-widest">Status: Valid</span></div>
                     <h4 class="text-lg font-bold text-green-900 mb-2">Original Document</h4>
-                    <p class="text-sm text-green-800/70 leading-relaxed">Hash matches the registry. Uploaded by <strong>${res.uploaded_by}</strong> on ${new Date(res.timestamp).toLocaleDateString()}.</p>
+                    <p class="text-[10px] font-black text-emerald-600 uppercase mb-2">Compared against: ${res.original_uploader}'s upload from ${new Date(res.original_upload_date).toLocaleDateString()}</p>
+                    <p class="text-sm text-green-800/70 leading-relaxed">Hash matches the registry record.</p>
                     <code class="hash-text bg-green-100 px-3 py-2 rounded block mt-3 text-green-800 mb-4">${res.original_hash}</code>
                     ${res.ocr_valid ? '<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-700 text-[10px] font-extrabold uppercase"><span class="material-symbols-outlined text-xs">description</span>Text Content Verified</div>' : ''}
                 </div>`;
