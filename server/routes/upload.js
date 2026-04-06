@@ -43,6 +43,12 @@ router.post('/', (req, res) => {
     upload.single('file')(req, res, async (err) => {
         if (err) return res.status(400).json({ success: false, error: err.message });
         
+        console.log('Upload request fields:', {
+            filename: req.file?.originalname,
+            uploaded_by: req.body.uploaded_by,
+            department: req.body.department
+        });
+
         const tmpFilePath = req.file ? path.resolve(req.file.path) : null;
 
         try {
@@ -56,6 +62,20 @@ router.post('/', (req, res) => {
             if (req.file.size === 0) {
                 if (fs.existsSync(tmpFilePath)) fs.unlinkSync(tmpFilePath);
                 return res.status(400).json({ success: false, error: 'Empty file not allowed' });
+            }
+
+            const uploadedBy = req.body.uploaded_by || req.body.user || 'anonymous';
+            const existing = db.prepare('SELECT * FROM documents WHERE filename = ? AND uploaded_by = ?').get(req.file.originalname, uploadedBy);
+            
+            if (existing) {
+                if (fs.existsSync(tmpFilePath)) fs.unlinkSync(tmpFilePath);
+                return res.status(409).json({
+                    success: false,
+                    error: "Duplicate document",
+                    message: "A document with this filename already exists under this legal name",
+                    existing_document_id: existing.id || existing.block_index,
+                    uploaded_at: existing.upload_timestamp
+                });
             }
 
             // 1. Stream to GridFS

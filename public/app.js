@@ -307,6 +307,33 @@ function renderUpload(app) {
                         </div>
                     </div>
                 </div>`;
+            } else if (res.existing_document_id) {
+                resultDiv.innerHTML = `<div class="result-card bg-orange-50 border border-orange-200 rounded-xl p-6 fade-in relative">
+                    <div class="flex items-center gap-3 mb-3">
+                        <span class="material-symbols-outlined text-orange-600 text-2xl">warning</span>
+                        <span class="text-sm font-extrabold text-orange-800 uppercase tracking-widest">Duplicate Detected — This document already exists in the registry</span>
+                    </div>
+                    <div class="space-y-1 text-sm text-orange-900/80 mb-5 ml-9">
+                        <p>Originally uploaded on <strong class="font-bold">${new Date(res.uploaded_at).toLocaleString()}</strong></p>
+                        <p>Document ID: <strong class="font-bold">#${res.existing_document_id}</strong></p>
+                    </div>
+                    <div class="ml-9">
+                        <button id="view-original-btn" type="button" class="bg-orange-600 text-white px-5 py-2.5 rounded-lg font-bold text-sm shadow-sm hover:bg-orange-700 active:scale-95 transition-all flex items-center gap-2">
+                            <span class="material-symbols-outlined text-sm">visibility</span> View Original
+                        </button>
+                    </div>
+                </div>`;
+                document.getElementById('view-original-btn').addEventListener('click', () => {
+                    window.location.hash = '#verify';
+                    setTimeout(() => {
+                        const input = document.getElementById('verify-id');
+                        if (input) {
+                            input.value = res.existing_document_id;
+                            // Optionally auto-submit the verify form
+                            document.getElementById('verify-form').dispatchEvent(new Event('submit', { cancelable: true }));
+                        }
+                    }, 50);
+                });
             } else {
                 resultDiv.innerHTML = `<div class="result-card bg-red-50/50 border border-red-200 rounded-xl p-6 fade-in">
                     <div class="flex items-center gap-3 mb-2"><span class="material-symbols-outlined text-red-600">error</span><span class="text-xs font-bold text-red-700 uppercase">Upload Failed</span></div>
