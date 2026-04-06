@@ -59,6 +59,11 @@ router.post('/', upload.single('file'), async (req, res) => {
         } else {
             const bucket = getBucket();
             const storageId = doc.storage_id || doc.filename;
+            
+            if (!mongoose.Types.ObjectId.isValid(storageId)) {
+                return res.status(400).json({ success: false, error: 'Invalid or legacy document ID' });
+            }
+
             tmpPath = path.resolve('tmp', `verify_${Date.now()}_${storageId}`);
             
             const downloadStream = bucket.openDownloadStream(new mongoose.Types.ObjectId(storageId));

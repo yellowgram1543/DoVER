@@ -41,7 +41,7 @@ async function hackAnything(blockIndex) {
         });
         await image.write(tmpPath);
         console.log('✅ Image forged (pixel modification).');
-    } else if (isText) {
+    }
         let content = fs.readFileSync(tmpPath, 'utf8');
         content = "FORGED CONTENT: " + content.toUpperCase();
         fs.writeFileSync(tmpPath, content);
