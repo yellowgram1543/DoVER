@@ -10,6 +10,7 @@ const ocr = require('../utils/ocr');
 const forensics = require('../utils/forensics');
 const signature = require('../utils/signature');
 const crypto = require('crypto');
+const { Jimp } = require('jimp');
 const { getBucket } = require('../db/mongodb');
 
 // Configure multer for temp storage
@@ -79,6 +80,8 @@ router.post('/', (req, res) => {
             let forensicScore = null;
             let signatureScore = null;
 
+            let forensicThumbnail = null;
+
             if (/png|jpg|jpeg/.test(req.file.mimetype)) {
                 ocrText = await ocr.extractText(tmpFilePath);
                 if (ocrText) ocrHash = crypto.createHash('sha256').update(ocrText).digest('hex');
@@ -88,13 +91,29 @@ router.post('/', (req, res) => {
                 // Signature Detection
                 const sigReport = await signature.detectSignature(tmpFilePath);
                 signatureScore = JSON.stringify(sigReport);
+                
+                if (sigReport.signature_found && sigReport.signature_region) {
+                    const img = await Jimp.read(tmpFilePath);
+                    const r = sigReport.signature_region;
+                    // Draw red bounding box
+                    img.scan(r.x, r.y, r.width, 2, function(x, y, idx) { this.bitmap.data[idx]=255; this.bitmap.data[idx+1]=0; this.bitmap.data[idx+2]=0; });
+                    img.scan(r.x, r.y+r.height, r.width, 2, function(x, y, idx) { this.bitmap.data[idx]=255; this.bitmap.data[idx+1]=0; this.bitmap.data[idx+2]=0; });
+                    img.scan(r.x, r.y, 2, r.height, function(x, y, idx) { this.bitmap.data[idx]=255; this.bitmap.data[idx+1]=0; this.bitmap.data[idx+2]=0; });
+                    img.scan(r.x+r.width, r.y, 2, r.height, function(x, y, idx) { this.bitmap.data[idx]=255; this.bitmap.data[idx+1]=0; this.bitmap.data[idx+2]=0; });
+                    
+                    // Crop to region with some padding
+                    const pad = 20;
+                    img.crop(Math.max(0, r.x-pad), Math.max(0, r.y-pad), Math.min(img.bitmap.width, r.width+(pad*2)), Math.min(img.bitmap.height, r.height+(pad*2)));
+                    forensicThumbnail = await img.getBase64Async(Jimp.MIME_PNG);
+                }
+
                 if (!sigReport.signature_found) {
                     forensicReport.flags.push('No signature detected in typical signing areas');
                 }
                 forensicScore = JSON.stringify(forensicReport);
             }
 
-            // 3. Store fileId in SQL
+            // 3. Store in SQL
             const insertDoc = db.prepare(`
                 INSERT INTO documents (filename, file_type, uploaded_by, upload_timestamp, file_hash, prev_hash, block_hash, ocr_text, ocr_hash, forensic_score, signature_score)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -102,10 +121,17 @@ router.post('/', (req, res) => {
             const result = insertDoc.run(gridfsId, req.file.mimetype, req.body.user || 'anonymous', timestamp, fileHash, prevHash, blockHash, ocrText, ocrHash, forensicScore, signatureScore);
             const documentId = result.lastInsertRowid;
 
-            // 4. Cleanup Temp File
+            // 4. Log action in audit_log
+            const insertAudit = db.prepare(`
+                INSERT INTO audit_log (document_id, action, actor, details)
+                VALUES (?, ?, ?, ?)
+            `);
+            insertAudit.run(documentId, 'UPLOAD', req.body.user || 'anonymous', `File ${req.file.originalname} uploaded and secured in GridFS`);
+
+            // 5. Cleanup Temp File
             if (fs.existsSync(tmpFilePath)) fs.unlinkSync(tmpFilePath);
 
-            // 5. Response
+            // 6. Response
             const qrData = JSON.stringify({ document_id: documentId, block_hash: blockHash, filename: req.file.originalname, timestamp });
             const qrImageBase64 = await QRCode.toDataURL(qrData);
 
@@ -117,6 +143,7 @@ router.post('/', (req, res) => {
                 gridfs_id: gridfsId,
                 forensic_score: forensicScore ? JSON.parse(forensicScore) : null,
                 signature_score: signatureScore ? JSON.parse(signatureScore) : null,
+                forensic_thumbnail: forensicThumbnail,
                 qr_image_base64: qrImageBase64
             });
 

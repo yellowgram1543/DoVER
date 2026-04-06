@@ -270,6 +270,17 @@ function renderUpload(app) {
                     }
                 }
 
+                let forensicThumbnailHtml = '';
+                if (res.forensic_thumbnail) {
+                    forensicThumbnailHtml = `
+                        <div class="mt-4 p-3 bg-white rounded-lg border border-primary/10 shadow-sm">
+                            <p class="text-[9px] font-black text-slate-400 uppercase mb-2">Forensic Highlight: Signature Area</p>
+                            <img src="${res.forensic_thumbnail}" class="w-full rounded border border-red-200" alt="Signature Highlight"/>
+                            <p class="text-[8px] text-center mt-1 text-red-500 font-bold">RED BOX = DETECTED HANDWRITING</p>
+                        </div>
+                    `;
+                }
+
                 resultDiv.innerHTML = `<div class="result-card bg-green-50/50 border border-green-200 rounded-xl p-6 relative overflow-hidden fade-in">
                     <div class="flex items-center gap-3 mb-4"><span class="material-symbols-outlined text-green-600">verified</span><span class="text-xs font-bold text-green-700 uppercase tracking-widest">Upload Successful</span></div>
                     <div class="flex flex-col md:flex-row gap-6 items-start">
@@ -278,6 +289,7 @@ function renderUpload(app) {
                             <p class="text-sm text-green-800/70 mb-3">Block Index: <strong>#${res.block_index}</strong></p>
                             <code class="hash-text bg-green-100 px-3 py-2 rounded block text-green-800 mb-2">${res.block_hash}</code>
                             ${signatureHtml}
+                            ${forensicThumbnailHtml}
                             ${forensicHtml}
                         </div>
                         <div class="bg-white p-2 rounded-lg shadow-sm border border-green-100">
