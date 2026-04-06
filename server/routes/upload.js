@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const db = require('../db/db');
 const hasher = require('../utils/hasher');
-const QRCode = require('qrcode');
+const qr = require('../utils/qr');
 const ocr = require('../utils/ocr');
 const forensics = require('../utils/forensics');
 const signature = require('../utils/signature');
@@ -143,8 +143,8 @@ router.post('/', (req, res) => {
             if (fs.existsSync(tmpFilePath)) fs.unlinkSync(tmpFilePath);
 
             // 6. Response
-            const qrData = JSON.stringify({ document_id: documentId, block_hash: blockHash, filename: req.file.originalname, timestamp });
-            const qrImageBase64 = await QRCode.toDataURL(qrData);
+            const qrData = { document_id: documentId, block_hash: blockHash, filename: req.file.originalname, timestamp };
+            const qrImageBase64 = await qr.generateQR(qrData);
 
             res.json({
                 success: true,
