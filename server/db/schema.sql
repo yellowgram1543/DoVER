@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS documents (
     is_tampered BOOLEAN DEFAULT 0,
     ocr_text TEXT,
     ocr_hash TEXT,
-    forensic_score TEXT
+    forensic_score TEXT,
+    signature_score TEXT
 );
 
 CREATE TABLE IF NOT EXISTS audit_log (

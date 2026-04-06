@@ -8,6 +8,7 @@ const hasher = require('../utils/hasher');
 const QRCode = require('qrcode');
 const ocr = require('../utils/ocr');
 const forensics = require('../utils/forensics');
+const signature = require('../utils/signature');
 const crypto = require('crypto');
 const { getBucket } = require('../db/mongodb');
 
@@ -76,19 +77,29 @@ router.post('/', (req, res) => {
             let ocrText = null;
             let ocrHash = null;
             let forensicScore = null;
+            let signatureScore = null;
+
             if (/png|jpg|jpeg/.test(req.file.mimetype)) {
                 ocrText = await ocr.extractText(tmpFilePath);
                 if (ocrText) ocrHash = crypto.createHash('sha256').update(ocrText).digest('hex');
+                
                 const forensicReport = await forensics.analyzeImage(tmpFilePath);
+                
+                // Signature Detection
+                const sigReport = await signature.detectSignature(tmpFilePath);
+                signatureScore = JSON.stringify(sigReport);
+                if (!sigReport.signature_found) {
+                    forensicReport.flags.push('No signature detected in typical signing areas');
+                }
                 forensicScore = JSON.stringify(forensicReport);
             }
 
             // 3. Store fileId in SQL
             const insertDoc = db.prepare(`
-                INSERT INTO documents (filename, file_type, uploaded_by, upload_timestamp, file_hash, prev_hash, block_hash, ocr_text, ocr_hash, forensic_score)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO documents (filename, file_type, uploaded_by, upload_timestamp, file_hash, prev_hash, block_hash, ocr_text, ocr_hash, forensic_score, signature_score)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `);
-            const result = insertDoc.run(gridfsId, req.file.mimetype, req.body.user || 'anonymous', timestamp, fileHash, prevHash, blockHash, ocrText, ocrHash, forensicScore);
+            const result = insertDoc.run(gridfsId, req.file.mimetype, req.body.user || 'anonymous', timestamp, fileHash, prevHash, blockHash, ocrText, ocrHash, forensicScore, signatureScore);
             const documentId = result.lastInsertRowid;
 
             // 4. Cleanup Temp File
@@ -105,6 +116,7 @@ router.post('/', (req, res) => {
                 block_hash: blockHash,
                 gridfs_id: gridfsId,
                 forensic_score: forensicScore ? JSON.parse(forensicScore) : null,
+                signature_score: signatureScore ? JSON.parse(signatureScore) : null,
                 qr_image_base64: qrImageBase64
             });
 

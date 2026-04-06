@@ -234,7 +234,7 @@ function renderUpload(app) {
             const resultDiv = document.getElementById('upload-result');
             resultDiv.classList.remove('hidden');
             if (res.success) {
-                // Forensic UI logic
+                // Forensic & Signature UI logic
                 let forensicHtml = '';
                 if (res.forensic_score) {
                     if (res.forensic_score.suspicious) {
@@ -257,6 +257,19 @@ function renderUpload(app) {
                     }
                 }
 
+                let signatureHtml = '';
+                if (res.signature_score) {
+                    const s = res.signature_score;
+                    if (s.signature_found || s.seal_found) {
+                        signatureHtml = '<div class="flex flex-wrap gap-2 mt-2">';
+                        if (s.signature_found) signatureHtml += `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 text-[9px] font-black uppercase"><span class="material-symbols-outlined text-[12px]">draw</span> Signature Detected</span>`;
+                        if (s.seal_found) signatureHtml += `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 text-[9px] font-black uppercase"><span class="material-symbols-outlined text-[12px]">approval_delegation</span> Seal Detected</span>`;
+                        signatureHtml += '</div>';
+                    } else {
+                        signatureHtml = `<div class="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-orange-100 text-orange-700 text-[9px] font-black uppercase"><span class="material-symbols-outlined text-[12px]">warning</span> Warning: No Signature or Seal Found</div>`;
+                    }
+                }
+
                 resultDiv.innerHTML = `<div class="result-card bg-green-50/50 border border-green-200 rounded-xl p-6 relative overflow-hidden fade-in">
                     <div class="flex items-center gap-3 mb-4"><span class="material-symbols-outlined text-green-600">verified</span><span class="text-xs font-bold text-green-700 uppercase tracking-widest">Upload Successful</span></div>
                     <div class="flex flex-col md:flex-row gap-6 items-start">
@@ -264,6 +277,7 @@ function renderUpload(app) {
                             <h4 class="text-lg font-bold text-green-900 mb-2">Document Secured</h4>
                             <p class="text-sm text-green-800/70 mb-3">Block Index: <strong>#${res.block_index}</strong></p>
                             <code class="hash-text bg-green-100 px-3 py-2 rounded block text-green-800 mb-2">${res.block_hash}</code>
+                            ${signatureHtml}
                             ${forensicHtml}
                         </div>
                         <div class="bg-white p-2 rounded-lg shadow-sm border border-green-100">
