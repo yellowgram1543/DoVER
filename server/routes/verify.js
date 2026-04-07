@@ -155,18 +155,88 @@ router.post('/', upload.single('file'), async (req, res) => {
             }
         }
 
-        // 4. Final Logging and Cleanup
+        // 4. Backward Chain Validation (Recursive Integrity)
+        // We traverse the chain backwards to the nearest checkpoint to ensure local history is intact.
+        let chain_valid = true;
+        let chain_error = null;
+        try {
+            let currentPointer = doc;
+            while (currentPointer) {
+                blocks_verified++;
+
+                // If this is the current block being verified from disk, we already have verificationResult
+                if (currentPointer.block_index !== doc.block_index) {
+                    const recomputed = hasher.generateBlockHash(currentPointer.file_hash, currentPointer.prev_hash, currentPointer.upload_timestamp);
+                    if (recomputed.trim() !== currentPointer.block_hash.trim()) {
+                        chain_valid = false;
+                        chain_error = `Chain broken at Block #${currentPointer.block_index}`;
+                        break;
+                    }
+                }
+
+                // ── Digital Signature Verification (Origin Proof) ──
+                // Verify that this block was signed by the server's private key
+                if (process.env.PUBLIC_KEY && currentPointer.signature) {
+                    try {
+                        const sigValid = hasher.verifySignature(currentPointer.block_hash, currentPointer.signature, process.env.PUBLIC_KEY.replace(/\\n/g, '\n'));
+                        if (!sigValid) {
+                            chain_valid = false;
+                            chain_error = `Invalid digital signature for Block #${currentPointer.block_index}`;
+                            break;
+                        }
+                    } catch (sigErr) {
+                        console.error(`[SIG_VERIFY_ERROR] Block #${currentPointer.block_index}:`, sigErr.message);
+                    }
+                }
+
+                // Stop if we hit a checkpoint (except for the block we just verified)
+                if (currentPointer.checkpoint_hash && currentPointer.block_index !== doc.block_index) {
+                    const tamperedPast = db.prepare('SELECT block_index FROM documents WHERE is_tampered = 1 AND block_index <= ? LIMIT 1').get(currentPointer.block_index);
+                    if (tamperedPast) {
+                        chain_valid = false;
+                        chain_error = `Historical tamper detected at Block #${tamperedPast.block_index} below checkpoint`;
+                    }
+                    break; 
+                }
+
+                // Move to previous block
+                if (currentPointer.prev_hash && currentPointer.prev_hash !== '0000000000000000') {
+                    const prevDoc = db.prepare('SELECT * FROM documents WHERE block_hash = ?').get(currentPointer.prev_hash);
+                    if (!prevDoc) {
+                        chain_valid = false;
+                        chain_error = `Previous block missing for Block #${currentPointer.block_index}`;
+                        break;
+                    }
+                    currentPointer = prevDoc;
+                } else {
+                    // We are at Genesis block (Block #1 usually)
+                    // We should still check if anything below this is tampered (though there shouldn't be)
+                    const tamperedPast = db.prepare('SELECT block_index FROM documents WHERE is_tampered = 1 AND block_index <= ? LIMIT 1').get(currentPointer.block_index);
+                    if (tamperedPast) {
+                        chain_valid = false;
+                        chain_error = `Historical tamper detected at Block #${tamperedPast.block_index} (Genesis/Near-Genesis)`;
+                    }
+                    break; 
+                }
+            }
+        } catch (err) {
+            console.error('[CHAIN_VERIFY_ERROR]', err);
+            chain_valid = false;
+            chain_error = 'Internal chain traversal error';
+        }
+
+        // 5. Final Logging and Cleanup
         const forensicTamper = forensic_comparison && forensic_comparison.suspicious_change;
         const signatureTamper = signature_comparison && signature_comparison.status_change;
-        const isTampered = !verificationResult.valid || (ocr_tampered === true) || forensicTamper || signatureTamper;
+        const isTampered = !verificationResult.valid || (ocr_tampered === true) || forensicTamper || signatureTamper || !chain_valid;
 
         if (isTampered) {
             db.prepare('UPDATE documents SET is_tampered = 1 WHERE block_index = ?').run(doc.block_index);
             db.prepare(`INSERT INTO audit_log (document_id, action, actor, details) VALUES (?, ?, ?, ?)`)
-              .run(doc.block_index, 'TAMPER_DETECTED', 'SYSTEM_VERIFIER', `Comparison verify failed for ${doc.filename}.`);
+              .run(doc.block_index, 'TAMPER_DETECTED', 'SYSTEM_VERIFIER', `Verification failed. ${chain_error || 'Content mismatch.'}`);
         } else {
             db.prepare(`INSERT INTO audit_log (document_id, action, actor, details) VALUES (?, ?, ?, ?)`)
-              .run(doc.block_index, 'VERIFIED', 'SYSTEM_VERIFIER', `Document verified successfully.`);
+              .run(doc.block_index, 'VERIFIED', 'SYSTEM_VERIFIER', `Document verified successfully. Chain depth: ${blocks_verified}`);
         }
 
         // FINAL Cleanup
@@ -191,7 +261,12 @@ router.post('/', upload.single('file'), async (req, res) => {
             stored_ocr_text,
             current_ocr_text,
             forensic_comparison,
-            signature_comparison
+            signature_comparison,
+            chain_integrity: {
+                valid: chain_valid,
+                error: chain_error,
+                blocks_traversed: blocks_verified
+            }
         });
 
     } catch (error) {

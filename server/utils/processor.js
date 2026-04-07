@@ -47,6 +47,16 @@ function initProcessor() {
             const timestamp = new Date().toISOString();
             const blockHash = hasher.generateBlockHash(fileHash, prevHash, timestamp);
 
+            // ── Step 2.5: Generate Digital Signature ──
+            let documentSignature = null;
+            if (process.env.PRIVATE_KEY) {
+                try {
+                    documentSignature = hasher.signData(blockHash, process.env.PRIVATE_KEY.replace(/\\n/g, '\n'));
+                } catch (sigError) {
+                    console.error('[PROCESSOR] Signature generation failed:', sigError.message);
+                }
+            }
+
             await job.progress(50);
 
             // ── Step 3: AI Analysis — OCR, Forensics, Signature (50→75%) ──
@@ -73,12 +83,27 @@ function initProcessor() {
             await job.progress(75);
 
             // ── Step 4: Store in SQLite + Audit Log (75→100%) ──
+            // Final Duplicate Check (Atomic within processor concurrency=1)
+            const finalExisting = db.prepare('SELECT block_index FROM documents WHERE filename = ? AND uploaded_by = ?').get(originalname, uploadedBy);
+            if (finalExisting) {
+                console.log(`[PROCESSOR] ⚠ Skipping duplicate document: ${originalname} for ${uploadedBy}`);
+                if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+                return { success: false, error: 'Duplicate', existing_id: finalExisting.block_index };
+            }
+
             const insertDoc = db.prepare(`
-                INSERT INTO documents (filename, file_type, uploaded_by, upload_timestamp, file_hash, prev_hash, block_hash, ocr_text, ocr_hash, forensic_score, signature_score, storage_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO documents (filename, file_type, uploaded_by, upload_timestamp, file_hash, prev_hash, block_hash, ocr_text, ocr_hash, forensic_score, signature_score, storage_id, signature)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `);
-            const result = insertDoc.run(originalname, mimetype, uploadedBy, timestamp, fileHash, prevHash, blockHash, ocrText, ocrHash, forensicScore, signatureScore, gridfsId);
+            const result = insertDoc.run(originalname, mimetype, uploadedBy, timestamp, fileHash, prevHash, blockHash, ocrText, ocrHash, forensicScore, signatureScore, gridfsId, documentSignature);
             const documentId = result.lastInsertRowid;
+
+            // ── Step 5: Periodic Checkpointing ──
+            // Every 10 blocks, we record the block_hash as a checkpoint
+            if (documentId % 10 === 0) {
+                db.prepare('UPDATE documents SET checkpoint_hash = ? WHERE block_index = ?').run(blockHash, documentId);
+                console.log(`[PROCESSOR] ⚐ Checkpoint created at Block #${documentId}`);
+            }
 
             db.prepare(`INSERT INTO audit_log (document_id, action, actor, details) VALUES (?, ?, ?, ?)`)
                 .run(documentId, 'UPLOAD', uploadedBy, `File ${originalname} processed via batch queue`);

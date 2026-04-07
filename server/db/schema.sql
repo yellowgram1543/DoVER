@@ -12,7 +12,9 @@ CREATE TABLE IF NOT EXISTS documents (
     ocr_hash TEXT,
     forensic_score TEXT,
     signature_score TEXT,
-    storage_id TEXT
+    storage_id TEXT,
+    checkpoint_hash TEXT,
+    signature TEXT
 );
 
 CREATE TABLE IF NOT EXISTS audit_log (

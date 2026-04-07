@@ -11,12 +11,12 @@ async function hackCloud(blockIndex) {
     const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'uploads' });
 
     // 2. Get File ID from SQL
-    const doc = db.prepare('SELECT filename FROM documents WHERE block_index = ?').get(blockIndex);
+    const doc = db.prepare('SELECT storage_id FROM documents WHERE block_index = ?').get(blockIndex);
     if (!doc) {
         console.error('Block not found in database.');
         process.exit(1);
     }
-    const fileId = new mongoose.Types.ObjectId(doc.filename);
+    const fileId = new mongoose.Types.ObjectId(doc.storage_id);
 
     // 3. Download from Cloud to local temp
     const tmpPath = './hacked_file.png';
@@ -31,10 +31,10 @@ async function hackCloud(blockIndex) {
     // 4. "Forge" the document using Jimp
     const image = await Jimp.read(tmpPath);
     // Draw a "forged" black box over the content
-    image.scan({ x: 10, y: 10, width: 200, height: 100 }, function(x, y, idx) {
-        this.bitmap.data[idx + 0] = 0; // Black out
-        this.bitmap.data[idx + 1] = 0;
-        this.bitmap.data[idx + 2] = 0;
+    image.scan(10, 10, 200, 100, (x, y, idx) => {
+        image.bitmap.data[idx + 0] = 0; // Black out
+        image.bitmap.data[idx + 1] = 0;
+        image.bitmap.data[idx + 2] = 0;
     });
     await image.write(tmpPath);
     console.log('✅ Document modified locally (Forgery complete).');

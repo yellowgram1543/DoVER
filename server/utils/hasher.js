@@ -45,9 +45,38 @@ function verifyDocument(documentId, db, manualFilePath) {
     };
 }
 
+/**
+ * Signs data using a private key (RSA)
+ * @param {string} data - The stringified data to sign
+ * @param {string} privateKey - PEM formatted RSA private key
+ * @returns {string} - Base64 encoded signature
+ */
+function signData(data, privateKey) {
+    const sign = crypto.createSign('SHA256');
+    sign.update(data);
+    sign.end();
+    return sign.sign(privateKey, 'base64');
+}
+
+/**
+ * Verifies a signature using a public key (RSA)
+ * @param {string} data - The original stringified data
+ * @param {string} signature - Base64 encoded signature
+ * @param {string} publicKey - PEM formatted RSA public key
+ * @returns {boolean} - True if signature is valid
+ */
+function verifySignature(data, signature, publicKey) {
+    const verify = crypto.createVerify('SHA256');
+    verify.update(data);
+    verify.end();
+    return verify.verify(publicKey, signature, 'base64');
+}
+
 module.exports = {
     generateFileHash,
     generateBlockHash,
     getLastBlockHash,
-    verifyDocument
+    verifyDocument,
+    signData,
+    verifySignature
 };
