@@ -148,6 +148,22 @@ router.post('/', upload.single('file'), async (req, res) => {
             verificationResult = hasher.verifyDocument(doc.block_index, db, tmpPath);
         }
 
+        // ── Digital Signature Verification (Origin Proof) ──
+        if (!doc.signature) {
+            if (tmpPath && fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+            return res.json({ status: "invalid", reason: "SIGNATURE_MISSING" });
+        }
+
+        const public_key = process.env.PUBLIC_KEY ? process.env.PUBLIC_KEY.replace(/\\n/g, '\n') : '';
+        const is_sig_valid = crypto.createVerify("SHA256")
+            .update(doc.file_hash)
+            .verify(public_key, doc.signature, "hex");
+
+        if (!is_sig_valid) {
+            if (tmpPath && fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+            return res.json({ status: "invalid", reason: "SIGNATURE_INVALID" });
+        }
+
         // 1 & 2. Run extraction ONCE at the top and store in currentOcrText
         let currentOcrText = '';
         if (tmpPath && fs.existsSync(tmpPath)) {
