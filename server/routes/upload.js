@@ -28,12 +28,12 @@ const storage = multer.diskStorage({
     }
 });
 
-const upload = multer({ 
+const upload = multer({
     storage: storage,
     limits: { fileSize: 10 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         const allowedExt = /pdf|docx|png|jpg|jpeg|txt/;
-        const allowedMime = /pdf|wordprocessingml|png|jpg|jpeg|text/; 
+        const allowedMime = /pdf|wordprocessingml|png|jpg|jpeg|text/;
         const ext = allowedExt.test(path.extname(file.originalname).toLowerCase());
         const mime = allowedMime.test(file.mimetype);
         cb(ext && mime ? null : new Error('Invalid file type'), ext && mime);
@@ -43,7 +43,7 @@ const upload = multer({
 router.post('/', (req, res) => {
     upload.single('file')(req, res, async (err) => {
         if (err) return res.status(400).json({ success: false, error: err.message });
-        
+
         console.log('Upload request fields:', {
             filename: req.file?.originalname,
             uploaded_by: req.body.uploaded_by,
@@ -54,7 +54,7 @@ router.post('/', (req, res) => {
 
         try {
             if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded' });
-            
+
             const bucket = getBucket();
             if (!bucket) {
                 return res.status(503).json({ success: false, error: 'Database connection not ready.' });
@@ -67,7 +67,7 @@ router.post('/', (req, res) => {
 
             const uploadedBy = req.body.uploaded_by || req.body.user || 'anonymous';
             const existing = db.prepare('SELECT * FROM documents WHERE filename = ? AND uploaded_by = ?').get(req.file.originalname, uploadedBy);
-            
+
             if (existing) {
                 if (fs.existsSync(tmpFilePath)) fs.unlinkSync(tmpFilePath);
                 return res.status(409).json({

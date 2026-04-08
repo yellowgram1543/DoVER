@@ -30,6 +30,47 @@ router.get('/:hash', async (req, res) => {
             return res.json({ success: true, status: 'tampered', block_index: doc.block_index });
         }
 
+        // ── Digital Signature Verification (Origin Proof) ──
+        if (doc.signature === null || doc.signature === undefined) {
+            return res.json({
+                success: true,
+                status: "invalid",
+                reason: "SIGNATURE_MISSING"
+            });
+        }
+
+        const publicKey = process.env.PUBLIC_KEY;
+
+        if (!publicKey) {
+            return res.json({
+                success: true,
+                status: "invalid",
+                reason: "PUBLIC_KEY_MISSING"
+            });
+        }
+
+        const crypto = require("crypto");
+
+        if (typeof doc.signature !== "string" || doc.signature.length < 10) {
+            return res.json({
+                success: true,
+                status: "invalid",
+                reason: "SIGNATURE_INVALID"
+            });
+        }
+
+        const isValid = crypto.createVerify("SHA256")
+            .update(doc.file_hash)
+            .verify(publicKey, doc.signature, "hex");
+
+        if (!isValid) {
+            return res.json({
+                success: true,
+                status: "invalid",
+                reason: "SIGNATURE_INVALID"
+            });
+        }
+
         // ── Safe Async Traversal ──
         const MAX_DEPTH = 150;
         const visited = new Set();
@@ -57,17 +98,17 @@ router.get('/:hash', async (req, res) => {
         }
 
         if (checked >= MAX_DEPTH) {
-            return res.json({ 
-                success: true, 
-                status: "invalid", 
-                reason: "MAX_DEPTH_EXCEEDED", 
-                checked_blocks: checked 
+            return res.json({
+                success: true,
+                status: "invalid",
+                reason: "MAX_DEPTH_EXCEEDED",
+                checked_blocks: checked
             });
         }
 
-        res.json({ 
-            success: true, 
-            status: 'valid', 
+        res.json({
+            success: true,
+            status: 'valid',
             block_index: doc.block_index,
             checked_blocks: checked,
             is_checkpoint: !!doc.checkpoint_hash
@@ -127,7 +168,7 @@ router.post('/', upload.single('file'), async (req, res) => {
         } else {
             const bucket = getBucket();
             const storageId = doc.storage_id || doc.filename;
-            
+
             if (!mongoose.Types.ObjectId.isValid(storageId)) {
                 return res.status(400).json({ success: false, error: 'Invalid or legacy document ID' });
             }
@@ -135,7 +176,7 @@ router.post('/', upload.single('file'), async (req, res) => {
             const extMap = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/jpg': '.jpg', 'text/plain': '.txt' };
             const ext = extMap[doc.file_type] || '';
             tmpPath = path.resolve('tmp', `verify_${Date.now()}_${storageId}${ext}`);
-            
+
             const downloadStream = bucket.openDownloadStream(new mongoose.Types.ObjectId(storageId));
             const writeStream = fs.createWriteStream(tmpPath);
             downloadStream.pipe(writeStream);
@@ -180,7 +221,7 @@ router.post('/', upload.single('file'), async (req, res) => {
         let ocr_valid = null;
         let ocr_tampered = null;
         let ocr_change_detected = null;
-        
+
         let ocr_text = currentOcrText;
         let stored_ocr_text = doc.ocr_text;
         let forensic_comparison = null;
@@ -193,7 +234,7 @@ router.post('/', upload.single('file'), async (req, res) => {
                 ocr_tampered = !ocr_valid;
                 ocr_change_detected = !ocr_valid;
             }
-        } 
+        }
         else if (/png|jpg|jpeg/.test(doc.file_type)) {
             if (doc.ocr_hash) {
                 const currentOcrHash = crypto.createHash('sha256').update(ocr_text).digest('hex');
@@ -281,9 +322,9 @@ router.post('/', upload.single('file'), async (req, res) => {
         }
 
         // 5. Final Result
-        const isTampered = !verificationResult.valid || (ocr_tampered === true) || 
-                          (forensic_comparison && forensic_comparison.suspicious_change) || 
-                          (signature_comparison && signature_comparison.status_change);
+        const isTampered = !verificationResult.valid || (ocr_tampered === true) ||
+            (forensic_comparison && forensic_comparison.suspicious_change) ||
+            (signature_comparison && signature_comparison.status_change);
 
         if (isTampered) {
             db.prepare('UPDATE documents SET is_tampered = 1 WHERE block_index = ?').run(doc.block_index);
@@ -291,8 +332,8 @@ router.post('/', upload.single('file'), async (req, res) => {
 
         if (tmpPath && fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
 
-        return res.json({ 
-            status: isTampered ? "tampered" : "valid", 
+        return res.json({
+            status: isTampered ? "tampered" : "valid",
             valid: !isTampered,
             verdict: isTampered ? "TAMPERED" : "ORIGINAL",
             document_id: doc.block_index,
