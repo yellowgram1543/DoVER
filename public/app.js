@@ -431,9 +431,26 @@ function renderVerify(app) {
             const res = await API.verify(fd);
             const r = document.getElementById('verify-result');
             r.classList.remove('hidden');
+
+            let sigBadge = '';
+            if (res.signature_status === 'VERIFIED') {
+                sigBadge = `<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-extrabold uppercase mb-4 shadow-sm border border-emerald-200">
+                    <span class="material-symbols-outlined text-xs" style="font-variation-settings:'FILL' 1;">shield_with_heart</span> Cryptographically Signed
+                </div>`;
+            } else if (res.signature_status === 'NOT_SIGNED') {
+                sigBadge = `<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-[10px] font-extrabold uppercase mb-4 shadow-sm border border-slate-200">
+                    <span class="material-symbols-outlined text-xs">shield</span> Legacy Document
+                </div>`;
+            } else if (res.signature_status === 'INVALID') {
+                sigBadge = `<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-100 text-red-700 text-[10px] font-extrabold uppercase mb-4 shadow-sm border border-red-200">
+                    <span class="material-symbols-outlined text-xs" style="font-variation-settings:'FILL' 1;">warning</span> Signature Invalid
+                </div>`;
+            }
+
             if (res.valid) {
                 r.innerHTML = `<div class="result-card bg-green-50/50 border border-green-200 rounded-xl p-6 relative overflow-hidden fade-in">
                     <div class="flex items-center gap-3 mb-4"><span class="material-symbols-outlined text-green-600">verified</span><span class="text-xs font-bold text-green-700 uppercase tracking-widest">Status: Valid</span></div>
+                    ${sigBadge}
                     <h4 class="text-lg font-bold text-green-900 mb-2">Original Document</h4>
                     <p class="text-[10px] font-black text-emerald-600 uppercase mb-2">Compared against: ${res.original_uploader}'s upload from ${new Date(res.original_upload_date).toLocaleDateString()}</p>
                     <p class="text-sm text-green-800/70 leading-relaxed">Hash matches the registry record.</p>
@@ -503,6 +520,7 @@ function renderVerify(app) {
 
                 r.innerHTML = `<div class="result-card bg-red-50/50 border border-red-200 rounded-xl p-6 relative overflow-hidden fade-in">
                     <div class="flex items-center gap-3 mb-4"><span class="material-symbols-outlined text-red-600">error</span><span class="text-xs font-bold text-red-700 uppercase tracking-widest">Status: Tampered</span></div>
+                    ${sigBadge}
                     <h4 class="text-lg font-bold text-red-900 mb-2">Deep Verification Failed</h4>
                     <p class="text-[10px] font-black text-red-600 uppercase mb-2">Compared against: ${res.original_uploader}'s upload from ${new Date(res.original_upload_date).toLocaleDateString()}</p>
                     <p class="text-sm text-red-800/70 leading-relaxed">System has detected unauthorized modifications via multi-layered analysis.</p>
@@ -577,7 +595,14 @@ function loadChain(silent = false) {
                 : '<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-700 text-[10px] font-extrabold uppercase"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>Verified</span>';
             return `<tr class="${i%2===0?'':'bg-surface-container-lowest'} hover:bg-slate-50/50 transition-colors">
                 <td class="px-6 py-5 text-sm font-bold text-secondary">#${d.block_index}</td>
-                <td class="px-6 py-5 text-sm font-semibold text-primary">${fname}</td>
+                <td class="px-6 py-5 text-sm font-semibold text-primary">
+                    ${fname}
+                    <div class="mt-1">
+                        <a href="/api/verify/${d.block_index}/proof" target="_blank" class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-secondary hover:text-primary-container transition-colors">
+                            <span class="material-symbols-outlined text-[12px]">download</span> Download Proof
+                        </a>
+                    </div>
+                </td>
                 <td class="px-6 py-5"><code class="text-[11px] font-mono bg-slate-100 px-2 py-1 rounded text-slate-600">${d.block_hash.slice(0,16)}...</code></td>
                 <td class="px-6 py-5 text-xs font-semibold text-slate-600">${d.uploaded_by || 'Anonymous'}</td>
                 <td class="px-6 py-5 text-xs text-on-surface-variant font-medium">${new Date(d.upload_timestamp).toLocaleString()}</td>

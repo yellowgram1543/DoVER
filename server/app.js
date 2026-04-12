@@ -44,8 +44,17 @@ setInterval(async () => {
     if (!bucket) return; // Wait for connection
 
     try {
-        const docs = db.prepare('SELECT block_index, filename, storage_id, is_tampered FROM documents WHERE is_tampered = 0').all();
+        const docs = db.prepare(`
+            SELECT * FROM documents 
+            WHERE is_tampered = 0 
+            ORDER BY last_checked_at ASC NULLS FIRST
+            LIMIT 50
+        `).all();
+
         for (const doc of docs) {
+            // Update last_checked_at timestamp immediately so we don't retry failed/legacy ones forever
+            db.prepare("UPDATE documents SET last_checked_at = datetime('now') WHERE block_index = ?").run(doc.block_index);
+
             const storageId = doc.storage_id || doc.filename;
             // Skip legacy local files that aren't valid MongoDB ObjectIds (24 hex chars)
             if (!/^[0-9a-fA-F]{24}$/.test(storageId)) continue;

@@ -80,15 +80,31 @@ function levenshteinDistance(str1, str2) {
 }
 
 /**
+ * Normalizes text by converting to lowercase, removing extra whitespace/line breaks, and trimming.
+ * @param {string} text - The text to normalize.
+ * @returns {string} - The normalized text.
+ */
+function normalizeText(text) {
+    if (!text) return '';
+    return text
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+/**
  * Calculates the percentage similarity between two strings using Levenshtein distance.
  * @param {string} str1 - First string.
  * @param {string} str2 - Second string.
  * @returns {number} - Similarity score (0-100).
  */
 function calculateSimilarity(str1, str2) {
-    if (str1.length === 0 && str2.length === 0) return 100;
-    const distance = levenshteinDistance(str1, str2);
-    const maxLength = Math.max(str1.length, str2.length);
+    const s1 = normalizeText(str1);
+    const s2 = normalizeText(str2);
+
+    if (s1.length === 0 && s2.length === 0) return 100;
+    const distance = levenshteinDistance(s1, s2);
+    const maxLength = Math.max(s1.length, s2.length);
     if (maxLength === 0) return 100;
     return (1 - distance / maxLength) * 100;
 }
@@ -96,5 +112,6 @@ function calculateSimilarity(str1, str2) {
 module.exports = {
     extractText,
     levenshteinDistance,
-    calculateSimilarity
+    calculateSimilarity,
+    normalizeText
 };

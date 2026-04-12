@@ -1,9 +1,6 @@
 const crypto = require('crypto');
 const fs = require('fs');
 
-const PRIVATE_KEY = `your_private_key_here`;
-const PUBLIC_KEY = `your_public_key_here`;
-
 function generateFileHash(filePath) {
     const fileBuffer = fs.readFileSync(filePath);
     return crypto.createHash('sha256').update(fileBuffer).digest('hex');
@@ -19,14 +16,16 @@ function getLastBlockHash(db) {
     return row ? row.block_hash : '0000000000000000';
 }
 
-function verifyDocument(documentId, db) {
-    const doc = db.prepare('SELECT * FROM documents WHERE block_index = ?').get();
+function verifyDocument(documentId, db, manualFilePath) {
+    if (!manualFilePath) throw new Error("manualFilePath required - system uses GridFS");
+    
+    const doc = db.prepare('SELECT * FROM documents WHERE block_index = ?').get(documentId);
     if (!doc) return { valid: false, details: 'Document not found' };
 
-    const currentFileHash = generateFileHash(`uploads/${doc.filename}`);
+    const currentFileHash = generateFileHash(manualFilePath);
     const recomputedBlockHash = generateBlockHash(currentFileHash, doc.prev_hash, doc.upload_timestamp);
 
-    const isValid = (currentFileHash === doc.file_hash) && (recomputedBlockHash === doc.block_hash);
+    const isValid = (currentFileHash.trim() === doc.file_hash.trim()) && (recomputedBlockHash.trim() === doc.block_hash.trim());
 
     return {
         valid: isValid,
@@ -39,25 +38,9 @@ function verifyDocument(documentId, db) {
     };
 }
 
-function signData(data) {
-  const sign = crypto.createSign('SHA256');
-  sign.update(data);
-  sign.end();
-  return sign.sign(PRIVATE_KEY, 'hex');
-}
-
-function verifySignature(data, signature) {
-  const verify = crypto.createVerify('SHA256');
-  verify.update(data);
-  verify.end();
-  return verify.verify(PUBLIC_KEY, signature, 'hex');
-}
-
 module.exports = {
     generateFileHash,
     generateBlockHash,
     getLastBlockHash,
-    verifyDocument,
-    signData,
-    verifySignature
+    verifyDocument
 };

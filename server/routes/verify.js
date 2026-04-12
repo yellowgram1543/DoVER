@@ -17,6 +17,43 @@ if (!fs.existsSync('tmp')) fs.mkdirSync('tmp');
 
 const upload = multer({ dest: 'tmp/' });
 
+router.get('/:id/proof', (req, res) => {
+    try {
+        const id = req.params.id;
+        const doc = db.prepare('SELECT * FROM documents WHERE block_index = ?').get(id);
+
+        if (!doc) {
+            return res.status(404).json({ success: false, error: 'Document not found' });
+        }
+
+        const publicKey = process.env.PUBLIC_KEY_B64 
+            ? Buffer.from(process.env.PUBLIC_KEY_B64, 'base64').toString('utf8')
+            : (process.env.PUBLIC_KEY ? process.env.PUBLIC_KEY.replace(/\\n/g, '\n') : null);
+
+        const proof = {
+            document_id: doc.block_index,
+            filename: doc.filename,
+            uploaded_by: doc.uploaded_by,
+            upload_timestamp: doc.upload_timestamp,
+            file_hash: doc.file_hash,
+            block_hash: doc.block_hash,
+            block_index: doc.block_index,
+            prev_hash: doc.prev_hash,
+            signature: doc.signature,
+            public_key: publicKey,
+            ocr_text_stored: doc.ocr_text,
+            forensic_score: doc.forensic_score ? JSON.parse(doc.forensic_score) : null,
+            verified_at: new Date().toISOString()
+        };
+
+        res.setHeader('Content-Disposition', 'attachment; filename=proof_' + id + '.json');
+        res.json(proof);
+    } catch (error) {
+        console.error('[PROOF_ERROR]', error);
+        res.status(500).json({ success: false, error: 'Failed to generate proof' });
+    }
+});
+
 // Quick Verification via Hash
 router.get('/:hash', async (req, res) => {
     try {
@@ -31,45 +68,29 @@ router.get('/:hash', async (req, res) => {
             return res.json({ success: true, status: 'tampered', block_index: doc.block_index });
         }
 
-        // ── Digital Signature Verification (Origin Proof) ──
-        if (doc.signature === null || doc.signature === undefined) {
-            return res.json({
-                success: true,
-                status: "invalid",
-                reason: "SIGNATURE_MISSING"
-            });
-        }
+        // ── Digital Signature Verification ──
+        let signature_status = "VERIFIED";
+        if (!doc.signature) {
+            signature_status = "NOT_SIGNED";
+        } else {
+            console.log('Verifying block_hash:', doc.block_hash);
+            const verify = crypto.createVerify('SHA256');
+            verify.update(doc.block_hash);
+            
+            let publicKey = '';
+            if (process.env.PUBLIC_KEY_B64) {
+                publicKey = Buffer.from(process.env.PUBLIC_KEY_B64, 'base64').toString('utf8');
+            } else if (process.env.PUBLIC_KEY) {
+                publicKey = process.env.PUBLIC_KEY.replace(/\\n/g, '\n');
+            }
 
-        const publicKey = process.env.PUBLIC_KEY;
+            if (!publicKey) {
+                return res.json({ success: true, status: "invalid", reason: "PUBLIC_KEY_MISSING" });
+            }
 
-        if (!publicKey) {
-            return res.json({
-                success: true,
-                status: "invalid",
-                reason: "PUBLIC_KEY_MISSING"
-            });
-        }
-
-        const crypto = require("crypto");
-
-        if (typeof doc.signature !== "string" || doc.signature.length < 10) {
-            return res.json({
-                success: true,
-                status: "invalid",
-                reason: "SIGNATURE_INVALID"
-            });
-        }
-
-        const isValid = crypto.createVerify("SHA256")
-            .update(doc.file_hash)
-            .verify(publicKey, doc.signature, "hex");
-
-        if (!isValid) {
-            return res.json({
-                success: true,
-                status: "invalid",
-                reason: "SIGNATURE_INVALID"
-            });
+            const isValid = verify.verify(publicKey, doc.signature, 'hex');
+            console.log('Signature valid:', isValid);
+            signature_status = isValid ? "VERIFIED" : "INVALID";
         }
 
         // ── Safe Async Traversal ──
@@ -109,9 +130,10 @@ router.get('/:hash', async (req, res) => {
 
         res.json({
             success: true,
-            status: 'valid',
+            status: (signature_status === "INVALID") ? "tampered" : "valid",
             block_index: doc.block_index,
             checked_blocks: checked,
+            signature_status,
             is_checkpoint: !!doc.checkpoint_hash
         });
     } catch (error) {
@@ -139,6 +161,7 @@ router.post('/', upload.single('file'), async (req, res) => {
 
         // 1. Identify the document to verify against
         if (req.body.document_id) {
+            console.log('[TRACE] Received document_id:', req.body.document_id, 'Type:', typeof req.body.document_id);
             doc = db.prepare('SELECT * FROM documents WHERE block_index = ?').get(req.body.document_id);
         } else if (req.file) {
             const originalName = req.file.originalname;
@@ -187,23 +210,42 @@ router.post('/', upload.single('file'), async (req, res) => {
                 writeStream.on('error', reject);
             });
 
+            console.log('Calling verifyDocument with:', tmpPath);
             verificationResult = hasher.verifyDocument(doc.block_index, db, tmpPath);
         }
 
-        // ── Digital Signature Verification (Origin Proof) ──
+        // ── Digital Signature Verification ──
+        let signature_status = "VERIFIED";
+        let signature_mismatch = false;
         if (!doc.signature) {
-            if (tmpPath && fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
-            return res.json({ status: "invalid", reason: "SIGNATURE_MISSING" });
-        }
+            signature_status = "NOT_SIGNED";
+        } else {
+            console.log('Verifying block_hash:', doc.block_hash);
+            const verify = crypto.createVerify('SHA256');
+            verify.update(doc.block_hash);
 
-        const public_key = process.env.PUBLIC_KEY ? process.env.PUBLIC_KEY.replace(/\\n/g, '\n') : '';
-        const is_sig_valid = crypto.createVerify("SHA256")
-            .update(doc.file_hash)
-            .verify(public_key, doc.signature, "hex");
+            let publicKey = '';
+            if (process.env.PUBLIC_KEY_B64) {
+                publicKey = Buffer.from(process.env.PUBLIC_KEY_B64, 'base64').toString('utf8');
+            } else if (process.env.PUBLIC_KEY) {
+                publicKey = process.env.PUBLIC_KEY.replace(/\\n/g, '\n');
+            }
 
-        if (!is_sig_valid) {
-            if (tmpPath && fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
-            return res.json({ status: "invalid", reason: "SIGNATURE_INVALID" });
+            if (!publicKey) {
+                if (tmpPath && fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+                return res.json({ status: "invalid", reason: "PUBLIC_KEY_MISSING" });
+            }
+
+            try {
+                const isValid = verify.verify(publicKey, doc.signature, 'hex');
+                console.log('Signature valid:', isValid);
+                signature_status = isValid ? "VERIFIED" : "INVALID";
+                if (!isValid) signature_mismatch = true;
+            } catch (err) {
+                console.error('[POST_SIG_VERIFY_ERROR]', err.message);
+                if (tmpPath && fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+                return res.json({ status: "invalid", reason: "SIGNATURE_VERIFICATION_FAILED" });
+            }
         }
 
         // 1 & 2. Run extraction ONCE at the top and store in currentOcrText
@@ -226,8 +268,8 @@ router.post('/', upload.single('file'), async (req, res) => {
         let forensic_comparison = null;
         let signature_comparison = null;
 
-        if (stored_ocr_text) {
-            ocr_similarity = calculateSimilarity(stored_ocr_text, current_ocr_text);
+        if (doc.ocr_text) {
+            ocr_similarity = calculateSimilarity(doc.ocr_text, current_ocr_text);
             ocr_tampered = ocr_similarity < OCR_THRESHOLD;
         }
 
@@ -311,9 +353,14 @@ router.post('/', upload.single('file'), async (req, res) => {
         }
 
         // 5. Final Result
-        const isTampered = !verificationResult.valid || (ocr_tampered === true) ||
-            (forensic_comparison && forensic_comparison.suspicious_change) ||
-            (signature_comparison && signature_comparison.status_change);
+        let tamper_reasons = [];
+        if (!verificationResult.valid) tamper_reasons.push("File hash mismatch");
+        if (ocr_tampered) tamper_reasons.push("OCR text similarity below threshold");
+        if (forensic_comparison && forensic_comparison.suspicious_change) tamper_reasons.push("Forensic analysis detected modifications");
+        if (signature_comparison && signature_comparison.status_change) tamper_reasons.push("Signature/Seal presence changed");
+        if (signature_mismatch) tamper_reasons.push("Signature mismatch");
+
+        const isTampered = tamper_reasons.length > 0;
 
         if (isTampered) {
             db.prepare('UPDATE documents SET is_tampered = 1 WHERE block_index = ?').run(doc.block_index);
@@ -327,6 +374,8 @@ router.post('/', upload.single('file'), async (req, res) => {
             verdict: isTampered ? "TAMPERED" : "ORIGINAL",
             document_id: doc.block_index,
             checked_blocks: checked,
+            signature_status,
+            tamper_reasons: isTampered ? tamper_reasons : [],
             ocr_similarity_score: ocr_similarity,
             ocr_threshold: OCR_THRESHOLD,
             ocr_tampered: ocr_tampered,

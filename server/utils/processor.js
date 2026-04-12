@@ -47,11 +47,16 @@ function initProcessor() {
             const timestamp = new Date().toISOString();
             const blockHash = hasher.generateBlockHash(fileHash, prevHash, timestamp);
 
-            // ── Step 2.5: Generate Digital Signature ──
+            // ── Step 2.5: Digital Signature ──
             let documentSignature = null;
-            if (process.env.PRIVATE_KEY) {
+            if (process.env.PRIVATE_KEY_B64) {
                 try {
-                    documentSignature = hasher.signData(blockHash, process.env.PRIVATE_KEY.replace(/\\n/g, '\n'));
+                    const privateKey = Buffer.from(process.env.PRIVATE_KEY_B64, 'base64').toString('utf8');
+                    const sign = crypto.createSign('SHA256');
+                    sign.update(blockHash);
+                    documentSignature = sign.sign(privateKey, 'hex');
+                    console.log('Signed block_hash:', blockHash);
+                    console.log('Signature first 20:', documentSignature.substring(0, 20));
                 } catch (sigError) {
                     console.error('[PROCESSOR] Signature generation failed:', sigError.message);
                 }
@@ -99,8 +104,8 @@ function initProcessor() {
             const documentId = result.lastInsertRowid;
 
             // ── Step 5: Periodic Checkpointing ──
-            // Every 10 blocks, we record the block_hash as a checkpoint
-            if (documentId % 10 === 0) {
+            // Every 100 blocks, we record the block_hash as a checkpoint
+            if (documentId % 100 === 0) {
                 db.prepare('UPDATE documents SET checkpoint_hash = ? WHERE block_index = ?').run(blockHash, documentId);
                 console.log(`[PROCESSOR] ⚐ Checkpoint created at Block #${documentId}`);
             }
