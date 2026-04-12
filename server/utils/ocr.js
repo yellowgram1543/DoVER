@@ -49,6 +49,52 @@ async function extractText(filePath) {
     }
 }
 
+/**
+ * Calculates the Levenshtein distance between two strings using dynamic programming.
+ * @param {string} str1 - First string.
+ * @param {string} str2 - Second string.
+ * @returns {number} - Levenshtein distance.
+ */
+function levenshteinDistance(str1, str2) {
+    if (str1 === str2) return 0;
+    if (str1.length === 0) return str2.length;
+    if (str2.length === 0) return str1.length;
+
+    const track = Array(str2.length + 1).fill(null).map(() =>
+        Array(str1.length + 1).fill(null));
+
+    for (let i = 0; i <= str1.length; i += 1) track[0][i] = i;
+    for (let j = 0; j <= str2.length; j += 1) track[j][0] = j;
+
+    for (let j = 1; j <= str2.length; j += 1) {
+        for (let i = 1; i <= str1.length; i += 1) {
+            const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
+            track[j][i] = Math.min(
+                track[j][i - 1] + 1, // deletion
+                track[j - 1][i] + 1, // insertion
+                track[j - 1][i - 1] + indicator // substitution
+            );
+        }
+    }
+    return track[str2.length][str1.length];
+}
+
+/**
+ * Calculates the percentage similarity between two strings using Levenshtein distance.
+ * @param {string} str1 - First string.
+ * @param {string} str2 - Second string.
+ * @returns {number} - Similarity score (0-100).
+ */
+function calculateSimilarity(str1, str2) {
+    if (str1.length === 0 && str2.length === 0) return 100;
+    const distance = levenshteinDistance(str1, str2);
+    const maxLength = Math.max(str1.length, str2.length);
+    if (maxLength === 0) return 100;
+    return (1 - distance / maxLength) * 100;
+}
+
 module.exports = {
-    extractText
+    extractText,
+    levenshteinDistance,
+    calculateSimilarity
 };

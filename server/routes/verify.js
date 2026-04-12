@@ -10,6 +10,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { getBucket, mongoose } = require('../db/mongodb');
+const { calculateSimilarity } = require('../utils/ocr');
 
 if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
 if (!fs.existsSync('tmp')) fs.mkdirSync('tmp');
@@ -218,31 +219,19 @@ router.post('/', upload.single('file'), async (req, res) => {
         let current_ocr_text = (!currentOcrText || currentOcrText.trim().length === 0) ? 'extraction_failed' : currentOcrText.trim();
 
         // 3. Deep Analysis
-        let ocr_valid = null;
-        let ocr_tampered = null;
-        let ocr_change_detected = null;
+        const OCR_THRESHOLD = 95;
+        let ocr_similarity = 100;
+        let ocr_tampered = false;
 
-        let ocr_text = currentOcrText;
-        let stored_ocr_text = doc.ocr_text;
         let forensic_comparison = null;
         let signature_comparison = null;
 
-        if (doc.file_type === 'text/plain' || doc.filename.endsWith('.txt')) {
-            if (stored_ocr_text) {
-                const currentOcrHash = crypto.createHash('sha256').update(ocr_text).digest('hex');
-                ocr_valid = (currentOcrHash.trim() === doc.ocr_hash.trim());
-                ocr_tampered = !ocr_valid;
-                ocr_change_detected = !ocr_valid;
-            }
+        if (stored_ocr_text) {
+            ocr_similarity = calculateSimilarity(stored_ocr_text, current_ocr_text);
+            ocr_tampered = ocr_similarity < OCR_THRESHOLD;
         }
-        else if (/png|jpg|jpeg/.test(doc.file_type)) {
-            if (doc.ocr_hash) {
-                const currentOcrHash = crypto.createHash('sha256').update(ocr_text).digest('hex');
-                ocr_valid = (currentOcrHash.trim() === doc.ocr_hash.trim());
-                ocr_tampered = !ocr_valid;
-                ocr_change_detected = !ocr_valid;
-            }
 
+        if (/png|jpg|jpeg/.test(doc.file_type)) {
             const currentForensic = await forensics.analyzeImage(tmpPath);
             const storedForensic = doc.forensic_score ? JSON.parse(doc.forensic_score) : null;
             if (storedForensic) {
@@ -338,7 +327,9 @@ router.post('/', upload.single('file'), async (req, res) => {
             verdict: isTampered ? "TAMPERED" : "ORIGINAL",
             document_id: doc.block_index,
             checked_blocks: checked,
-            ocr_valid,
+            ocr_similarity_score: ocr_similarity,
+            ocr_threshold: OCR_THRESHOLD,
+            ocr_tampered: ocr_tampered,
             forensic_comparison,
             signature_comparison
         });

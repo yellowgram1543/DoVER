@@ -725,44 +725,59 @@ function renderSettings(app) {
 function renderHelp(app) {
     document.getElementById('page-title').textContent = 'User Guide';
     const wrap = document.createElement('div');
-    wrap.className = 'max-w-4xl mx-auto space-y-12 fade-in';
+    wrap.className = 'max-w-6xl mx-auto space-y-12 fade-in';
     
     wrap.innerHTML = `
         <div class="text-center space-y-4">
             <h1 class="text-5xl font-black text-primary tracking-tight">How <span class="text-secondary">DoVER</span> Works</h1>
-            <p class="text-on-surface-variant text-lg">A simple guide to decentralized document integrity.</p>
+            <p class="text-on-surface-variant text-lg">A comprehensive guide to decentralized document integrity.</p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm space-y-4">
-                <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center"><span class="material-symbols-outlined text-3xl">upload_file</span></div>
-                <h3 class="text-xl font-bold text-primary">1. Digital Registration</h3>
-                <p class="text-sm text-slate-500 leading-relaxed">Upload any PDF, DOCX, or Image. The system creates a unique SHA-256 fingerprint and chains it to the previous record, ensuring permanent immutability.</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm hover:shadow-md transition-shadow space-y-4 group">
+                <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">upload_file</span></div>
+                <h3 class="text-xl font-bold text-primary">1. Single Registration</h3>
+                <p class="text-sm text-slate-500 leading-relaxed">Upload any PDF, DOCX, or Image. The system creates a unique SHA-256 fingerprint and chains it to the registry, ensuring permanent immutability.</p>
             </div>
 
-            <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm space-y-4">
-                <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center"><span class="material-symbols-outlined text-3xl">fact_check</span></div>
-                <h3 class="text-xl font-bold text-primary">2. Secure Verification</h3>
-                <p class="text-sm text-slate-500 leading-relaxed">Enter a Block ID or upload a copy of the document. The system re-hashes the file and compares it against the secure registry record instantly.</p>
+            <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm hover:shadow-md transition-shadow space-y-4 group">
+                <div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">folder_zip</span></div>
+                <h3 class="text-xl font-bold text-primary">2. Batch Processing</h3>
+                <p class="text-sm text-slate-500 leading-relaxed">Upload up to 20 documents simultaneously. The system uses a dedicated background queue to efficiently process and cryptographically seal large volumes.</p>
             </div>
 
-            <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm space-y-4">
-                <div class="w-12 h-12 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center"><span class="material-symbols-outlined text-3xl">visibility</span></div>
-                <h3 class="text-xl font-bold text-primary">3. Deep Analysis</h3>
-                <p class="text-sm text-slate-500 leading-relaxed">Our system uses OCR and Forensic heuristics to detect if text has been edited in Paint or Photoshop, even if the file format looks original.</p>
+            <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm hover:shadow-md transition-shadow space-y-4 group">
+                <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">fact_check</span></div>
+                <h3 class="text-xl font-bold text-primary">3. Secure Verification</h3>
+                <p class="text-sm text-slate-500 leading-relaxed">Enter a Block ID or upload a copy of the document. The system re-hashes the file and mathematically proves its authenticity against the ledger.</p>
             </div>
 
-            <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm space-y-4">
-                <div class="w-12 h-12 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center"><span class="material-symbols-outlined text-3xl">history_edu</span></div>
-                <h3 class="text-xl font-bold text-primary">4. Registry Audit</h3>
-                <p class="text-sm text-slate-500 leading-relaxed">Every verification and tamper event is logged. You can view the complete "Chain of Custody" for any document identity in the Audit Log.</p>
+            <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm hover:shadow-md transition-shadow space-y-4 group">
+                <div class="w-12 h-12 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">troubleshoot</span></div>
+                <h3 class="text-xl font-bold text-primary">4. Deep Analysis</h3>
+                <p class="text-sm text-slate-500 leading-relaxed">Our AI analyzes internal metadata, font inconsistencies, and verifies digital signatures to detect tampering, even if the file is expertly forged.</p>
+            </div>
+
+            <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm hover:shadow-md transition-shadow space-y-4 group">
+                <div class="w-12 h-12 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">account_tree</span></div>
+                <h3 class="text-xl font-bold text-primary">5. Chain Explorer</h3>
+                <p class="text-sm text-slate-500 leading-relaxed">View the entire, unalterable block history of the registry. Monitor block generation in real-time and review the cryptographic sequence of uploads.</p>
+            </div>
+
+            <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm hover:shadow-md transition-shadow space-y-4 group">
+                <div class="w-12 h-12 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">history_edu</span></div>
+                <h3 class="text-xl font-bold text-primary">6. Audit Log</h3>
+                <p class="text-sm text-slate-500 leading-relaxed">Every verification request, tamper alert, and system action is relentlessly logged. Review the detailed Chain of Custody for any active record.</p>
             </div>
         </div>
 
-        <div class="bg-primary p-10 rounded-[3rem] text-white text-center space-y-6 shadow-2xl shadow-primary/30">
-            <h2 class="text-3xl font-black">Ready to secure your first record?</h2>
-            <p class="opacity-80 max-w-md mx-auto">Click the button below to head to the registration gateway.</p>
-            <a href="#upload" class="inline-flex bg-white text-primary px-8 py-4 rounded-2xl font-black hover:scale-105 transition-transform">Get Started</a>
+        <div class="bg-primary p-10 rounded-[3rem] text-white text-center space-y-6 shadow-2xl shadow-primary/30 relative overflow-hidden mt-8">
+            <div class="relative z-10">
+                <h2 class="text-3xl font-black">Ready to secure your first record?</h2>
+                <p class="opacity-80 max-w-md mx-auto">Click the button below to head to the registration gateway.</p>
+                <a href="#upload" class="inline-flex bg-white text-primary px-8 py-4 mt-2 rounded-2xl font-black hover:scale-105 active:scale-95 transition-transform">Get Started</a>
+            </div>
+            <span class="material-symbols-outlined absolute -right-6 -bottom-6 text-9xl opacity-10 pointer-events-none">lock</span>
         </div>
     `;
     app.appendChild(wrap);
