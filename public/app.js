@@ -190,6 +190,24 @@ function renderUpload(app) {
                                 </div>
                             </div>
                         </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-blue-50/50 rounded-xl border border-blue-100/50">
+                            <div class="space-y-2">
+                                <label class="block text-[10px] font-black uppercase text-blue-600 px-1 tracking-widest">Parent Document ID (Optional)</label>
+                                <div class="relative flex items-center">
+                                    <span class="material-symbols-outlined absolute left-3 text-blue-400 text-lg">schema</span>
+                                    <input id="upload-parent" class="w-full bg-white pl-10 pr-4 py-2.5 rounded-lg border-none focus:ring-2 focus:ring-blue-500/20 text-on-surface text-xs font-bold" placeholder="e.g. 1" type="number"/>
+                                </div>
+                            </div>
+                            <div class="space-y-2">
+                                <label class="block text-[10px] font-black uppercase text-blue-600 px-1 tracking-widest">Version Note</label>
+                                <div class="relative flex items-center">
+                                    <span class="material-symbols-outlined absolute left-3 text-blue-400 text-lg">edit_note</span>
+                                    <input id="upload-note" class="w-full bg-white pl-10 pr-4 py-2.5 rounded-lg border-none focus:ring-2 focus:ring-blue-500/20 text-on-surface text-xs" placeholder="What changed?" type="text"/>
+                                </div>
+                            </div>
+                        </div>
+
                         <button type="submit" id="submit-btn" class="w-full bg-gradient-to-r from-primary to-primary-container text-white px-10 py-4 rounded-xl font-bold shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all text-lg flex items-center justify-center gap-3 disabled:opacity-50" disabled>
                             <span class="material-symbols-outlined">upload_file</span> Submit Record
                         </button>
@@ -253,6 +271,12 @@ function renderUpload(app) {
         const fd = new FormData();
         fd.append('file', fileInput.files[0]);
         fd.append('user', document.getElementById('upload-user').value || 'anonymous');
+        fd.append('department', document.getElementById('upload-dept').value);
+        
+        const parentId = document.getElementById('upload-parent').value.trim();
+        const note = document.getElementById('upload-note').value.trim();
+        if (parentId) fd.append('parent_document_id', parentId);
+        if (note) fd.append('version_note', note);
         try {
             const res = await API.upload(fd);
             const resultDiv = document.getElementById('upload-result');
@@ -380,8 +404,12 @@ function renderSuccessUI(resultDiv, res) {
         <div class="flex flex-col md:flex-row gap-6 items-start">
             <div class="flex-1">
                 <h4 class="text-lg font-bold text-green-900 mb-2">Document Secured</h4>
-                <p class="text-sm text-green-800/70 mb-3">Block Index: <strong>#${res.block_index}</strong></p>
+                <div class="flex items-center gap-2 mb-3">
+                    <p class="text-sm text-green-800/70 text-sm">Block Index: <strong>#${res.block_index}</strong></p>
+                    <span class="px-2 py-0.5 rounded bg-green-200 text-green-800 text-[10px] font-black uppercase">Version ${res.version_number || 1}</span>
+                </div>
                 <code class="hash-text bg-green-100 px-3 py-2 rounded block text-green-800 mb-2">${res.block_hash}</code>
+                ${res.parent_document_id ? `<p class="text-[10px] font-bold text-green-600 mb-2 uppercase">Supersedes Block #${res.parent_document_id}</p>` : ''}
                 ${signatureHtml}
                 ${forensicHtml}
             </div>
@@ -678,13 +706,19 @@ function loadChain(silent = false) {
                 : '';
 
             return `<tr class="${i%2===0?'':'bg-surface-container-lowest'} hover:bg-slate-50/50 transition-colors">
-                <td class="px-6 py-5 text-sm font-bold text-secondary">#${d.block_index}</td>
+                <td class="px-6 py-5 text-sm font-bold text-secondary flex flex-col items-start gap-1">
+                    #${d.block_index}
+                    <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-[8px] font-black uppercase">V${d.version_number || 1}</span>
+                </td>
                 <td class="px-6 py-5 text-sm font-semibold text-primary">
                     ${fname}
-                    <div class="mt-1">
+                    <div class="mt-1 flex flex-wrap gap-2">
                         <a href="/api/verify/${d.block_index}/proof?api_key=${API_KEY}" target="_blank" class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-secondary hover:text-primary-container transition-colors">
                             <span class="material-symbols-outlined text-[12px]">download</span> Download Proof
                         </a>
+                        <button onclick="showVersionHistory(${d.block_index})" class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-blue-600 hover:text-blue-800 transition-colors">
+                            <span class="material-symbols-outlined text-[12px]">history</span> View Versions
+                        </button>
                     </div>
                 </td>
                 <td class="px-6 py-5 flex flex-col gap-1">
@@ -1105,4 +1139,64 @@ function renderBatch(app) {
 
     // Cleanup on page navigation
     window.addEventListener('hashchange', () => { if (pollInterval) clearInterval(pollInterval); }, { once: true });
+}
+
+async function showVersionHistory(id) {
+    // Basic modal/overlay for version history
+    const overlay = document.createElement('div');
+    overlay.className = 'fixed inset-0 z-[100] flex items-center justify-center p-6 bg-primary/40 backdrop-blur-sm fade-in';
+    overlay.id = 'version-overlay';
+    overlay.innerHTML = `
+        <div class="bg-white dark:bg-[#1C2A41] w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh] scale-in">
+            <div class="px-8 py-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                <div>
+                    <h3 class="text-xl font-black text-primary dark:text-[#E9C176] uppercase tracking-tight">Version Timeline</h3>
+                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Document Lineage Tracking</p>
+                </div>
+                <button onclick="document.getElementById('version-overlay').remove()" class="w-10 h-10 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors">
+                    <span class="material-symbols-outlined text-slate-400">close</span>
+                </button>
+            </div>
+            <div id="version-timeline-content" class="p-8 overflow-y-auto flex-1 space-y-8">
+                <div class="flex justify-center py-12"><div class="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div></div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    try {
+        const versions = await fetch(`/api/chain/document/${id}/versions`).then(r => r.json());
+        const content = document.getElementById('version-timeline-content');
+        
+        if (!versions.length) {
+            content.innerHTML = '<p class="text-center text-slate-400 font-medium py-12">No version history found.</p>';
+            return;
+        }
+
+        content.innerHTML = versions.map((v, i) => {
+            const isLatest = i === versions.length - 1;
+            return `
+                <div class="relative flex gap-6">
+                    ${!isLatest ? '<div class="absolute left-[19px] top-10 bottom-[-32px] w-0.5 bg-slate-100 dark:bg-slate-800"></div>' : ''}
+                    <div class="flex-shrink-0 w-10 h-10 rounded-full ${isLatest ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'} flex items-center justify-center z-10 font-black text-xs">
+                        V${v.version_number}
+                    </div>
+                    <div class="flex-1 pb-2">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">${new Date(v.upload_timestamp).toLocaleDateString()}</span>
+                            ${isLatest ? '<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[8px] font-black uppercase tracking-tighter">Current Version</span>' : ''}
+                        </div>
+                        <h4 class="font-bold text-primary dark:text-[#D6E3FF] text-sm">${v.version_note || (v.version_number === 1 ? 'Original Registration' : 'No note provided')}</h4>
+                        <div class="mt-2 flex items-center gap-3 text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                            <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">person</span> ${v.uploaded_by}</span>
+                            <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">tag</span> Block #${v.document_id}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).reverse().join(''); // Show latest at top
+
+    } catch (e) {
+        document.getElementById('version-timeline-content').innerHTML = '<p class="text-center text-red-500 font-bold py-12">Failed to load history.</p>';
+    }
 }

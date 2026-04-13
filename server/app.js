@@ -88,7 +88,9 @@ setInterval(async () => {
                 if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
             } catch (err) {
                 // If file is missing in GridFS, it's a real tamper/deletion
-                console.error(`[BG_WATCHER] Error verifying block #${doc.block_index}:`, err.message);
+                if (err.code !== 'ENOENT') {
+                    console.error(`[BG_WATCHER] Error verifying block #${doc.block_index}:`, err.message);
+                }
                 if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
             }
         }

@@ -106,4 +106,56 @@ router.get('/batch/:batch_id/status', async (req, res) => {
     }
 });
 
+router.get('/document/:id/versions', (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        
+        // 1. Find the current document
+        let currentDoc = db.prepare('SELECT block_index, parent_document_id FROM documents WHERE block_index = ?').get(id);
+        if (!currentDoc) {
+            return res.status(404).json({ success: false, error: 'Document not found' });
+        }
+
+        // 2. Trace back to the root document (parent_document_id is NULL)
+        let rootId = currentDoc.block_index;
+        let parentId = currentDoc.parent_document_id;
+        let safety = 0;
+        
+        while (parentId !== null && safety < 50) {
+            const parent = db.prepare('SELECT block_index, parent_document_id FROM documents WHERE block_index = ?').get(parentId);
+            if (!parent) break;
+            rootId = parent.block_index;
+            parentId = parent.parent_document_id;
+            safety++;
+        }
+
+        // 3. Fetch all documents in the version chain starting from root
+        // Using a recursive CTE to find all descendants
+        const versions = db.prepare(`
+            WITH RECURSIVE descendants(id) AS (
+                SELECT block_index FROM documents WHERE block_index = ?
+                UNION
+                SELECT block_index FROM documents JOIN descendants ON documents.parent_document_id = descendants.id
+            )
+            SELECT 
+                version_number,
+                block_index as document_id,
+                filename,
+                uploaded_by,
+                upload_timestamp,
+                version_note,
+                block_hash,
+                is_tampered
+            FROM documents 
+            WHERE block_index IN descendants 
+            ORDER BY version_number ASC
+        `).all(rootId);
+
+        res.json(versions);
+    } catch (error) {
+        console.error('[VERSIONS_ERROR]', error);
+        res.status(500).json({ success: false, error: 'Failed to retrieve version history' });
+    }
+});
+
 module.exports = router;

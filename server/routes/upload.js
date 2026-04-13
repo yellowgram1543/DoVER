@@ -67,17 +67,32 @@ router.post('/', apiKey, (req, res) => {
             }
 
             const uploadedBy = req.body.uploaded_by || req.body.user || 'anonymous';
-            const existing = db.prepare('SELECT * FROM documents WHERE filename = ? AND uploaded_by = ?').get(req.file.originalname, uploadedBy);
+            
+            // Versioning logic
+            let parent_document_id = (req.body.parent_document_id && req.body.parent_document_id !== 'undefined') ? parseInt(req.body.parent_document_id) : null;
+            let version_number = 1;
+            const version_note = req.body.version_note || null;
 
-            if (existing) {
-                if (fs.existsSync(tmpFilePath)) fs.unlinkSync(tmpFilePath);
-                return res.status(409).json({
-                    success: false,
-                    error: "Duplicate document",
-                    message: "A document with this filename already exists under this legal name",
-                    existing_document_id: existing.id || existing.block_index,
-                    uploaded_at: existing.upload_timestamp
-                });
+            if (parent_document_id && !isNaN(parent_document_id)) {
+                const parent = db.prepare('SELECT version_number FROM documents WHERE block_index = ?').get(parent_document_id);
+                if (!parent) {
+                    if (fs.existsSync(tmpFilePath)) fs.unlinkSync(tmpFilePath);
+                    return res.status(404).json({ success: false, error: 'Parent document not found' });
+                }
+                version_number = (parent.version_number || 1) + 1;
+            } else {
+                // Duplicate check ONLY for initial uploads
+                const existing = db.prepare('SELECT * FROM documents WHERE filename = ? AND uploaded_by = ?').get(req.file.originalname, uploadedBy);
+                if (existing) {
+                    if (fs.existsSync(tmpFilePath)) fs.unlinkSync(tmpFilePath);
+                    return res.status(409).json({
+                        success: false,
+                        error: "Duplicate document",
+                        message: "A document with this filename already exists under this legal name. Use parent_document_id to upload a new version.",
+                        existing_document_id: existing.id || existing.block_index,
+                        uploaded_at: existing.upload_timestamp
+                    });
+                }
             }
 
             // ── Async Processing via Queue ──
@@ -88,7 +103,10 @@ router.post('/', apiKey, (req, res) => {
                 originalname: req.file.originalname, // Original name for DB
                 mimetype: req.file.mimetype,
                 uploadedBy: uploadedBy,
-                department: req.body.department
+                department: req.body.department,
+                version_number,
+                parent_document_id,
+                version_note
             });
 
             res.json({
@@ -96,7 +114,8 @@ router.post('/', apiKey, (req, res) => {
                 message: 'Document upload received and queued for secure processing.',
                 job_id: job.id,
                 filename: req.file.originalname,
-                status: 'processing'
+                status: 'processing',
+                version_number
             });
 
         } catch (error) {
