@@ -11,13 +11,111 @@ const fs = require('fs');
 const path = require('path');
 const { getBucket, mongoose } = require('../db/mongodb');
 const { calculateSimilarity } = require('../utils/ocr');
+const apiKey = require('../middleware/apiKey');
+const { verifyMerkleProof } = require('../utils/merkle');
 
 if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
 if (!fs.existsSync('tmp')) fs.mkdirSync('tmp');
 
 const upload = multer({ dest: 'tmp/' });
 
-router.get('/:id/proof', (req, res) => {
+router.get('/public/verify/:hash', async (req, res) => {
+    try {
+        const hash = req.params.hash;
+        const doc = db.prepare('SELECT * FROM documents WHERE block_hash = ?').get(hash);
+
+        if (!doc) {
+            return res.json({ found: false, message: "No record found" });
+        }
+
+        // Logic for signature status (consistent with existing verification)
+        let signature_status = "VERIFIED";
+        if (!doc.signature) {
+            signature_status = "NOT_SIGNED";
+        } else {
+            const verify = crypto.createVerify('SHA256');
+            verify.update(doc.block_hash);
+            let publicKey = '';
+            if (process.env.PUBLIC_KEY_B64) {
+                publicKey = Buffer.from(process.env.PUBLIC_KEY_B64, 'base64').toString('utf8');
+            } else if (process.env.PUBLIC_KEY) {
+                publicKey = process.env.PUBLIC_KEY.replace(/\\n/g, '\n');
+            }
+
+            if (publicKey) {
+                const isValid = verify.verify(publicKey, doc.signature, 'hex');
+                signature_status = isValid ? "VERIFIED" : "INVALID";
+            }
+        }
+
+        return res.json({
+            found: true,
+            document_id: doc.block_index,
+            filename: doc.filename,
+            uploaded_by: doc.uploaded_by,
+            upload_timestamp: doc.upload_timestamp,
+            block_index: doc.block_index,
+            block_hash: doc.block_hash,
+            is_tampered: doc.is_tampered,
+            signature_status: signature_status,
+            ocr_similarity_score: doc.ocr_hash ? 100 : null, // Default to 100 for verified blocks
+            verdict: doc.is_tampered ? "TAMPERED" : "ORIGINAL"
+        });
+    } catch (error) {
+        console.error('[PUBLIC_VERIFY_ERROR]', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+router.get('/public/verify/qr/:document_id', async (req, res) => {
+    try {
+        const id = req.params.document_id;
+        const doc = db.prepare('SELECT * FROM documents WHERE block_index = ?').get(id);
+
+        if (!doc) {
+            return res.json({ found: false, message: "No record found" });
+        }
+
+        // Logic for signature status (consistent with existing verification)
+        let signature_status = "VERIFIED";
+        if (!doc.signature) {
+            signature_status = "NOT_SIGNED";
+        } else {
+            const verify = crypto.createVerify('SHA256');
+            verify.update(doc.block_hash);
+            let publicKey = '';
+            if (process.env.PUBLIC_KEY_B64) {
+                publicKey = Buffer.from(process.env.PUBLIC_KEY_B64, 'base64').toString('utf8');
+            } else if (process.env.PUBLIC_KEY) {
+                publicKey = process.env.PUBLIC_KEY.replace(/\\n/g, '\n');
+            }
+
+            if (publicKey) {
+                const isValid = verify.verify(publicKey, doc.signature, 'hex');
+                signature_status = isValid ? "VERIFIED" : "INVALID";
+            }
+        }
+
+        return res.json({
+            found: true,
+            document_id: doc.block_index,
+            filename: doc.filename,
+            uploaded_by: doc.uploaded_by,
+            upload_timestamp: doc.upload_timestamp,
+            block_index: doc.block_index,
+            block_hash: doc.block_hash,
+            is_tampered: doc.is_tampered,
+            signature_status: signature_status,
+            ocr_similarity_score: doc.ocr_hash ? 100 : null,
+            verdict: doc.is_tampered ? "TAMPERED" : "ORIGINAL"
+        });
+    } catch (error) {
+        console.error('[PUBLIC_QR_VERIFY_ERROR]', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+router.get('/:id/proof', apiKey, (req, res) => {
     try {
         const id = req.params.id;
         const doc = db.prepare('SELECT * FROM documents WHERE block_index = ?').get(id);
@@ -55,7 +153,7 @@ router.get('/:id/proof', (req, res) => {
 });
 
 // Quick Verification via Hash
-router.get('/:hash', async (req, res) => {
+router.get('/:hash', apiKey, async (req, res) => {
     try {
         const hash = req.params.hash;
         const doc = db.prepare('SELECT * FROM documents WHERE block_hash = ?').get(hash);
@@ -141,7 +239,7 @@ router.get('/:hash', async (req, res) => {
     }
 });
 
-router.post('/', upload.single('file'), async (req, res) => {
+router.post('/', apiKey, upload.single('file'), async (req, res) => {
     let tmpPath = '';
     try {
         let newPath = null;
@@ -352,6 +450,25 @@ router.post('/', upload.single('file'), async (req, res) => {
             return res.status(500).json({ success: false, error: 'Chain traversal failed' });
         }
 
+        // 4.5 Merkle Verification
+        let merkle_valid = null;
+        let merkle_status = "VERIFIED";
+        let merkle_proof_length = 0;
+
+        if (!doc.merkle_proof) {
+            merkle_status = "NOT_COMPUTED";
+        } else {
+            try {
+                const proof = JSON.parse(doc.merkle_proof);
+                merkle_proof_length = proof.length;
+                merkle_valid = verifyMerkleProof(doc.block_hash, proof, doc.merkle_root);
+                merkle_status = merkle_valid ? "VERIFIED" : "INVALID";
+            } catch (err) {
+                console.error('[MERKLE_VERIFY_ERROR]', err);
+                merkle_status = "ERROR";
+            }
+        }
+
         // 5. Final Result
         let tamper_reasons = [];
         if (!verificationResult.valid) tamper_reasons.push("File hash mismatch");
@@ -359,6 +476,7 @@ router.post('/', upload.single('file'), async (req, res) => {
         if (forensic_comparison && forensic_comparison.suspicious_change) tamper_reasons.push("Forensic analysis detected modifications");
         if (signature_comparison && signature_comparison.status_change) tamper_reasons.push("Signature/Seal presence changed");
         if (signature_mismatch) tamper_reasons.push("Signature mismatch");
+        if (merkle_valid === false) tamper_reasons.push("Merkle proof invalid");
 
         const isTampered = tamper_reasons.length > 0;
 
@@ -375,6 +493,9 @@ router.post('/', upload.single('file'), async (req, res) => {
             document_id: doc.block_index,
             checked_blocks: checked,
             signature_status,
+            merkle_status,
+            merkle_root: doc.merkle_root,
+            merkle_proof_length,
             tamper_reasons: isTampered ? tamper_reasons : [],
             ocr_similarity_score: ocr_similarity,
             ocr_threshold: OCR_THRESHOLD,

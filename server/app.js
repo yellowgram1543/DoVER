@@ -4,6 +4,7 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const app = express();
+const apiKey = require('./middleware/apiKey');
 
 app.use((req, res, next) => {
   console.log("REQUEST_RECEIVED:", req.method, req.url);
@@ -21,8 +22,14 @@ const verifyRoutes = require('./routes/verify');
 const chainRoutes = require('./routes/chain');
 const statsRoutes = require('./routes/stats');
 
-app.use('/api/upload', uploadRoutes);
-app.use('/api/verify', verifyRoutes);
+app.use('/api/upload', apiKey, uploadRoutes);
+app.use('/api/verify', (req, res, next) => {
+    // Apply apiKey only to POST /api/verify or GET /api/verify/:id/proof
+    if (req.method === 'POST' || req.path.endsWith('/proof')) {
+        return apiKey(req, res, next);
+    }
+    next();
+}, verifyRoutes);
 app.use('/api/chain', chainRoutes);
 app.use('/api/stats', statsRoutes);
 

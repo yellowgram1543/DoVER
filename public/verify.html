@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Public Verification Portal | DoVER</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary":"#001e40",
+                        "secondary":"#0059bb",
+                        "error":"#ba1a1a",
+                        "surface-container-low":"#f3f4f5",
+                        "surface-container-lowest":"#ffffff",
+                        "on-surface-variant":"#43474f",
+                        "outline-variant":"#c3c6d1"
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="/styles.css"/>
+    <style>
+        .verdict-banner { transition: all 0.3s ease; }
+        .hash-mono { font-family: 'JetBrains Mono', 'Courier New', monospace; word-break: break-all; }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-[#0A192F] text-slate-900 dark:text-[#D6E3FF] min-h-screen">
+
+    <!-- Top Navigation -->
+    <nav class="bg-white/80 dark:bg-[#1C2A41]/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-700 fixed top-0 w-full z-50 transition-colors">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-[#001e40] to-[#0059bb] rounded-xl flex items-center justify-center text-white shadow-lg">
+                    <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1;">verified_user</span>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-blue-900 dark:text-[#E9C176] tracking-tighter uppercase">DoVER</h1>
+                    <p class="text-[10px] uppercase tracking-widest text-slate-500 dark:text-[#D6E3FF]/60 font-black">Public Trust Layer</p>
+                </div>
+            </div>
+            <div class="hidden md:flex items-center gap-4">
+                <div class="bg-slate-100 dark:bg-[#0F1B33] px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <p class="text-[8px] uppercase font-black text-slate-400 dark:text-slate-500 mb-0.5">Network Root</p>
+                    <code id="global-root" class="text-[10px] font-mono font-bold text-blue-600 dark:text-[#E9C176]">Synchronizing...</code>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="pt-32 pb-12 px-6 max-w-2xl mx-auto space-y-8">
+        <!-- Header -->
+        <div class="text-center space-y-2 fade-in">
+            <h2 class="text-3xl font-extrabold tracking-tight text-primary dark:text-[#E9C176]">Document Verification</h2>
+            <p class="text-slate-500 dark:text-[#D6E3FF]/70 text-sm font-medium">Verify any electronic record against the decentralized vault.</p>
+        </div>
+
+        <!-- Search Card -->
+        <div class="bg-white dark:bg-[#1C2A41] rounded-2xl p-8 shadow-xl border border-slate-200 dark:border-slate-700 space-y-6 fade-in" style="animation-delay: 0.1s">
+            <div class="space-y-4">
+                <div class="space-y-1.5">
+                    <label class="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Block Identity Hash</label>
+                    <div class="relative">
+                        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">fingerprint</span>
+                        <input type="text" id="input-hash" class="w-full pl-10 pr-4 py-3 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#0F1B33] text-sm font-mono focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#E9C176] transition-all" placeholder="Enter 64-char block hash...">
+                    </div>
+                </div>
+
+                <div class="relative flex items-center justify-center py-2">
+                    <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-100 dark:border-slate-800"></div></div>
+                    <span class="relative px-4 bg-white dark:bg-[#1C2A41] text-[10px] font-black text-slate-300 dark:text-slate-600 uppercase tracking-widest">OR</span>
+                </div>
+
+                <div class="space-y-1.5">
+                    <label class="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Document Index ID</label>
+                    <div class="relative">
+                        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">tag</span>
+                        <input type="number" id="input-id" class="w-full pl-10 pr-4 py-3 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#0F1B33] text-sm font-bold focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#E9C176] transition-all" placeholder="e.g. 35">
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="runVerification()" class="w-full bg-primary dark:bg-[#E9C176] text-white dark:text-[#0A192F] py-4 rounded-xl font-extrabold uppercase tracking-widest text-xs flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-blue-900/10 dark:shadow-none">
+                <span class="material-symbols-outlined text-xl">verified_user</span>
+                Verify Now
+            </button>
+        </div>
+
+        <!-- Result Display -->
+        <div id="verify-output" class="hidden space-y-6 fade-in"></div>
+    </main>
+
+    <footer class="text-center py-8 text-slate-400 dark:text-slate-600">
+        <p class="text-[10px] font-black uppercase tracking-[0.2em] mb-2">Powered by DoVER Protocol</p>
+        <p class="text-[9px] font-medium">Decentralized Official Vault for Electronic Records &copy; 2026</p>
+    </footer>
+
+    <script>
+        // Fetch latest Merkle Root for header
+        fetch('/api/chain').then(r => r.json()).then(chain => {
+            const root = chain.length ? chain[chain.length-1].merkle_root : 'No Active Chain';
+            document.getElementById('global-root').textContent = root ? root.slice(0,24) + '...' : 'Pending';
+        });
+
+        async function runVerification() {
+            const hash = document.getElementById('input-hash').value.trim();
+            const id = document.getElementById('input-id').value.trim();
+            const out = document.getElementById('verify-output');
+
+            if (!hash && !id) return alert('Enter a hash or an ID');
+
+            out.innerHTML = `<div class="py-12 flex justify-center"><div class="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div></div>`;
+            out.classList.remove('hidden');
+
+            const url = id ? `/api/verify/public/verify/qr/${id}` : `/api/verify/public/verify/${hash}`;
+
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+
+                if (!data.found) {
+                    out.innerHTML = `
+                        <div class="bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-2xl p-8 text-center space-y-4">
+                            <span class="material-symbols-outlined text-5xl text-red-500">search_off</span>
+                            <h3 class="text-xl font-bold text-red-900 dark:text-red-400">Record Not Found</h3>
+                            <p class="text-sm text-red-800/60 dark:text-red-400/60">The identifier provided does not match any entry in the decentralized registry.</p>
+                        </div>`;
+                    return;
+                }
+
+                const isOriginal = !data.is_tampered;
+                const sigColor = data.signature_status === 'VERIFIED' ? 'emerald' : (data.signature_status === 'INVALID' ? 'red' : 'slate');
+                const sigIcon = data.signature_status === 'VERIFIED' ? 'shield_with_heart' : (data.signature_status === 'INVALID' ? 'warning' : 'shield');
+                const sigLabel = data.signature_status === 'VERIFIED' ? 'Cryptographically Signed' : (data.signature_status === 'INVALID' ? 'Signature Invalid' : 'Legacy Document');
+
+                out.innerHTML = `
+                    <div class="space-y-6">
+                        <div class="${isOriginal ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-900/30 text-emerald-900 dark:text-emerald-400' : 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30 text-red-900 dark:text-red-400'} border rounded-2xl p-8 text-center space-y-4 verdict-banner">
+                            <span class="material-symbols-outlined text-6xl">${isOriginal ? 'verified' : 'gpp_bad'}</span>
+                            <h3 class="text-2xl font-black uppercase tracking-tight">${isOriginal ? 'Authentic Document' : 'Tampered Document'}</h3>
+                            
+                            <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-${sigColor}-100 dark:bg-${sigColor}-900/20 text-${sigColor}-700 dark:text-${sigColor}-400 text-[10px] font-black uppercase border border-${sigColor}-200 dark:border-${sigColor}-900/30 shadow-sm">
+                                <span class="material-symbols-outlined text-sm" style="font-variation-settings:'FILL' 1">${sigIcon}</span>
+                                ${sigLabel}
+                            </div>
+                        </div>
+
+                        <div class="bg-white dark:bg-[#1C2A41] rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-lg">
+                            <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0F1B33]/50 flex justify-between items-center">
+                                <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Registry Details</span>
+                                <span class="text-[10px] font-black text-blue-600 dark:text-[#E9C176]">BLOCK #${data.document_id}</span>
+                            </div>
+                            <div class="p-6 space-y-4">
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div><p class="text-[9px] uppercase font-black text-slate-400 mb-1">Legal Identity</p><p class="text-xs font-bold text-slate-700 dark:text-[#D6E3FF]">${data.uploaded_by}</p></div>
+                                    <div><p class="text-[9px] uppercase font-black text-slate-400 mb-1">Upload Date</p><p class="text-xs font-bold text-slate-700 dark:text-[#D6E3FF]">${new Date(data.upload_timestamp).toLocaleString()}</p></div>
+                                </div>
+                                <div><p class="text-[9px] uppercase font-black text-slate-400 mb-1">File Registered</p><p class="text-xs font-bold text-slate-700 dark:text-[#D6E3FF]">${data.filename}</p></div>
+                                <div>
+                                    <p class="text-[9px] uppercase font-black text-slate-400 mb-1">Cryptographic Fingerprint</p>
+                                    <code class="block bg-slate-50 dark:bg-[#0F1B33] p-3 rounded-lg text-[10px] hash-mono text-slate-500 dark:text-[#D6E3FF]/60 border border-slate-100 dark:border-slate-800">${data.block_hash}</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } catch (e) {
+                out.innerHTML = `<div class="text-center py-8 text-red-500 font-bold text-sm">System connection failed. Please try again.</div>`;
+            }
+            }
+
+            // Auto-verify if ID or Hash is in URL
+            window.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const id = urlParams.get('id');
+            const hash = urlParams.get('hash');
+
+            if (id) {
+                document.getElementById('input-id').value = id;
+                runVerification();
+            } else if (hash) {
+                document.getElementById('input-hash').value = hash;
+                runVerification();
+            }
+            });
+
+            // Apply dark mode if user has preference
+
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        }
+    </script>
+</body>
+</html>

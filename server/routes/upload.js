@@ -14,6 +14,7 @@ const { Jimp } = require('jimp');
 const { rgbaToInt } = require('@jimp/utils');
 const { getBucket } = require('../db/mongodb');
 const documentQueue = require('../utils/queue');
+const apiKey = require('../middleware/apiKey');
 
 // Configure multer for temp storage
 const storage = multer.diskStorage({
@@ -40,7 +41,7 @@ const upload = multer({
     }
 });
 
-router.post('/', (req, res) => {
+router.post('/', apiKey, (req, res) => {
     upload.single('file')(req, res, async (err) => {
         if (err) return res.status(400).json({ success: false, error: err.message });
 
@@ -107,7 +108,7 @@ router.post('/', (req, res) => {
 });
 
 // ── Batch Upload (Queue-Based) ──
-router.post('/batch-upload', (req, res) => {
+router.post('/batch-upload', apiKey, (req, res) => {
     upload.array('files', 20)(req, res, async (err) => {
         if (err) return res.status(400).json({ success: false, error: err.message });
 
@@ -150,6 +151,28 @@ router.post('/batch-upload', (req, res) => {
             res.status(500).json({ success: false, error: error.message || 'Batch upload failed' });
         }
     });
+});
+
+// ── Job Status Endpoint ──
+router.get('/status/:job_id', async (req, res) => {
+    try {
+        const job = await documentQueue.getJob(req.params.job_id);
+        if (!job) return res.status(404).json({ error: 'Job not found' });
+
+        const state = await job.getState();
+        const progress = job._progress;
+        const result = job.returnvalue;
+
+        res.json({
+            id: job.id,
+            state,
+            progress,
+            result,
+            error: job.failedReason
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to get job status' });
+    }
 });
 
 module.exports = router;

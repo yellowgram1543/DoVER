@@ -1,17 +1,32 @@
+// ── API Configuration ──
+const API_KEY = 'dover_secret_key_2026';
+
 // ── API helpers ──
 const API = {
     async getStats() { return (await fetch('/api/stats')).json(); },
     async getChain() { return (await fetch('/api/chain')).json(); },
     async upload(formData) {
-        return (await fetch('/api/upload', { method: 'POST', body: formData })).json();
+        return (await fetch('/api/upload', { 
+            method: 'POST', 
+            headers: { 'x-api-key': API_KEY },
+            body: formData 
+        })).json();
     },
     async verify(formData) {
-        return (await fetch('/api/verify', { method: 'POST', body: formData })).json();
+        return (await fetch('/api/verify', { 
+            method: 'POST', 
+            headers: { 'x-api-key': API_KEY },
+            body: formData 
+        })).json();
     },
     async getAudit() { return (await fetch('/api/chain/audit')).json(); },
     async getDocumentHistory(id) { return (await fetch(`/api/chain/document/${id}/history`)).json(); },
     async batchUpload(formData) {
-        return (await fetch('/api/upload/batch-upload', { method: 'POST', body: formData })).json();
+        return (await fetch('/api/upload/batch-upload', { 
+            method: 'POST', 
+            headers: { 'x-api-key': API_KEY },
+            body: formData 
+        })).json();
     },
     async getBatchStatus(batchId) {
         return (await fetch(`/api/chain/batch/${batchId}/status`)).json();
@@ -243,70 +258,44 @@ function renderUpload(app) {
             const resultDiv = document.getElementById('upload-result');
             resultDiv.classList.remove('hidden');
             if (res.success) {
-                // Forensic & Signature UI logic
-                let forensicHtml = '';
-                if (res.forensic_score) {
-                    if (res.forensic_score.suspicious) {
-                        forensicHtml = `
-                            <div class="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
-                                <div class="flex items-center gap-2 mb-2 text-orange-700 font-bold text-xs uppercase tracking-wider">
-                                    <span class="material-symbols-outlined text-sm">forensics</span> Forensic Analysis: Suspicious Document
-                                </div>
-                                <ul class="space-y-1">
-                                    ${res.forensic_score.flags.map(f => `<li class="text-[10px] text-orange-800 flex items-center gap-1.5"><span class="w-1 h-1 rounded-full bg-orange-400"></span> ${f}</li>`).join('')}
-                                </ul>
-                            </div>
-                        `;
-                    } else {
-                        forensicHtml = `
-                            <div class="mt-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-700 text-[10px] font-extrabold uppercase">
-                                <span class="material-symbols-outlined text-xs">verified</span> Forensic Analysis: Clean
-                            </div>
-                        `;
-                    }
-                }
+                // If it's a queued job, we need to wait for it or tell user it's processing
+                if (res.status === 'processing') {
+                    resultDiv.innerHTML = `<div class="result-card bg-blue-50 border border-blue-200 rounded-xl p-6 fade-in">
+                        <div class="flex items-center gap-3 mb-2"><span class="material-symbols-outlined text-blue-600 animate-spin">sync</span><span class="text-xs font-bold text-blue-700 uppercase">Processing...</span></div>
+                        <p class="text-sm text-blue-800/70">Document #${res.job_id} is being secured on the blockchain. Check the Chain Explorer in a few seconds.</p>
+                    </div>`;
+                    
+                    // Poll for specific job completion
+                    let attempts = 0;
+                    const checkJob = setInterval(async () => {
+                        attempts++;
+                        try {
+                            const status = await fetch(`/api/upload/status/${res.job_id}`, {
+                                headers: { 'x-api-key': API_KEY }
+                            }).then(r => r.json());
 
-                let signatureHtml = '';
-                if (res.signature_score) {
-                    const s = res.signature_score;
-                    if (s.signature_found || s.seal_found) {
-                        signatureHtml = '<div class="flex flex-wrap gap-2 mt-2">';
-                        if (s.signature_found) signatureHtml += `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 text-[9px] font-black uppercase"><span class="material-symbols-outlined text-[12px]">draw</span> Signature Detected</span>`;
-                        if (s.seal_found) signatureHtml += `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 text-[9px] font-black uppercase"><span class="material-symbols-outlined text-[12px]">approval_delegation</span> Seal Detected</span>`;
-                        signatureHtml += '</div>';
-                    } else {
-                        signatureHtml = `<div class="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-orange-100 text-orange-700 text-[9px] font-black uppercase"><span class="material-symbols-outlined text-[12px]">warning</span> Warning: No Signature or Seal Found</div>`;
-                    }
+                            if (status.state === 'completed' && status.result) {
+                                clearInterval(checkJob);
+                                // The result now contains the correct block_index and qr_image_base64
+                                const finalResult = {
+                                    ...status.result,
+                                    block_index: status.result.document_id, // Map for UI consistency
+                                    upload_timestamp: new Date().toISOString() // Fallback
+                                };
+                                renderSuccessUI(resultDiv, finalResult);
+                            } else if (status.state === 'failed' || attempts > 20) {
+                                clearInterval(checkJob);
+                                resultDiv.innerHTML = `<div class="result-card bg-red-50 border border-red-200 rounded-xl p-6 fade-in">
+                                    <div class="flex items-center gap-3 mb-2"><span class="material-symbols-outlined text-red-600">error</span><span class="text-xs font-bold text-red-700 uppercase">Processing Failed</span></div>
+                                    <p class="text-sm text-red-800/70">${status.error || 'The background processor failed to secure this document.'}</p>
+                                </div>`;
+                            }
+                        } catch (e) {
+                            console.error('Polling error:', e);
+                        }
+                    }, 3000);
+                    return;
                 }
-
-                let forensicThumbnailHtml = '';
-                if (res.forensic_thumbnail) {
-                    forensicThumbnailHtml = `
-                        <div class="mt-4 p-3 bg-white rounded-lg border border-primary/10 shadow-sm">
-                            <p class="text-[9px] font-black text-slate-400 uppercase mb-2">Forensic Highlight: Signature Area</p>
-                            <img src="${res.forensic_thumbnail}" class="w-full rounded border border-red-200" alt="Signature Highlight"/>
-                            <p class="text-[8px] text-center mt-1 text-red-500 font-bold">RED BOX = DETECTED HANDWRITING</p>
-                        </div>
-                    `;
-                }
-
-                resultDiv.innerHTML = `<div class="result-card bg-green-50/50 border border-green-200 rounded-xl p-6 relative overflow-hidden fade-in">
-                    <div class="flex items-center gap-3 mb-4"><span class="material-symbols-outlined text-green-600">verified</span><span class="text-xs font-bold text-green-700 uppercase tracking-widest">Upload Successful</span></div>
-                    <div class="flex flex-col md:flex-row gap-6 items-start">
-                        <div class="flex-1">
-                            <h4 class="text-lg font-bold text-green-900 mb-2">Document Secured</h4>
-                            <p class="text-sm text-green-800/70 mb-3">Block Index: <strong>#${res.block_index}</strong></p>
-                            <code class="hash-text bg-green-100 px-3 py-2 rounded block text-green-800 mb-2">${res.block_hash}</code>
-                            ${signatureHtml}
-                            ${forensicThumbnailHtml}
-                            ${forensicHtml}
-                        </div>
-                        <div class="bg-white p-2 rounded-lg shadow-sm border border-green-100">
-                            <img src="${res.qr_image_base64}" class="w-32 h-32" alt="Verification QR"/>
-                            <p class="text-[10px] text-center mt-1 text-green-600 font-bold">SCAN TO VERIFY</p>
-                        </div>
-                    </div>
-                </div>`;
             } else if (res.existing_document_id) {
                 resultDiv.innerHTML = `<div class="result-card bg-orange-50 border border-orange-200 rounded-xl p-6 fade-in relative">
                     <div class="flex items-center gap-3 mb-3">
@@ -346,6 +335,62 @@ function renderUpload(app) {
         submitBtn.disabled = false;
         submitBtn.innerHTML = '<span class="material-symbols-outlined">upload_file</span> Submit Record';
     });
+}
+
+function renderSuccessUI(resultDiv, res) {
+    // Forensic & Signature UI logic
+    let forensicHtml = '';
+    if (res.forensic_score) {
+        const forensic = typeof res.forensic_score === 'string' ? JSON.parse(res.forensic_score) : res.forensic_score;
+        if (forensic.suspicious) {
+            forensicHtml = `
+                <div class="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                    <div class="flex items-center gap-2 mb-2 text-orange-700 font-bold text-xs uppercase tracking-wider">
+                        <span class="material-symbols-outlined text-sm">forensics</span> Forensic Analysis: Suspicious Document
+                    </div>
+                    <ul class="space-y-1">
+                        ${forensic.flags.map(f => `<li class="text-[10px] text-orange-800 flex items-center gap-1.5"><span class="w-1 h-1 rounded-full bg-orange-400"></span> ${f}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+        } else {
+            forensicHtml = `
+                <div class="mt-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-700 text-[10px] font-extrabold uppercase">
+                    <span class="material-symbols-outlined text-xs">verified</span> Forensic Analysis: Clean
+                </div>
+            `;
+        }
+    }
+
+    let signatureHtml = '';
+    if (res.signature_score) {
+        const s = typeof res.signature_score === 'string' ? JSON.parse(res.signature_score) : res.signature_score;
+        if (s.signature_found || s.seal_found) {
+            signatureHtml = '<div class="flex flex-wrap gap-2 mt-2">';
+            if (s.signature_found) signatureHtml += `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 text-[9px] font-black uppercase"><span class="material-symbols-outlined text-[12px]">draw</span> Signature Detected</span>`;
+            if (s.seal_found) signatureHtml += `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 text-[9px] font-black uppercase"><span class="material-symbols-outlined text-[12px]">approval_delegation</span> Seal Detected</span>`;
+            signatureHtml += '</div>';
+        } else {
+            signatureHtml = `<div class="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-orange-100 text-orange-700 text-[9px] font-black uppercase"><span class="material-symbols-outlined text-[12px]">warning</span> Warning: No Signature or Seal Found</div>`;
+        }
+    }
+
+    resultDiv.innerHTML = `<div class="result-card bg-green-50/50 border border-green-200 rounded-xl p-6 relative overflow-hidden fade-in">
+        <div class="flex items-center gap-3 mb-4"><span class="material-symbols-outlined text-green-600">verified</span><span class="text-xs font-bold text-green-700 uppercase tracking-widest">Upload Successful</span></div>
+        <div class="flex flex-col md:flex-row gap-6 items-start">
+            <div class="flex-1">
+                <h4 class="text-lg font-bold text-green-900 mb-2">Document Secured</h4>
+                <p class="text-sm text-green-800/70 mb-3">Block Index: <strong>#${res.block_index}</strong></p>
+                <code class="hash-text bg-green-100 px-3 py-2 rounded block text-green-800 mb-2">${res.block_hash}</code>
+                ${signatureHtml}
+                ${forensicHtml}
+            </div>
+            <div class="bg-white p-2 rounded-lg shadow-sm border border-green-100">
+                <img src="${res.qr_image_base64 || ''}" class="w-32 h-32" alt="Verification QR"/>
+                <p class="text-[10px] text-center mt-1 text-green-600 font-bold">SCAN TO VERIFY</p>
+            </div>
+        </div>
+    </div>`;
 }
 
 // ── Verify Page ──
@@ -452,9 +497,13 @@ function renderVerify(app) {
                     <div class="flex items-center gap-3 mb-4"><span class="material-symbols-outlined text-green-600">verified</span><span class="text-xs font-bold text-green-700 uppercase tracking-widest">Status: Valid</span></div>
                     ${sigBadge}
                     <h4 class="text-lg font-bold text-green-900 mb-2">Original Document</h4>
-                    <p class="text-[10px] font-black text-emerald-600 uppercase mb-2">Compared against: ${res.original_uploader}'s upload from ${new Date(res.original_upload_date).toLocaleDateString()}</p>
+                    <p class="text-[10px] font-black text-emerald-600 uppercase mb-2">Compared against: ${res.uploaded_by || 'Unknown'}'s upload from ${res.upload_timestamp ? new Date(res.upload_timestamp).toLocaleDateString() : 'Original Date'}</p>
                     <p class="text-sm text-green-800/70 leading-relaxed">Hash matches the registry record.</p>
-                    <code class="hash-text bg-green-100 px-3 py-2 rounded block mt-3 text-green-800 mb-4">${res.original_hash}</code>
+                    <code class="hash-text bg-green-100 px-3 py-2 rounded block mt-3 text-green-800 mb-4">${res.file_hash || 'Verified'}</code>
+                    ${res.merkle_root ? `<div class="mb-4 text-[10px] text-slate-500 font-mono bg-slate-50 p-2 rounded border border-slate-100">
+                        <span class="block font-black uppercase text-slate-400 mb-1">Merkle Root Inclusion:</span>
+                        ${res.merkle_root}
+                    </div>` : ''}
                     ${res.ocr_valid ? '<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-700 text-[10px] font-extrabold uppercase"><span class="material-symbols-outlined text-xs">description</span>Text Content Verified</div>' : ''}
                 </div>`;
             } else if (res.error) {
@@ -518,12 +567,21 @@ function renderVerify(app) {
                     }
                 }
 
+                const reasons = res.tamper_reasons ? res.tamper_reasons.map(r => `<li class="flex items-center gap-2 text-red-800/80"><span class="w-1.5 h-1.5 rounded-full bg-red-400"></span> ${r}</li>`).join('') : '';
+                const blockId = res.document_id || res.block_index || 'N/A';
+
                 r.innerHTML = `<div class="result-card bg-red-50/50 border border-red-200 rounded-xl p-6 relative overflow-hidden fade-in">
                     <div class="flex items-center gap-3 mb-4"><span class="material-symbols-outlined text-red-600">error</span><span class="text-xs font-bold text-red-700 uppercase tracking-widest">Status: Tampered</span></div>
                     ${sigBadge}
                     <h4 class="text-lg font-bold text-red-900 mb-2">Deep Verification Failed</h4>
-                    <p class="text-[10px] font-black text-red-600 uppercase mb-2">Compared against: ${res.original_uploader}'s upload from ${new Date(res.original_upload_date).toLocaleDateString()}</p>
-                    <p class="text-sm text-red-800/70 leading-relaxed">System has detected unauthorized modifications via multi-layered analysis.</p>
+                    <p class="text-[10px] font-black text-red-600 uppercase mb-2">Reference: Block #${blockId}</p>
+                    <p class="text-sm text-red-800/70 leading-relaxed mb-4">System has detected unauthorized modifications via multi-layered analysis.</p>
+                    
+                    ${reasons ? `<div class="bg-white/50 p-4 rounded-lg border border-red-100 mb-4">
+                        <p class="text-[9px] font-black text-red-400 uppercase mb-2">Tamper Reasons Identified:</p>
+                        <ul class="space-y-1 text-xs">${reasons}</ul>
+                    </div>` : ''}
+
                     ${ocrDisplay}
                     ${forensicDiff}
                     ${signatureDiff}
@@ -547,9 +605,20 @@ function renderChain(app) {
         <div class="flex flex-col md:flex-row md:items-end justify-between mb-2 gap-6">
             <div class="space-y-2"><h1 class="text-4xl font-extrabold tracking-tight text-primary">Chain Explorer</h1>
             <p class="text-on-surface-variant max-w-lg">Immutable ledger of document interactions. Every entry is cryptographically sealed.</p></div>
-            <div class="bg-surface-container-lowest px-5 py-3 rounded-xl flex items-center gap-4 shadow-sm">
-                <div class="text-right"><p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Network Status</p>
-                <p class="text-sm font-bold text-green-600 flex items-center justify-end gap-1"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> Synchronized</p></div>
+            <div class="flex flex-col items-end gap-3">
+                <div class="bg-surface-container-lowest px-5 py-3 rounded-xl flex items-center gap-4 shadow-sm border border-emerald-100">
+                    <div class="text-right">
+                        <p class="text-[9px] uppercase font-black text-emerald-600 tracking-widest">Current Merkle Root</p>
+                        <code id="current-merkle-root" class="text-xs font-mono font-bold text-emerald-700 tracking-tighter">Initializing...</code>
+                    </div>
+                    <div class="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center">
+                        <span class="material-symbols-outlined text-sm">account_tree</span>
+                    </div>
+                </div>
+                <div class="bg-surface-container-lowest px-5 py-3 rounded-xl flex items-center gap-4 shadow-sm">
+                    <div class="text-right"><p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Network Status</p>
+                    <p class="text-sm font-bold text-green-600 flex items-center justify-end gap-1"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> Synchronized</p></div>
+                </div>
             </div>
         </div>`;
     renderStatsBar(wrap);
@@ -585,25 +654,52 @@ function loadChain(silent = false) {
         if (!chain.length) {
             body.innerHTML = '<tr><td colspan="6" class="px-6 py-8 text-center text-slate-400">No blocks yet. Upload a document to begin.</td></tr>';
             document.getElementById('chain-count').textContent = '0 entries';
+            const rootEl = document.getElementById('current-merkle-root');
+            if (rootEl) rootEl.textContent = 'None';
             return;
         }
+
+        // Update Global Merkle Root in Header
+        const latestRoot = chain[chain.length - 1].merkle_root;
+        const rootEl = document.getElementById('current-merkle-root');
+        if (rootEl) rootEl.textContent = latestRoot ? latestRoot.slice(0, 24) + '...' : 'Pending';
+
         const sorted = [...chain].reverse();
         body.innerHTML = sorted.map((d, i) => {
             const fname = d.filename.split(/[/\\]/).pop();
             const status = d.is_tampered
                 ? '<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-100 text-red-700 text-[10px] font-extrabold uppercase"><span class="w-1.5 h-1.5 rounded-full bg-red-500 pulse-dot"></span>Tampered</span>'
                 : '<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-700 text-[10px] font-extrabold uppercase"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>Verified</span>';
+            
+            const merkleBadge = d.merkle_proof 
+                ? `<div class="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-600 text-[8px] font-black border border-emerald-100 uppercase">
+                    <span class="material-symbols-outlined text-[10px]">account_tree</span> Merkle Verified
+                   </div>`
+                : '';
+
             return `<tr class="${i%2===0?'':'bg-surface-container-lowest'} hover:bg-slate-50/50 transition-colors">
                 <td class="px-6 py-5 text-sm font-bold text-secondary">#${d.block_index}</td>
                 <td class="px-6 py-5 text-sm font-semibold text-primary">
                     ${fname}
                     <div class="mt-1">
-                        <a href="/api/verify/${d.block_index}/proof" target="_blank" class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-secondary hover:text-primary-container transition-colors">
+                        <a href="/api/verify/${d.block_index}/proof?api_key=${API_KEY}" target="_blank" class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-secondary hover:text-primary-container transition-colors">
                             <span class="material-symbols-outlined text-[12px]">download</span> Download Proof
                         </a>
                     </div>
                 </td>
-                <td class="px-6 py-5"><code class="text-[11px] font-mono bg-slate-100 px-2 py-1 rounded text-slate-600">${d.block_hash.slice(0,16)}...</code></td>
+                <td class="px-6 py-5 flex flex-col gap-1">
+                    <div class="flex items-center gap-2">
+                        <span class="text-[8px] font-black text-slate-400 uppercase">Block Hash:</span>
+                        <code class="text-[10px] font-mono bg-slate-100 px-2 py-0.5 rounded text-slate-600">${d.block_hash.slice(0,16)}...</code>
+                    </div>
+                    ${d.merkle_root ? `
+                    <div class="flex items-center gap-2">
+                        <span class="text-[8px] font-black text-emerald-400 uppercase">Merkle Root:</span>
+                        <code class="text-[10px] font-mono bg-emerald-50 px-2 py-0.5 rounded text-emerald-600">${d.merkle_root.slice(0,16)}...</code>
+                    </div>
+                    ` : ''}
+                    ${merkleBadge}
+                </td>
                 <td class="px-6 py-5 text-xs font-semibold text-slate-600">${d.uploaded_by || 'Anonymous'}</td>
                 <td class="px-6 py-5 text-xs text-on-surface-variant font-medium">${new Date(d.upload_timestamp).toLocaleString()}</td>
                 <td class="px-6 py-5">${status}</td></tr>`;
