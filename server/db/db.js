@@ -28,4 +28,13 @@ try {
     }
 }
 
+try {
+    db.prepare('ALTER TABLE documents ADD COLUMN ai_summary TEXT').run();
+    console.log('[DB_MIGRATE] ✓ Added ai_summary column');
+} catch (err) {
+    if (!err.message.includes('duplicate column name')) {
+        console.error('[DB_MIGRATE] ✗ Error adding ai_summary column:', err.message);
+    }
+}
+
 module.exports = db;
