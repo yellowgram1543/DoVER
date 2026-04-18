@@ -10,6 +10,27 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { getBucket } = require('../db/mongodb');
+const { Worker } = require('worker_threads');
+const { anchorBatch } = require('./polygon');
+
+/**
+ * Helper to run heavy analysis in a separate thread.
+ */
+function analyzeInWorker(filePath, type) {
+    return new Promise((resolve, reject) => {
+        const worker = new Worker(path.join(__dirname, 'analysis_worker.js'), {
+            workerData: { filePath, type }
+        });
+        worker.on('message', (msg) => {
+            if (msg.success) resolve(msg.data);
+            else reject(new Error(msg.error));
+        });
+        worker.on('error', reject);
+        worker.on('exit', (code) => {
+            if (code !== 0) reject(new Error(`Worker stopped with exit code ${code}`));
+        });
+    });
+}
 
 let isInitialized = false;
 
@@ -18,7 +39,7 @@ function initProcessor() {
     isInitialized = true;
 
     documentQueue.process(1, async (job) => {
-        const { filePath, originalname, mimetype, uploadedBy, parent_document_id, version_number, version_note } = job.data;
+        const { filePath, originalname, mimetype, uploadedBy, uploaderEmail, parent_document_id, version_number, version_note } = job.data;
 
         try {
             // Validate file exists
@@ -49,7 +70,7 @@ function initProcessor() {
             await job.progress(25);
 
             // ── Step 2: Generate Hashes (25→50%) ──
-            const fileHash = await hasher.generateFileHashAsync(filePath);
+            const fileHash = job.data.fileHash || await hasher.generateFileHashAsync(filePath);
             const prevHash = hasher.getLastBlockHash(db);
             const timestamp = new Date().toISOString();
             const blockHash = hasher.generateBlockHash(fileHash, prevHash, timestamp);
@@ -71,14 +92,10 @@ function initProcessor() {
                     const sign = crypto.createSign('SHA256');
                     sign.update(blockHash);
                     documentSignature = sign.sign(privateKey, 'hex');
-                    console.log('Signed block_hash:', blockHash);
-                    console.log('Signature first 20:', documentSignature.substring(0, 20));
                 } catch (sigError) {
                     console.error('[PROCESSOR] Signature generation failed:', sigError.message);
                 }
             }
-
-            await job.progress(50);
 
             // ── Step 3: AI Analysis — OCR, Forensics, Signature (50→75%) ──
             let ocrText = null;
@@ -87,11 +104,13 @@ function initProcessor() {
             let signatureScore = null;
 
             if (/png|jpg|jpeg/.test(mimetype)) {
+                // OCR stays on main (it's mostly I/O waiting for the Tesseract process)
                 ocrText = await ocr.extractText(filePath);
                 if (ocrText) ocrHash = crypto.createHash('sha256').update(ocrText).digest('hex');
 
-                const forensicReport = await forensics.analyzeImage(filePath);
-                const sigReport = await signature.detectSignature(filePath);
+                // Forensics and Signature offloaded to Worker Thread
+                const forensicReport = await analyzeInWorker(filePath, 'forensics');
+                const sigReport = await analyzeInWorker(filePath, 'signature');
 
                 if (!sigReport.signature_found) {
                     forensicReport.flags.push('No signature detected in typical signing areas');
@@ -107,21 +126,29 @@ function initProcessor() {
             // Final Duplicate Check (Atomic within processor concurrency=1)
             // ONLY if NOT a version update
             if (!parent_document_id) {
-                const finalExisting = db.prepare('SELECT block_index FROM documents WHERE filename = ? AND uploaded_by = ?').get(originalname, uploadedBy);
+                // NEW: Check by file_hash AND uploadedBy
+                const finalExisting = db.prepare('SELECT block_index, filename, upload_timestamp FROM documents WHERE file_hash = ? AND uploaded_by = ?').get(fileHash, uploadedBy);
                 if (finalExisting) {
-                    console.log(`[PROCESSOR] ⚠ Skipping duplicate document: ${originalname} for ${uploadedBy}`);
+                    console.log(`[PROCESSOR] ⚠ Skipping duplicate content: ${originalname} matches Block #${finalExisting.block_index}`);
                     if (fs.existsSync(filePath)) {
                         try { fs.unlinkSync(filePath); } catch (e) {}
                     }
-                    return { success: false, error: 'Duplicate', existing_id: finalExisting.block_index, filename: originalname };
+                    return { 
+                        success: false, 
+                        error: 'Duplicate', 
+                        existing_id: finalExisting.block_index, 
+                        existing_filename: finalExisting.filename,
+                        uploaded_at: finalExisting.upload_timestamp,
+                        filename: originalname 
+                    };
                 }
             }
 
             const insertDoc = db.prepare(`
-                INSERT INTO documents (filename, file_type, uploaded_by, upload_timestamp, file_hash, prev_hash, block_hash, ocr_text, ocr_hash, forensic_score, signature_score, storage_id, signature, merkle_root, merkle_proof, parent_document_id, version_number, version_note)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO documents (filename, file_type, uploaded_by, uploader_email, upload_timestamp, file_hash, prev_hash, block_hash, ocr_text, ocr_hash, forensic_score, signature_score, storage_id, signature, merkle_root, merkle_proof, parent_document_id, version_number, version_note)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `);
-            const result = insertDoc.run(originalname, mimetype, uploadedBy, timestamp, fileHash, prevHash, blockHash, ocrText, ocrHash, forensicScore, signatureScore, gridfsId, documentSignature, merkleRoot, JSON.stringify(merkleProof), parent_document_id, version_number || 1, version_note);
+            const result = insertDoc.run(originalname, mimetype, uploadedBy, uploaderEmail, timestamp, fileHash, prevHash, blockHash, ocrText, ocrHash, forensicScore, signatureScore, gridfsId, documentSignature, merkleRoot, JSON.stringify(merkleProof), parent_document_id, version_number || 1, version_note);
             const documentId = result.lastInsertRowid;
 
             // ── Step 4.5: Update Global Merkle Root ──
@@ -133,6 +160,33 @@ function initProcessor() {
             if (documentId % 100 === 0) {
                 db.prepare('UPDATE documents SET checkpoint_hash = ? WHERE block_index = ?').run(blockHash, documentId);
                 console.log(`[PROCESSOR] ⚐ Checkpoint created at Block #${documentId}`);
+            }
+
+            // ── Step 5.5: Polygon Anchoring (Every 10 blocks) ──
+            if (documentId % 10 === 0) {
+                console.log(`[PROCESSOR] ⛓ Reached 10-block boundary (#${documentId}). Triggering Polygon anchor...`);
+                try {
+                    // Fetch the last 10 block hashes
+                    const batch = db.prepare('SELECT block_hash FROM documents ORDER BY block_index DESC LIMIT 10').all();
+                    const batchHashes = batch.map(b => b.block_hash).reverse();
+                    
+                    const batchMerkle = buildMerkleTree(batchHashes);
+                    const batchRoot = batchMerkle.root;
+                    
+                    const polygonTxid = await anchorBatch(batchRoot, {
+                        startBlock: documentId - 9,
+                        endBlock: documentId,
+                        batchSize: 10
+                    });
+
+                    if (polygonTxid) {
+                        const updateStmt = db.prepare('UPDATE documents SET polygon_txid = ? WHERE block_index > ? AND block_index <= ?');
+                        updateStmt.run(polygonTxid, documentId - 10, documentId);
+                        console.log(`[PROCESSOR] ✓ Batch #${documentId/10} anchored to Polygon. TXID: ${polygonTxid}`);
+                    }
+                } catch (anchorErr) {
+                    console.error('[PROCESSOR] Polygon anchoring trigger failed:', anchorErr.message);
+                }
             }
 
             db.prepare(`INSERT INTO audit_log (document_id, action, actor, details) VALUES (?, ?, ?, ?)`)
@@ -156,6 +210,7 @@ function initProcessor() {
             const qrImageBase64 = await qr.generateQR(qrData);
 
             return {
+                success: true,
                 document_id: documentId,
                 block_hash: blockHash,
                 gridfs_id: gridfsId,
