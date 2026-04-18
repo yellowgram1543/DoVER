@@ -3,14 +3,25 @@ const router = express.Router();
 const db = require('../db/db');
 const documentQueue = require('../utils/queue');
 
+/**
+ * Helper to check if a user can access a specific document.
+ * Authority can access all. Regular users can only access their own.
+ */
+function canAccessDocument(user, document) {
+    if (!user) return false;
+    if (user.role === 'authority') return true;
+    return document.uploaded_by === user.name || document.uploader_email === user.email;
+}
+
 router.get('/', (req, res) => {
     try {
-        const isAdmin = req.user && req.user.role === 'authority';
+        const isAuthority = req.user && req.user.role === 'authority';
         let documents;
-        if (isAdmin) {
+        if (isAuthority) {
             documents = db.prepare('SELECT * FROM documents ORDER BY block_index ASC').all();
         } else {
-            documents = db.prepare('SELECT * FROM documents WHERE uploaded_by = ? ORDER BY block_index ASC').all(req.user.name);
+            // Check both name and email for robustness, as some legacy docs might lack email
+            documents = db.prepare('SELECT * FROM documents WHERE uploaded_by = ? OR uploader_email = ? ORDER BY block_index ASC').all(req.user.name, req.user.email);
         }
         res.json(documents);
     } catch (error) {
@@ -21,9 +32,9 @@ router.get('/', (req, res) => {
 
 router.get('/audit', (req, res) => {
     try {
-        const isAdmin = req.user && req.user.role === 'authority';
+        const isAuthority = req.user && req.user.role === 'authority';
         let auditLogs;
-        if (isAdmin) {
+        if (isAuthority) {
             auditLogs = db.prepare(`
                 SELECT a.document_id, d.filename, a.action, a.actor, a.timestamp, a.details
                 FROM audit_log a
@@ -35,9 +46,9 @@ router.get('/audit', (req, res) => {
                 SELECT a.document_id, d.filename, a.action, a.actor, a.timestamp, a.details
                 FROM audit_log a
                 JOIN documents d ON a.document_id = d.block_index
-                WHERE d.uploaded_by = ?
+                WHERE d.uploaded_by = ? OR d.uploader_email = ?
                 ORDER BY a.timestamp DESC
-            `).all(req.user.name);
+            `).all(req.user.name, req.user.email);
         }
         res.json(auditLogs);
     } catch (error) {
@@ -48,6 +59,15 @@ router.get('/audit', (req, res) => {
 
 router.get('/document/:id/history', (req, res) => {
     try {
+        const doc = db.prepare('SELECT uploaded_by, uploader_email FROM documents WHERE block_index = ?').get(req.params.id);
+        if (!doc) {
+            return res.status(404).json({ success: false, error: 'Document not found' });
+        }
+
+        if (!canAccessDocument(req.user, doc)) {
+            return res.status(403).json({ success: false, error: 'Permission denied' });
+        }
+
         const history = db.prepare(`
             SELECT a.document_id, d.filename, a.action, a.actor, a.timestamp, a.details
             FROM audit_log a
@@ -79,10 +99,18 @@ router.get('/batch/:batch_id/status', async (req, res) => {
         const allJobs = [...waiting, ...active, ...completed, ...failed, ...delayed];
 
         // Filter to jobs belonging to this batch
-        const batchJobs = allJobs.filter(j => j.data.batch_id === batchId);
+        let batchJobs = allJobs.filter(j => j.data.batch_id === batchId);
 
         if (batchJobs.length === 0) {
             return res.status(404).json({ success: false, error: 'No jobs found for this batch_id' });
+        }
+
+        // RBAC: Ensure user owns this batch OR is authority
+        const isAuthority = req.user && req.user.role === 'authority';
+        const ownsBatch = batchJobs.every(j => j.data.uploadedBy === req.user.name || j.data.uploaderEmail === req.user.email);
+        
+        if (!isAuthority && !ownsBatch) {
+            return res.status(403).json({ success: false, error: 'Permission denied' });
         }
 
         // Map each job to a clean status object
@@ -129,9 +157,14 @@ router.get('/document/:id/versions', (req, res) => {
         const id = parseInt(req.params.id);
         
         // 1. Find the current document
-        let currentDoc = db.prepare('SELECT block_index, parent_document_id FROM documents WHERE block_index = ?').get(id);
+        let currentDoc = db.prepare('SELECT block_index, parent_document_id, uploaded_by, uploader_email FROM documents WHERE block_index = ?').get(id);
         if (!currentDoc) {
             return res.status(404).json({ success: false, error: 'Document not found' });
+        }
+
+        // RBAC check
+        if (!canAccessDocument(req.user, currentDoc)) {
+            return res.status(403).json({ success: false, error: 'Permission denied' });
         }
 
         // 2. Trace back to the root document (parent_document_id is NULL)

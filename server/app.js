@@ -55,8 +55,8 @@ app.use('/api/verify', (req, res, next) => {
     }
     next();
 }, verifyRoutes);
-app.use('/api/chain', chainRoutes);
-app.use('/api/stats', statsRoutes);
+app.use('/api/chain', requireAuth, chainRoutes);
+app.use('/api/stats', requireAuth, statsRoutes);
 
 // SPA fallback: serve index.html for any non-API route
 app.get('*', (req, res) => {

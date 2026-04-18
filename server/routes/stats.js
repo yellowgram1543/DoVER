@@ -4,24 +4,25 @@ const db = require('../db/db');
 
 router.get('/', (req, res) => {
     try {
-        const isAdmin = req.user && req.user.role === 'authority';
+        const isAuthority = req.user && req.user.role === 'authority';
         const userName = req.user?.name || '';
+        const userEmail = req.user?.email || '';
 
         let totalDocs, tamperedCount, verifiedToday;
         const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 
-        if (isAdmin) {
+        if (isAuthority) {
             totalDocs = db.prepare('SELECT COUNT(*) as count FROM documents').get().count;
             tamperedCount = db.prepare('SELECT COUNT(*) as count FROM documents WHERE is_tampered = 1').get().count;
             verifiedToday = db.prepare(
                 "SELECT COUNT(*) as count FROM documents WHERE date(upload_timestamp) = ? AND is_tampered = 0"
             ).get(today).count;
         } else {
-            totalDocs = db.prepare('SELECT COUNT(*) as count FROM documents WHERE uploaded_by = ?').get(userName).count;
-            tamperedCount = db.prepare('SELECT COUNT(*) as count FROM documents WHERE uploaded_by = ? AND is_tampered = 1').get(userName).count;
+            totalDocs = db.prepare('SELECT COUNT(*) as count FROM documents WHERE uploaded_by = ? OR uploader_email = ?').get(userName, userEmail).count;
+            tamperedCount = db.prepare('SELECT COUNT(*) as count FROM documents WHERE (uploaded_by = ? OR uploader_email = ?) AND is_tampered = 1').get(userName, userEmail).count;
             verifiedToday = db.prepare(
-                "SELECT COUNT(*) as count FROM documents WHERE uploaded_by = ? AND date(upload_timestamp) = ? AND is_tampered = 0"
-            ).get(userName, today).count;
+                "SELECT COUNT(*) as count FROM documents WHERE (uploaded_by = ? OR uploader_email = ?) AND date(upload_timestamp) = ? AND is_tampered = 0"
+            ).get(userName, userEmail, today).count;
         }
 
         res.json({
