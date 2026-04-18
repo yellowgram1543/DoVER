@@ -1,0 +1,13 @@
+{
+  "project_name": "DoVER",
+  "mode": "interactive",
+  "granularity": "standard",
+  "workflow": {
+    "research": true,
+    "plan_check": true,
+    "verifier": true,
+    "discuss_mode": "discuss"
+  },
+  "visual_style": "Modern Tech/Startup",
+  "blockchain_anchoring": "Polygon Testnet"
+}
