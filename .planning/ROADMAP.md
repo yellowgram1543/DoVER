@@ -11,9 +11,9 @@ Focus: Stabilizing RBAC and mathematical evidence.
 
 ### Phase 2: Intelligence & Advanced OCR
 Focus: Scaling the AI analysis pipeline.
-- [ ] **Multi-Lang OCR Engine**: Configure Tesseract workers for Hindi, Kannada, and Tamil scripts.
-- [ ] **Gemini Summary Service**: Integrate Gemini Pro to generate natural language audit trail summaries.
-- [ ] **Analysis UI Polish**: Display OCR results and AI summaries in a dedicated "Insight" panel.
+- [x] **Multi-Lang OCR Engine**: Configure Tesseract workers for Hindi, Kannada, and Tamil scripts.
+- [x] **Gemini Summary Service**: Integrate Gemini Pro to generate natural language audit trail summaries.
+- [x] **Analysis UI Polish**: Display OCR results and AI summaries in a dedicated "Insight" panel.
 
 ### Phase 3: Public Access & Export
 Focus: Accessibility and legal usability.

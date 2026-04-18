@@ -6,17 +6,17 @@ Requirements focused on establishing the "Official Vault" foundation and securit
 ### R1: Security & Identity
 - [x] **Strict Google Identity:** Enforce verified Google OAuth sessions for all uploads (already implemented).
 - [x] **Hierarchy & Lineage:** Prevent version hijacking via owner/department checks (already implemented).
-- [ ] **Authority Clearance:** Role-based access control (RBAC) where 'authority' users can see the global registry.
+- [x] **Authority Clearance:** Role-based access control (RBAC) where 'authority' users can see the global registry.
 
 ### R2: Content Integrity
 - [x] **Hash-Based Deduplication:** Block identical content uploads by the same user (already implemented).
-- [ ] **Merkle Tree Proofs:** Each block must contain a mathematical proof linking it to the global root.
-- [ ] **Polygon Anchoring:** Anchor the global Merkle Root to the Polygon Amoy testnet at regular intervals.
+- [x] **Merkle Tree Proofs:** Each block must contain a mathematical proof linking it to the global root.
+- [x] **Polygon Anchoring:** Anchor the global Merkle Root to the Polygon Amoy testnet at regular intervals.
 
 ### R3: Intelligent Analysis
 - [x] **Worker-Powered Forensics:** Offload heavy image pixel analysis to background threads (already implemented).
-- [ ] **Multi-Lang OCR:** Tesseract-powered extraction for Hindi, Kannada, Tamil, and English.
-- [ ] **Gemini Summary:** AI-generated natural language explanation of document history and status.
+- [x] **Multi-Lang OCR:** Tesseract-powered extraction for Hindi, Kannada, Tamil, and English.
+- [x] **Gemini Summary:** AI-generated natural language explanation of document history and status.
 
 ### R4: Accessibility
 - [ ] **Public Portal:** Search and verify any document by ID or file hash without logging in.
