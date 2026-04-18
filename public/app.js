@@ -63,27 +63,29 @@ async function checkAuth() {
 
 function renderLogin(container) {
     container.innerHTML = `
-        <div class="min-h-[80vh] flex items-center justify-center fade-in">
-            <div class="bg-white dark:bg-[#1C2A41] p-12 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 max-w-md w-full text-center space-y-8">
-                <div class="flex flex-col items-center gap-4">
-                    <div class="w-20 h-20 bg-gradient-to-br from-[#001e40] to-[#0059bb] rounded-2xl flex items-center justify-center text-white shadow-xl">
-                        <span class="material-symbols-outlined text-5xl" style="font-variation-settings:'FILL' 1;">verified_user</span>
+        <div class="fixed inset-0 flex items-center justify-center bg-slate-50 dark:bg-[#0A192F] z-[100] fade-in">
+            <div class="bg-white dark:bg-[#1C2A41] p-12 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-slate-100 dark:border-slate-800 max-w-md w-full text-center space-y-8 scale-in mx-6">
+                <div class="flex flex-col items-center gap-6">
+                    <div class="w-24 h-24 bg-gradient-to-br from-[#001e40] to-[#0059bb] rounded-3xl flex items-center justify-center text-white shadow-2xl">
+                        <span class="material-symbols-outlined text-6xl" style="font-variation-settings:'FILL' 1;">verified_user</span>
                     </div>
-                    <div>
-                        <h1 class="text-3xl font-black text-primary dark:text-[#E9C176] tracking-tighter">DoVER</h1>
-                        <p class="text-xs uppercase tracking-widest text-slate-500 dark:text-[#D6E3FF]/60 font-black">Official Vault Portal</p>
+                    <div class="space-y-1">
+                        <h1 class="text-4xl font-black text-primary dark:text-[#E9C176] tracking-tighter uppercase">DoVER</h1>
+                        <p class="text-[10px] uppercase tracking-[0.3em] text-slate-400 dark:text-[#D6E3FF]/40 font-black">Official Vault Portal</p>
                     </div>
                 </div>
 
-                <div class="space-y-4">
-                    <h2 class="text-xl font-bold text-slate-700 dark:text-[#D6E3FF]">Authentication Required</h2>
-                    <p class="text-sm text-slate-500 dark:text-slate-400">Access to the decentralized registry is restricted to authorized personnel.</p>
+                <div class="space-y-4 py-4">
+                    <h2 class="text-2xl font-bold text-slate-800 dark:text-[#D6E3FF]">Authentication Required</h2>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed px-4">Access to the decentralized registry is restricted to authorized personnel.</p>
                 </div>
 
-                <button onclick="window.location='/auth/google'" class="w-full flex items-center justify-center gap-3 bg-white dark:bg-[#0F1B33] border border-slate-300 dark:border-slate-600 py-3.5 rounded-xl font-bold text-slate-700 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-700 transition-all active:scale-[0.98] shadow-sm">
-                    <img src="https://www.gstatic.com/images/branding/product/1x/gsa_512dp.png" class="w-5 h-5" alt="Google"/>
-                    Sign in with Google
+                <button onclick="window.location='/auth/google'" class="w-full flex items-center justify-center gap-4 bg-white dark:bg-[#0F1B33] border border-slate-200 dark:border-slate-700 py-4 rounded-2xl font-bold text-slate-700 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-700 hover:border-slate-300 dark:hover:border-slate-500 transition-all active:scale-[0.98] shadow-sm group">
+                    <img src="https://www.gstatic.com/images/branding/product/1x/gsa_512dp.png" class="w-6 h-6 group-hover:scale-110 transition-transform" alt="Google"/>
+                    <span class="text-base">Sign in with Google</span>
                 </button>
+                
+                <p class="text-[10px] text-slate-400 font-medium">By signing in, you agree to the secure audit protocols.</p>
             </div>
         </div>
     `;
@@ -97,7 +99,7 @@ function updateHeaderUI(header, user) {
         <div class="flex items-center gap-4">
             <span class="md:hidden material-symbols-outlined text-blue-900 dark:text-[#E9C176] cursor-pointer" id="menu-toggle">menu</span>
             <div class="flex items-center gap-2">
-                <h2 id="page-title" class="font-sans tracking-tight text-slate-500 dark:text-[#D6E3FF] font-medium text-sm">Welcome back, ${user.name.split(' ')[0]}</h2>
+                <h2 id="page-title" class="font-sans tracking-tight text-slate-500 dark:text-[#D6E3FF] font-medium text-sm">Welcome back, ${(user.name || 'User').split(' ')[0]}</h2>
                 ${badge}
             </div>
         </div>

@@ -45,6 +45,7 @@ passport.serializeUser((user, done) => {
 passport.deserializeUser((id, done) => {
     try {
         const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+        if (!user) return done(null, false); // No user found, clear session
         done(null, user);
     } catch (error) {
         done(error);

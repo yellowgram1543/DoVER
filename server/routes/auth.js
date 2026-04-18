@@ -26,13 +26,13 @@ router.get('/logout', (req, res, next) => {
 // Get Current User
 router.get('/me', (req, res) => {
     if (req.isAuthenticated()) {
-        const { id, displayName, emails, photos } = req.user;
+        const user = req.user;
         res.json({
-            id,
-            name: displayName,
-            email: emails && emails[0]?.value,
-            picture: photos && photos[0]?.value,
-            role: 'user'
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            picture: user.picture,
+            role: user.role || 'user'
         });
     } else {
         res.status(401).json({ error: 'Not authenticated' });

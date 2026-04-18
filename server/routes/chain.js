@@ -5,7 +5,13 @@ const documentQueue = require('../utils/queue');
 
 router.get('/', (req, res) => {
     try {
-        const documents = db.prepare('SELECT * FROM documents ORDER BY block_index ASC').all();
+        const isAdmin = req.user && req.user.role === 'authority';
+        let documents;
+        if (isAdmin) {
+            documents = db.prepare('SELECT * FROM documents ORDER BY block_index ASC').all();
+        } else {
+            documents = db.prepare('SELECT * FROM documents WHERE uploaded_by = ? ORDER BY block_index ASC').all(req.user.name);
+        }
         res.json(documents);
     } catch (error) {
         console.error(error);
@@ -15,12 +21,24 @@ router.get('/', (req, res) => {
 
 router.get('/audit', (req, res) => {
     try {
-        const auditLogs = db.prepare(`
-            SELECT a.document_id, d.filename, a.action, a.actor, a.timestamp, a.details
-            FROM audit_log a
-            JOIN documents d ON a.document_id = d.block_index
-            ORDER BY a.timestamp DESC
-        `).all();
+        const isAdmin = req.user && req.user.role === 'authority';
+        let auditLogs;
+        if (isAdmin) {
+            auditLogs = db.prepare(`
+                SELECT a.document_id, d.filename, a.action, a.actor, a.timestamp, a.details
+                FROM audit_log a
+                JOIN documents d ON a.document_id = d.block_index
+                ORDER BY a.timestamp DESC
+            `).all();
+        } else {
+            auditLogs = db.prepare(`
+                SELECT a.document_id, d.filename, a.action, a.actor, a.timestamp, a.details
+                FROM audit_log a
+                JOIN documents d ON a.document_id = d.block_index
+                WHERE d.uploaded_by = ?
+                ORDER BY a.timestamp DESC
+            `).all(req.user.name);
+        }
         res.json(auditLogs);
     } catch (error) {
         console.error(error);
