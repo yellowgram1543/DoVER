@@ -35,6 +35,9 @@ const API = {
     },
     async getBatchStatus(batchId) {
         return (await fetch(`/api/chain/batch/${batchId}/status`)).json();
+    },
+    async getDocument(id) {
+        return (await fetch(`/api/chain/document/${id}`)).json();
     }
 };
 
@@ -554,6 +557,11 @@ function renderSuccessUI(resultDiv, res) {
                 </div>
                 <code class="hash-text bg-green-100 px-3 py-2 rounded block text-green-800 mb-2">${res.block_hash}</code>
                 ${res.parent_document_id ? `<p class="text-[10px] font-bold text-green-600 mb-2 uppercase">Supersedes Block #${res.parent_document_id}</p>` : ''}
+                <div class="flex gap-2 mt-4">
+                    <button onclick="renderIntegrityModal(${res.block_index})" class="bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-[10px] uppercase tracking-wider flex items-center gap-2 hover:bg-green-700 transition-colors">
+                        <span class="material-symbols-outlined text-xs">analytics</span> Verify Integrity
+                    </button>
+                </div>
                 ${signatureHtml}
                 ${forensicHtml}
             </div>
@@ -848,10 +856,14 @@ function loadChain(silent = false) {
                     <span class="material-symbols-outlined text-[10px]">account_tree</span> Merkle Verified
                    </div>`
                 : '';
+            
+            const anchorIcon = d.polygon_txid 
+                ? `<span class="material-symbols-outlined text-[14px] text-emerald-500" title="Anchored to Polygon">link</span>`
+                : '';
 
             return `<tr class="${i%2===0?'':'bg-surface-container-lowest'} hover:bg-slate-50/50 transition-colors">
                 <td class="px-6 py-5 text-sm font-bold text-secondary flex flex-col items-start gap-1">
-                    #${d.block_index}
+                    <div class="flex items-center gap-1.5">#${d.block_index} ${anchorIcon}</div>
                     <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-[8px] font-black uppercase">V${d.version_number || 1}</span>
                 </td>
                 <td class="px-6 py-5 text-sm font-semibold text-primary">
@@ -862,6 +874,9 @@ function loadChain(silent = false) {
                         </a>
                         <button onclick="showVersionHistory(${d.block_index})" class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-blue-600 hover:text-blue-800 transition-colors">
                             <span class="material-symbols-outlined text-[12px]">history</span> View Versions
+                        </button>
+                        <button onclick="renderIntegrityModal(${d.block_index})" class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-emerald-600 hover:text-emerald-800 transition-colors">
+                            <span class="material-symbols-outlined text-[12px]">analytics</span> Verify Integrity
                         </button>
                     </div>
                 </td>
@@ -1022,66 +1037,68 @@ function renderSettings(app) {
 
 // ── Help Guide Page ──
 function renderHelp(app) {
-    document.getElementById('page-title').textContent = 'User Guide';
+    document.getElementById('page-title').textContent = 'System Protocol Guide';
     const wrap = document.createElement('div');
     wrap.className = 'max-w-6xl mx-auto space-y-12 fade-in';
-    
+
     wrap.innerHTML = `
         <div class="text-center space-y-4">
+            <div class="inline-flex items-center gap-2 px-3 py-1 bg-primary text-white rounded-full text-[10px] font-black tracking-widest uppercase mb-2">Protocol v2.4 Active</div>
             <h1 class="text-5xl font-black text-primary tracking-tight">How <span class="text-secondary">DoVER</span> Works</h1>
-            <p class="text-on-surface-variant text-lg">A comprehensive guide to decentralized document integrity.</p>
+            <p class="text-on-surface-variant text-lg max-w-2xl mx-auto">A comprehensive guide to decentralized document integrity and verified identity management.</p>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm hover:shadow-md transition-shadow space-y-4 group">
-                <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">upload_file</span></div>
-                <h3 class="text-xl font-bold text-primary">1. Single Registration</h3>
-                <p class="text-sm text-slate-500 leading-relaxed">Upload any PDF, DOCX, or Image. The system creates a unique SHA-256 fingerprint and chains it to the registry, ensuring permanent immutability.</p>
+                <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">fingerprint</span></div>
+                <h3 class="text-xl font-bold text-primary">1. Verified Identity</h3>
+                <p class="text-sm text-slate-500 leading-relaxed">Every action is tied to your <strong>Google Workspace Identity</strong>. The system strictly enforces verified sessions, ensuring absolute accountability for every block added to the chain.</p>
             </div>
 
             <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm hover:shadow-md transition-shadow space-y-4 group">
-                <div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">folder_zip</span></div>
-                <h3 class="text-xl font-bold text-primary">2. Batch Processing</h3>
-                <p class="text-sm text-slate-500 leading-relaxed">Upload up to 20 documents simultaneously. The system uses a dedicated background queue to efficiently process and cryptographically seal large volumes.</p>
+                <div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">copy_all</span></div>
+                <h3 class="text-xl font-bold text-primary">2. Hash-Based Duplication</h3>
+                <p class="text-sm text-slate-500 leading-relaxed">We don't just check filenames. Our <strong>Content-Fingerprinting</strong> logic detects duplicate files by their cryptographic hash, preventing redundant records even if the file is renamed.</p>
             </div>
 
             <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm hover:shadow-md transition-shadow space-y-4 group">
-                <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">fact_check</span></div>
-                <h3 class="text-xl font-bold text-primary">3. Secure Verification</h3>
-                <p class="text-sm text-slate-500 leading-relaxed">Enter a Block ID or upload a copy of the document. The system re-hashes the file and mathematically proves its authenticity against the ledger.</p>
+                <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">shield_person</span></div>
+                <h3 class="text-xl font-bold text-primary">3. Privacy Isolation</h3>
+                <p class="text-sm text-slate-500 leading-relaxed">Secure multi-tenancy ensures you only see your own records. Only users with <strong>Authority-level</strong> clearance can view the global registry and unrestricted audit logs.</p>
             </div>
 
             <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm hover:shadow-md transition-shadow space-y-4 group">
-                <div class="w-12 h-12 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">troubleshoot</span></div>
-                <h3 class="text-xl font-bold text-primary">4. Deep Analysis</h3>
-                <p class="text-sm text-slate-500 leading-relaxed">Our AI analyzes internal metadata, font inconsistencies, and verifies digital signatures to detect tampering, even if the file is expertly forged.</p>
+                <div class="w-12 h-12 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">memory</span></div>
+                <h3 class="text-xl font-bold text-primary">4. Worker-Powered AI</h3>
+                <p class="text-sm text-slate-500 leading-relaxed">Forensic analysis is offloaded to <strong>Worker Threads</strong>. This keeps the main system responsive while our AI crunches pixels to detect font shifts and baseline jitter.</p>
             </div>
 
             <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm hover:shadow-md transition-shadow space-y-4 group">
-                <div class="w-12 h-12 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">account_tree</span></div>
-                <h3 class="text-xl font-bold text-primary">5. Chain Explorer</h3>
-                <p class="text-sm text-slate-500 leading-relaxed">View the entire, unalterable block history of the registry. Monitor block generation in real-time and review the cryptographic sequence of uploads.</p>
+                <div class="w-12 h-12 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">history</span></div>
+                <h3 class="text-xl font-bold text-primary">5. Lineage Protection</h3>
+                <p class="text-sm text-slate-500 leading-relaxed">Document versioning is protected. New versions can only be added by the <strong>Original Author</strong> or members of the <strong>Same Department</strong>, preventing version hijacking.</p>
             </div>
 
             <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm hover:shadow-md transition-shadow space-y-4 group">
-                <div class="w-12 h-12 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">history_edu</span></div>
-                <h3 class="text-xl font-bold text-primary">6. Audit Log</h3>
-                <p class="text-sm text-slate-500 leading-relaxed">Every verification request, tamper alert, and system action is relentlessly logged. Review the detailed Chain of Custody for any active record.</p>
+                <div class="w-12 h-12 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">account_tree</span></div>
+                <h3 class="text-xl font-bold text-primary">6. Merkle Proofs</h3>
+                <p class="text-sm text-slate-500 leading-relaxed">Every document includes a <strong>Merkle Proof</strong>. This mathematical evidence links your record to the global root, allowing anyone to verify authenticity without needing the entire database.</p>
             </div>
         </div>
 
-        <div class="bg-primary p-10 rounded-[3rem] text-white text-center space-y-6 shadow-2xl shadow-primary/30 relative overflow-hidden mt-8">
+        <div class="bg-primary p-12 rounded-[3rem] text-white text-center space-y-6 shadow-2xl shadow-primary/30 relative overflow-hidden mt-8">
             <div class="relative z-10">
-                <h2 class="text-3xl font-black">Ready to secure your first record?</h2>
-                <p class="opacity-80 max-w-md mx-auto">Click the button below to head to the registration gateway.</p>
-                <a href="#upload" class="inline-flex bg-white text-primary px-8 py-4 mt-2 rounded-2xl font-black hover:scale-105 active:scale-95 transition-transform">Get Started</a>
+                <h2 class="text-3xl font-black uppercase tracking-tight">Enterprise Compliance Standards</h2>
+                <p class="opacity-70 max-w-lg mx-auto text-sm leading-relaxed">DoVER adheres to strict immutable ledger standards, ensuring every document registration is legally traceable and cryptographically secure.</p>
+                <div class="flex justify-center gap-4 mt-6">
+                    <a href="#upload" class="inline-flex bg-white text-primary px-10 py-4 rounded-2xl font-black hover:scale-105 active:scale-95 transition-transform shadow-xl">Start Secure Upload</a>
+                </div>
             </div>
-            <span class="material-symbols-outlined absolute -right-6 -bottom-6 text-9xl opacity-10 pointer-events-none">lock</span>
+            <span class="material-symbols-outlined absolute -right-6 -bottom-6 text-[15rem] opacity-5 pointer-events-none">gavel</span>
         </div>
     `;
     app.appendChild(wrap);
 }
-
 // ── Batch Upload Page ──
 function renderBatch(app) {
     document.getElementById('page-title').textContent = 'Batch Upload';
@@ -1344,3 +1361,137 @@ async function showVersionHistory(id) {
         document.getElementById('version-timeline-content').innerHTML = '<p class="text-center text-red-500 font-bold py-12">Failed to load history.</p>';
     }
 }
+
+async function renderIntegrityModal(id) {
+    const overlay = document.createElement('div');
+    overlay.className = 'fixed inset-0 z-[110] flex items-center justify-center p-6 bg-primary/60 backdrop-blur-md fade-in';
+    overlay.id = 'integrity-overlay';
+    overlay.innerHTML = `
+        <div class="bg-white dark:bg-[#1C2A41] w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] scale-in border border-white/20">
+            <div class="px-10 py-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-gradient-to-r from-slate-50 to-white dark:from-[#1C2A41] dark:to-[#162235]">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center text-white shadow-lg">
+                        <span class="material-symbols-outlined">verified_user</span>
+                    </div>
+                    <div>
+                        <h3 class="text-2xl font-black text-primary dark:text-[#E9C176] tracking-tight uppercase">Integrity Report</h3>
+                        <p class="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em]">Cryptographic Consensus Audit</p>
+                    </div>
+                </div>
+                <button onclick="document.getElementById('integrity-overlay').remove()" class="w-12 h-12 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-all active:scale-90">
+                    <span class="material-symbols-outlined text-slate-400">close</span>
+                </button>
+            </div>
+            <div id="integrity-modal-content" class="p-10 overflow-y-auto flex-1 space-y-10 custom-scrollbar">
+                <div class="flex justify-center py-20"><div class="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div></div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    try {
+        const doc = await API.getDocument(id);
+        const content = document.getElementById('integrity-modal-content');
+        
+        const isAnchored = !!doc.polygon_txid;
+        const txUrl = `https://amoy.polygonscan.com/tx/${doc.polygon_txid}`;
+        
+        // Parse Merkle Proof if it exists
+        let proofHtml = '<p class="text-xs text-slate-400 italic">No Merkle proof available for this block.</p>';
+        if (doc.merkle_proof) {
+            try {
+                const proof = JSON.parse(doc.merkle_proof);
+                proofHtml = `
+                    <div class="space-y-3">
+                        ${proof.map((p, i) => `
+                            <div class="flex items-center gap-4 group">
+                                <div class="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center text-[10px] font-black text-emerald-600 flex-shrink-0 border border-emerald-100 dark:border-emerald-800/30">
+                                    ${i + 1}
+                                </div>
+                                <div class="flex-1 bg-slate-50 dark:bg-slate-900/30 px-4 py-2.5 rounded-xl border border-slate-100 dark:border-slate-800/50 group-hover:border-emerald-200 transition-colors">
+                                    <code class="text-[10px] font-mono text-slate-600 dark:text-slate-400 break-all">${p}</code>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } catch (e) {
+                console.error("Merkle parse error", e);
+            }
+        }
+
+        content.innerHTML = `
+            <!-- Content Hash Section -->
+            <section class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                        <span class="material-symbols-outlined text-sm">fingerprint</span> Content Fingerprint (SHA-256)
+                    </h4>
+                    <button onclick="navigator.clipboard.writeText('${doc.block_hash}')" class="text-[10px] font-bold text-primary hover:underline uppercase tracking-tighter">Copy Hash</button>
+                </div>
+                <div class="bg-slate-900 rounded-2xl p-6 shadow-inner border border-white/5">
+                    <code class="text-emerald-400 font-mono text-sm break-all leading-relaxed">${doc.block_hash}</code>
+                </div>
+            </section>
+
+            <!-- Merkle Proof Section -->
+            <section class="space-y-4">
+                <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <span class="material-symbols-outlined text-sm">account_tree</span> Merkle Inclusion Path
+                </h4>
+                <div class="bg-white dark:bg-[#162235] rounded-2xl p-6 border border-slate-100 dark:border-slate-800 shadow-sm space-y-4">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="text-[10px] font-black text-emerald-600 uppercase bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded">Root Hash</span>
+                        <code class="text-[10px] font-mono text-slate-500">${doc.merkle_root || 'Pending Calculation'}</code>
+                    </div>
+                    ${proofHtml}
+                </div>
+            </section>
+
+            <!-- Chain Anchor Section -->
+            <section class="space-y-4">
+                <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <span class="material-symbols-outlined text-sm">link</span> Public Ledger Anchor
+                </h4>
+                <div class="bg-gradient-to-br from-primary to-[#003366] rounded-[2rem] p-8 text-white relative overflow-hidden shadow-xl">
+                    <div class="relative z-10 space-y-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">Network</p>
+                                <p class="font-bold">Polygon PoS (Amoy Testnet)</p>
+                            </div>
+                            <div class="px-4 py-1.5 rounded-full ${isAnchored ? 'bg-emerald-500' : 'bg-orange-500'} text-[10px] font-black uppercase shadow-lg">
+                                ${isAnchored ? 'Anchored' : 'Pending Sync'}
+                            </div>
+                        </div>
+                        
+                        ${isAnchored ? `
+                            <div class="space-y-2">
+                                <p class="text-[10px] font-black uppercase tracking-widest opacity-60">Transaction ID</p>
+                                <code class="block bg-black/20 backdrop-blur-md px-4 py-3 rounded-xl text-xs font-mono break-all border border-white/10">${doc.polygon_txid}</code>
+                            </div>
+                            <a href="${txUrl}" target="_blank" class="w-full bg-white text-primary py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all shadow-xl">
+                                <span class="material-symbols-outlined text-lg">open_in_new</span> View on Polygonscan
+                            </a>
+                        ` : `
+                            <div class="flex items-center gap-4 bg-white/10 backdrop-blur-md p-6 rounded-2xl border border-white/5">
+                                <span class="material-symbols-outlined text-orange-400 animate-pulse">hourglass_empty</span>
+                                <p class="text-xs leading-relaxed opacity-80 font-medium">This document is queued for the next public chain anchor. Usually takes 5-10 minutes.</p>
+                            </div>
+                        `}
+                    </div>
+                    <span class="material-symbols-outlined absolute -right-8 -bottom-8 text-[12rem] opacity-5 pointer-events-none rotate-12">currency_bitcoin</span>
+                </div>
+            </section>
+        `;
+
+    } catch (e) {
+        document.getElementById('integrity-modal-content').innerHTML = `
+            <div class="text-center py-20 space-y-4">
+                <span class="material-symbols-outlined text-6xl text-red-200">error</span>
+                <p class="text-slate-400 font-medium">Failed to load integrity report. ${e.message}</p>
+            </div>
+        `;
+    }
+}
+

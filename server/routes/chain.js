@@ -57,6 +57,26 @@ router.get('/audit', (req, res) => {
     }
 });
 
+router.get('/document/:id', (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        const document = db.prepare('SELECT * FROM documents WHERE block_index = ?').get(id);
+
+        if (!document) {
+            return res.status(404).json({ success: false, error: 'Document not found' });
+        }
+
+        if (!canAccessDocument(req.user, document)) {
+            return res.status(403).json({ success: false, error: 'Permission denied' });
+        }
+
+        res.json(document);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, error: 'Failed to retrieve document details' });
+    }
+});
+
 router.get('/document/:id/history', (req, res) => {
     try {
         const doc = db.prepare('SELECT uploaded_by, uploader_email FROM documents WHERE block_index = ?').get(req.params.id);
