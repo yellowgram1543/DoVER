@@ -66,30 +66,56 @@ router.post('/', apiKey, (req, res) => {
                 return res.status(400).json({ success: false, error: 'Empty file not allowed' });
             }
 
-            const uploadedBy = req.body.user || req.body.uploaded_by || 'anonymous';
+            // STRICT IDENTITY: Use only the name and email from the verified session
+            const uploadedBy = req.user.name;
+            const uploaderEmail = req.user.email;
             
+            if (!uploadedBy || !uploaderEmail) {
+                if (fs.existsSync(tmpFilePath)) fs.unlinkSync(tmpFilePath);
+                return res.status(403).json({ success: false, error: 'Verified identity required' });
+            }
+            
+            // Calculate hash for duplicate pre-check
+            const fileHash = await hasher.generateFileHashAsync(tmpFilePath);
+
             // Versioning logic
             let parent_document_id = (req.body.parent_document_id && req.body.parent_document_id !== 'undefined') ? parseInt(req.body.parent_document_id) : null;
             let version_number = 1;
             const version_note = req.body.version_note || null;
 
             if (parent_document_id && !isNaN(parent_document_id)) {
-                const parent = db.prepare('SELECT version_number FROM documents WHERE block_index = ?').get(parent_document_id);
+                const parent = db.prepare('SELECT version_number, uploader_email, department FROM documents WHERE block_index = ?').get(parent_document_id);
                 if (!parent) {
                     if (fs.existsSync(tmpFilePath)) fs.unlinkSync(tmpFilePath);
                     return res.status(404).json({ success: false, error: 'Parent document not found' });
                 }
+
+                // HIJACKING PROTECTION: Check ownership or department match
+                const isOwner = parent.uploader_email === uploaderEmail;
+                const isSameDept = parent.department === req.body.department;
+
+                if (!isOwner && !isSameDept) {
+                    if (fs.existsSync(tmpFilePath)) fs.unlinkSync(tmpFilePath);
+                    return res.status(403).json({ 
+                        success: false, 
+                        error: 'Permission Denied', 
+                        message: 'You are not authorized to version this document. Only the original author or members of the same department can perform this action.' 
+                    });
+                }
+
                 version_number = (parent.version_number || 1) + 1;
             } else {
                 // Duplicate check ONLY for initial uploads
-                const existing = db.prepare('SELECT * FROM documents WHERE filename = ? AND uploaded_by = ?').get(req.file.originalname, uploadedBy);
+                // NEW: Check by file_hash AND uploaded_by
+                const existing = db.prepare('SELECT * FROM documents WHERE file_hash = ? AND uploaded_by = ?').get(fileHash, uploadedBy);
                 if (existing) {
                     if (fs.existsSync(tmpFilePath)) fs.unlinkSync(tmpFilePath);
                     return res.status(409).json({
                         success: false,
-                        error: "Duplicate document",
-                        message: "A document with this filename already exists under this legal name. Use parent_document_id to upload a new version.",
-                        existing_document_id: existing.id || existing.block_index,
+                        error: "Duplicate document content",
+                        message: "This exact document content has already been registered by you.",
+                        existing_document_id: existing.block_index,
+                        existing_filename: existing.filename,
                         uploaded_at: existing.upload_timestamp
                     });
                 }
@@ -101,10 +127,12 @@ router.post('/', apiKey, (req, res) => {
                 originalname: req.file.originalname,
                 mimetype: req.file.mimetype,
                 uploadedBy: uploadedBy,
+                uploaderEmail: uploaderEmail,
                 department: req.body.department,
                 version_number,
                 parent_document_id,
-                version_note
+                version_note,
+                fileHash // Pass the already calculated hash to avoid re-calculating
             });
 
             res.json({
@@ -134,7 +162,16 @@ router.post('/batch-upload', apiKey, (req, res) => {
                 return res.status(400).json({ success: false, error: 'No files uploaded' });
             }
 
-            const uploadedBy = req.body.user || 'anonymous';
+            const uploadedBy = req.user.name;
+            const uploaderEmail = req.user.email;
+            if (!uploadedBy || !uploaderEmail) {
+                req.files.forEach(f => {
+                    const p = path.resolve(f.path);
+                    if (fs.existsSync(p)) fs.unlinkSync(p);
+                });
+                return res.status(403).json({ success: false, error: 'Verified identity required' });
+            }
+
             const batchId = Date.now();
             const jobIds = [];
 
@@ -145,6 +182,7 @@ router.post('/batch-upload', apiKey, (req, res) => {
                     originalname: file.originalname,
                     mimetype: file.mimetype,
                     uploadedBy,
+                    uploaderEmail: uploaderEmail,
                     batch_id: batchId
                 });
                 jobIds.push(job.id);

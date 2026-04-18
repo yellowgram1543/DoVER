@@ -5,9 +5,9 @@ Establishing the core integrity and AI analysis layers for the hackathon.
 
 ### Phase 1: Security & Chain Integrity
 Focus: Stabilizing RBAC and mathematical evidence.
-- [ ] **RBAC Enforcement**: Fully implement 'authority' vs 'user' permissions for the global registry view.
-- [ ] **Merkle Proof Integration**: Store and serve mathematical inclusion proofs for every document block.
-- [ ] **Polygon Testnet Anchor**: Implement the daily anchoring task to secure the Merkle Root on-chain.
+- [x] **RBAC Enforcement**: Fully implement 'authority' vs 'user' permissions for the global registry view.
+- [x] **Merkle Proof Integration**: Store and serve mathematical inclusion proofs for every document block.
+- [x] **Polygon Testnet Anchor**: Implement the daily anchoring task to secure the Merkle Root on-chain.
 
 ### Phase 2: Intelligence & Advanced OCR
 Focus: Scaling the AI analysis pipeline.
