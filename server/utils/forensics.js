@@ -10,31 +10,46 @@ const fs = require('fs');
 async function fontConsistencyCheck(filePath) {
     try {
         const image = await Jimp.read(filePath);
+        if (!image || !image.bitmap || !image.bitmap.data) throw new Error('Invalid image data');
         image.greyscale();
-        const { width, height } = image.bitmap;
+        
+        const width = Math.floor(image.bitmap.width);
+        const height = Math.floor(image.bitmap.height);
+        if (width === 0 || height === 0) return { score: 100, suspicious: false };
+
         const cellW = Math.floor(width / 10);
         const cellH = Math.floor(height / 10);
         const variances = [];
 
         for (let row = 0; row < 10; row++) {
             for (let col = 0; col < 10; col++) {
+                // Yield to event loop to allow Bull to renew lock
+                await new Promise(r => setImmediate(r));
+                
                 const pixels = [];
-                // Fix: Jimp v1.6.0 requires object for region
-                const region = {
-                    x: col * cellW,
-                    y: row * cellH,
-                    width: cellW,
-                    height: cellH
-                };
+                const startX = Math.floor(col * cellW);
+                const startY = Math.floor(row * cellH);
 
-                image.scan(region, (x, y, idx) => {
-                    if (x % 5 === 0 && y % 5 === 0) {
-                        const r = image.bitmap.data[idx + 0];
-                        const g = image.bitmap.data[idx + 1];
-                        const b = image.bitmap.data[idx + 2];
-                        pixels.push((r + g + b) / 3);
+                if (cellW > 0 && cellH > 0) {
+                    // Manual loop with STRICT integer indices
+                    for (let y = 0; y < cellH; y++) {
+                        const actualY = startY + y;
+                        if (actualY >= height) break;
+                        
+                        for (let x = 0; x < cellW; x++) {
+                            const actualX = startX + x;
+                            if (actualX >= width) break;
+
+                            if (actualX % 5 === 0 && actualY % 5 === 0) {
+                                const idx = (actualY * width + actualX) * 4;
+                                const r = image.bitmap.data[idx + 0];
+                                const g = image.bitmap.data[idx + 1];
+                                const b = image.bitmap.data[idx + 2];
+                                pixels.push((r + g + b) / 3);
+                            }
+                        }
                     }
-                });
+                }
                 
                 if (pixels.length > 1) {
                     const t = tf.tensor1d(pixels);
@@ -72,18 +87,25 @@ async function fontConsistencyCheck(filePath) {
 async function alignmentCheck(filePath) {
     try {
         const image = await Jimp.read(filePath);
+        if (!image || !image.bitmap || !image.bitmap.data) throw new Error('Invalid image data');
         image.greyscale();
-        const { width, height } = image.bitmap;
+        
+        const width = Math.floor(image.bitmap.width);
+        const height = Math.floor(image.bitmap.height);
+        if (width === 0 || height === 0) return { score: 100, suspicious: false, misaligned_regions: [] };
+
         const misaligned_regions = [];
         let score = 100;
 
         const lineY = [];
         for (let y = 0; y < height; y++) {
+            if (y % 100 === 0) await new Promise(r => setImmediate(r)); // Yield every 100 lines
+            
             let darkPixels = 0;
+            const rowOffset = y * width;
             for (let x = 0; x < width; x += 2) {
-                const color = image.getPixelColor(x, y);
-                // Manual bit extraction for speed/reliability in v1
-                const r = (color >> 24) & 0xff;
+                const idx = (rowOffset + x) * 4;
+                const r = image.bitmap.data[idx + 0];
                 if (r < 150) darkPixels++;
             }
             if (darkPixels > width * 0.05) lineY.push(y);
@@ -104,11 +126,18 @@ async function alignmentCheck(filePath) {
         for (let i = 0; i < lineY.length; i += 10) {
             const y = lineY[i];
             let leftDark = 0, rightDark = 0;
-            for (let x = 0; x < width/4; x++) {
-                if (((image.getPixelColor(x, y) >> 24) & 0xff) < 150) leftDark++;
+            const rowOffset = y * width;
+            
+            const quarterWidth = Math.floor(width / 4);
+            for (let x = 0; x < quarterWidth; x++) {
+                const idx = (rowOffset + x) * 4;
+                if (image.bitmap.data[idx + 0] < 150) leftDark++;
             }
-            for (let x = (width*3)/4; x < width; x++) {
-                if (((image.getPixelColor(x, y) >> 24) & 0xff) < 150) rightDark++;
+            
+            const threeQuarterWidth = Math.floor((width * 3) / 4);
+            for (let x = threeQuarterWidth; x < width; x++) {
+                const idx = (rowOffset + x) * 4;
+                if (image.bitmap.data[idx + 0] < 150) rightDark++;
             }
             if (Math.abs(leftDark - rightDark) > width * 0.1) rotationJitter++;
         }
@@ -155,18 +184,21 @@ async function analyzeImage(filePath) {
         }
 
         const image = await Jimp.read(filePath);
-        const { width, height } = image.bitmap;
+        if (!image || !image.bitmap || !image.bitmap.data) return report;
+        const width = Math.floor(image.bitmap.width);
+        const height = Math.floor(image.bitmap.height);
 
         const pixels = [];
         const stepX = Math.max(1, Math.floor(width / 10));
         const stepY_noise = Math.max(1, Math.floor(height / 10));
         
         for (let y = 0; y < height; y += stepY_noise) {
+            const rowOffset = y * width;
             for (let x = 0; x < width; x += stepX) {
-                const color = image.getPixelColor(x, y);
-                const r = (color >> 24) & 0xff;
-                const g = (color >> 16) & 0xff;
-                const b = (color >> 8) & 0xff;
+                const idx = (rowOffset + x) * 4;
+                const r = image.bitmap.data[idx + 0];
+                const g = image.bitmap.data[idx + 1];
+                const b = image.bitmap.data[idx + 2];
                 pixels.push((r + g + b) / 3);
             }
         }

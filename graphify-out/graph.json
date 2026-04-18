@@ -1,0 +1,2995 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {
+    "hyperedges": [
+      {
+        "id": "integrity_verification_engine",
+        "label": "Integrity Verification Engine",
+        "nodes": [
+          "hasher_util",
+          "ocr_service",
+          "forensics_service",
+          "signature_service",
+          "merkle_util"
+        ],
+        "relation": "participate_in",
+        "confidence": "EXTRACTED",
+        "confidence_score": 0.95,
+        "source_file": "server/routes/verify.js"
+      },
+      {
+        "id": "distributed_ledger_storage",
+        "label": "Hybrid Distributed Storage",
+        "nodes": [
+          "sqlite_ledger",
+          "mongodb_gridfs",
+          "sha256_chaining"
+        ],
+        "relation": "form",
+        "confidence": "EXTRACTED",
+        "confidence_score": 0.9,
+        "source_file": "server/app.js"
+      },
+      {
+        "id": "document_processing_flow",
+        "label": "Document Processing Pipeline",
+        "nodes": [
+          "processor_initProcessor",
+          "ocr_extractText",
+          "signature_detectSignature",
+          "merkle_buildMerkleTree",
+          "qr_generateQR"
+        ],
+        "relation": "implement",
+        "confidence": "EXTRACTED",
+        "confidence_score": 0.9,
+        "source_file": "server/utils/processor.js"
+      },
+      {
+        "id": "lorem_shop_receipts",
+        "label": "Lorem Shop Receipts",
+        "nodes": [
+          "tampered_test_receipt",
+          "test_receipt",
+          "test2_receipt",
+          "test_parallel_receipt"
+        ],
+        "relation": "participate_in",
+        "confidence": "INFERRED",
+        "confidence_score": 0.9,
+        "source_file": "tampered_test.png"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "label": "create_modified_ocr.js",
+      "file_type": "code",
+      "source_file": "create_modified_ocr.js",
+      "source_location": "L1",
+      "id": "create_modified_ocr_js",
+      "community": 12,
+      "norm_label": "create_modified_ocr.js"
+    },
+    {
+      "label": "modifyImage()",
+      "file_type": "code",
+      "source_file": "create_modified_ocr.js",
+      "source_location": "L4",
+      "id": "create_modified_ocr_modifyimage",
+      "community": 12,
+      "norm_label": "modifyimage()"
+    },
+    {
+      "label": "tamper_cloud.js",
+      "file_type": "code",
+      "source_file": "tamper_cloud.js",
+      "source_location": "L1",
+      "id": "tamper_cloud_js",
+      "community": 13,
+      "norm_label": "tamper_cloud.js"
+    },
+    {
+      "label": "hackCloud()",
+      "file_type": "code",
+      "source_file": "tamper_cloud.js",
+      "source_location": "L6",
+      "id": "tamper_cloud_hackcloud",
+      "community": 13,
+      "norm_label": "hackcloud()"
+    },
+    {
+      "label": "tamper_files_cloud.js",
+      "file_type": "code",
+      "source_file": "tamper_files_cloud.js",
+      "source_location": "L1",
+      "id": "tamper_files_cloud_js",
+      "community": 14,
+      "norm_label": "tamper_files_cloud.js"
+    },
+    {
+      "label": "hackAnything()",
+      "file_type": "code",
+      "source_file": "tamper_files_cloud.js",
+      "source_location": "L8",
+      "id": "tamper_files_cloud_hackanything",
+      "community": 14,
+      "norm_label": "hackanything()"
+    },
+    {
+      "label": "tamper_image.js",
+      "file_type": "code",
+      "source_file": "tamper_image.js",
+      "source_location": "L1",
+      "id": "tamper_image_js",
+      "community": 15,
+      "norm_label": "tamper_image.js"
+    },
+    {
+      "label": "tamper()",
+      "file_type": "code",
+      "source_file": "tamper_image.js",
+      "source_location": "L3",
+      "id": "tamper_image_tamper",
+      "community": 15,
+      "norm_label": "tamper()"
+    },
+    {
+      "label": "detect.py",
+      "file_type": "code",
+      "source_file": "graphify-out\\detect.py",
+      "source_location": "L1",
+      "id": "graphify_out_detect_py",
+      "community": 24,
+      "norm_label": "detect.py"
+    },
+    {
+      "label": "app.js",
+      "file_type": "code",
+      "source_file": "public\\app.js",
+      "source_location": "L1",
+      "id": "public_app_js",
+      "community": 0,
+      "norm_label": "app.js"
+    },
+    {
+      "label": "navigate()",
+      "file_type": "code",
+      "source_file": "public\\app.js",
+      "source_location": "L37",
+      "id": "app_navigate",
+      "community": 0,
+      "norm_label": "navigate()"
+    },
+    {
+      "label": "renderStatsBar()",
+      "file_type": "code",
+      "source_file": "public\\app.js",
+      "source_location": "L62",
+      "id": "app_renderstatsbar",
+      "community": 0,
+      "norm_label": "renderstatsbar()"
+    },
+    {
+      "label": "renderDashboard()",
+      "file_type": "code",
+      "source_file": "public\\app.js",
+      "source_location": "L106",
+      "id": "app_renderdashboard",
+      "community": 0,
+      "norm_label": "renderdashboard()"
+    },
+    {
+      "label": "renderUpload()",
+      "file_type": "code",
+      "source_file": "public\\app.js",
+      "source_location": "L152",
+      "id": "app_renderupload",
+      "community": 0,
+      "norm_label": "renderupload()"
+    },
+    {
+      "label": "renderSuccessUI()",
+      "file_type": "code",
+      "source_file": "public\\app.js",
+      "source_location": "L364",
+      "id": "app_rendersuccessui",
+      "community": 0,
+      "norm_label": "rendersuccessui()"
+    },
+    {
+      "label": "renderVerify()",
+      "file_type": "code",
+      "source_file": "public\\app.js",
+      "source_location": "L425",
+      "id": "app_renderverify",
+      "community": 0,
+      "norm_label": "renderverify()"
+    },
+    {
+      "label": "renderChain()",
+      "file_type": "code",
+      "source_file": "public\\app.js",
+      "source_location": "L628",
+      "id": "app_renderchain",
+      "community": 0,
+      "norm_label": "renderchain()"
+    },
+    {
+      "label": "loadChain()",
+      "file_type": "code",
+      "source_file": "public\\app.js",
+      "source_location": "L677",
+      "id": "app_loadchain",
+      "community": 0,
+      "norm_label": "loadchain()"
+    },
+    {
+      "label": "renderAudit()",
+      "file_type": "code",
+      "source_file": "public\\app.js",
+      "source_location": "L748",
+      "id": "app_renderaudit",
+      "community": 0,
+      "norm_label": "renderaudit()"
+    },
+    {
+      "label": "loadAudit()",
+      "file_type": "code",
+      "source_file": "public\\app.js",
+      "source_location": "L791",
+      "id": "app_loadaudit",
+      "community": 0,
+      "norm_label": "loadaudit()"
+    },
+    {
+      "label": "renderSettings()",
+      "file_type": "code",
+      "source_file": "public\\app.js",
+      "source_location": "L841",
+      "id": "app_rendersettings",
+      "community": 0,
+      "norm_label": "rendersettings()"
+    },
+    {
+      "label": "renderHelp()",
+      "file_type": "code",
+      "source_file": "public\\app.js",
+      "source_location": "L880",
+      "id": "app_renderhelp",
+      "community": 0,
+      "norm_label": "renderhelp()"
+    },
+    {
+      "label": "renderBatch()",
+      "file_type": "code",
+      "source_file": "public\\app.js",
+      "source_location": "L942",
+      "id": "app_renderbatch",
+      "community": 0,
+      "norm_label": "renderbatch()"
+    },
+    {
+      "label": "showVersionHistory()",
+      "file_type": "code",
+      "source_file": "public\\app.js",
+      "source_location": "L1144",
+      "id": "app_showversionhistory",
+      "community": 0,
+      "norm_label": "showversionhistory()"
+    },
+    {
+      "label": "app.js",
+      "file_type": "code",
+      "source_file": "server\\app.js",
+      "source_location": "L1",
+      "id": "server_app_js",
+      "community": 25,
+      "norm_label": "app.js"
+    },
+    {
+      "label": "db.js",
+      "file_type": "code",
+      "source_file": "server\\db\\db.js",
+      "source_location": "L1",
+      "id": "server_db_db_js",
+      "community": 26,
+      "norm_label": "db.js"
+    },
+    {
+      "label": "migrate_forensics.js",
+      "file_type": "code",
+      "source_file": "server\\db\\migrate_forensics.js",
+      "source_location": "L1",
+      "id": "server_db_migrate_forensics_js",
+      "community": 27,
+      "norm_label": "migrate_forensics.js"
+    },
+    {
+      "label": "migrate_merkle.js",
+      "file_type": "code",
+      "source_file": "server\\db\\migrate_merkle.js",
+      "source_location": "L1",
+      "id": "server_db_migrate_merkle_js",
+      "community": 28,
+      "norm_label": "migrate_merkle.js"
+    },
+    {
+      "label": "migrate_ocr.js",
+      "file_type": "code",
+      "source_file": "server\\db\\migrate_ocr.js",
+      "source_location": "L1",
+      "id": "server_db_migrate_ocr_js",
+      "community": 29,
+      "norm_label": "migrate_ocr.js"
+    },
+    {
+      "label": "migrate_signature.js",
+      "file_type": "code",
+      "source_file": "server\\db\\migrate_signature.js",
+      "source_location": "L1",
+      "id": "server_db_migrate_signature_js",
+      "community": 30,
+      "norm_label": "migrate_signature.js"
+    },
+    {
+      "label": "migrate_storage_id.js",
+      "file_type": "code",
+      "source_file": "server\\db\\migrate_storage_id.js",
+      "source_location": "L1",
+      "id": "server_db_migrate_storage_id_js",
+      "community": 31,
+      "norm_label": "migrate_storage_id.js"
+    },
+    {
+      "label": "migrate_versions.js",
+      "file_type": "code",
+      "source_file": "server\\db\\migrate_versions.js",
+      "source_location": "L1",
+      "id": "server_db_migrate_versions_js",
+      "community": 32,
+      "norm_label": "migrate_versions.js"
+    },
+    {
+      "label": "migrate_watcher.js",
+      "file_type": "code",
+      "source_file": "server\\db\\migrate_watcher.js",
+      "source_location": "L1",
+      "id": "server_db_migrate_watcher_js",
+      "community": 33,
+      "norm_label": "migrate_watcher.js"
+    },
+    {
+      "label": "mongodb.js",
+      "file_type": "code",
+      "source_file": "server\\db\\mongodb.js",
+      "source_location": "L1",
+      "id": "server_db_mongodb_js",
+      "community": 34,
+      "norm_label": "mongodb.js"
+    },
+    {
+      "label": "apiKey.js",
+      "file_type": "code",
+      "source_file": "server\\middleware\\apiKey.js",
+      "source_location": "L1",
+      "id": "server_middleware_apikey_js",
+      "community": 16,
+      "norm_label": "apikey.js"
+    },
+    {
+      "label": "apiKeyMiddleware()",
+      "file_type": "code",
+      "source_file": "server\\middleware\\apiKey.js",
+      "source_location": "L5",
+      "id": "apikey_apikeymiddleware",
+      "community": 16,
+      "norm_label": "apikeymiddleware()"
+    },
+    {
+      "label": "chain.js",
+      "file_type": "code",
+      "source_file": "server\\routes\\chain.js",
+      "source_location": "L1",
+      "id": "server_routes_chain_js",
+      "community": 35,
+      "norm_label": "chain.js"
+    },
+    {
+      "label": "stats.js",
+      "file_type": "code",
+      "source_file": "server\\routes\\stats.js",
+      "source_location": "L1",
+      "id": "server_routes_stats_js",
+      "community": 36,
+      "norm_label": "stats.js"
+    },
+    {
+      "label": "upload.js",
+      "file_type": "code",
+      "source_file": "server\\routes\\upload.js",
+      "source_location": "L1",
+      "id": "server_routes_upload_js",
+      "community": 37,
+      "norm_label": "upload.js"
+    },
+    {
+      "label": "verify.js",
+      "file_type": "code",
+      "source_file": "server\\routes\\verify.js",
+      "source_location": "L1",
+      "id": "server_routes_verify_js",
+      "community": 38,
+      "norm_label": "verify.js"
+    },
+    {
+      "label": "forensics.js",
+      "file_type": "code",
+      "source_file": "server\\utils\\forensics.js",
+      "source_location": "L1",
+      "id": "server_utils_forensics_js",
+      "community": 8,
+      "norm_label": "forensics.js"
+    },
+    {
+      "label": "fontConsistencyCheck()",
+      "file_type": "code",
+      "source_file": "server\\utils\\forensics.js",
+      "source_location": "L10",
+      "id": "forensics_fontconsistencycheck",
+      "community": 8,
+      "norm_label": "fontconsistencycheck()"
+    },
+    {
+      "label": "alignmentCheck()",
+      "file_type": "code",
+      "source_file": "server\\utils\\forensics.js",
+      "source_location": "L72",
+      "id": "forensics_alignmentcheck",
+      "community": 8,
+      "norm_label": "alignmentcheck()"
+    },
+    {
+      "label": "analyzeImage()",
+      "file_type": "code",
+      "source_file": "server\\utils\\forensics.js",
+      "source_location": "L134",
+      "id": "forensics_analyzeimage",
+      "community": 8,
+      "norm_label": "analyzeimage()"
+    },
+    {
+      "label": "generateApiKey.js",
+      "file_type": "code",
+      "source_file": "server\\utils\\generateApiKey.js",
+      "source_location": "L1",
+      "id": "server_utils_generateapikey_js",
+      "community": 17,
+      "norm_label": "generateapikey.js"
+    },
+    {
+      "label": "generateApiKey()",
+      "file_type": "code",
+      "source_file": "server\\utils\\generateApiKey.js",
+      "source_location": "L8",
+      "id": "generateapikey_generateapikey",
+      "community": 17,
+      "norm_label": "generateapikey()"
+    },
+    {
+      "label": "generateKeys.js",
+      "file_type": "code",
+      "source_file": "server\\utils\\generateKeys.js",
+      "source_location": "L1",
+      "id": "server_utils_generatekeys_js",
+      "community": 18,
+      "norm_label": "generatekeys.js"
+    },
+    {
+      "label": "generateKeys()",
+      "file_type": "code",
+      "source_file": "server\\utils\\generateKeys.js",
+      "source_location": "L8",
+      "id": "generatekeys_generatekeys",
+      "community": 18,
+      "norm_label": "generatekeys()"
+    },
+    {
+      "label": "hasher.js",
+      "file_type": "code",
+      "source_file": "server\\utils\\hasher.js",
+      "source_location": "L1",
+      "id": "server_utils_hasher_js",
+      "community": 5,
+      "norm_label": "hasher.js"
+    },
+    {
+      "label": "generateFileHash()",
+      "file_type": "code",
+      "source_file": "server\\utils\\hasher.js",
+      "source_location": "L4",
+      "id": "hasher_generatefilehash",
+      "community": 5,
+      "norm_label": "generatefilehash()"
+    },
+    {
+      "label": "generateBlockHash()",
+      "file_type": "code",
+      "source_file": "server\\utils\\hasher.js",
+      "source_location": "L9",
+      "id": "hasher_generateblockhash",
+      "community": 5,
+      "norm_label": "generateblockhash()"
+    },
+    {
+      "label": "getLastBlockHash()",
+      "file_type": "code",
+      "source_file": "server\\utils\\hasher.js",
+      "source_location": "L14",
+      "id": "hasher_getlastblockhash",
+      "community": 5,
+      "norm_label": "getlastblockhash()"
+    },
+    {
+      "label": "verifyDocument()",
+      "file_type": "code",
+      "source_file": "server\\utils\\hasher.js",
+      "source_location": "L19",
+      "id": "hasher_verifydocument",
+      "community": 5,
+      "norm_label": "verifydocument()"
+    },
+    {
+      "label": "merkle.js",
+      "file_type": "code",
+      "source_file": "server\\utils\\merkle.js",
+      "source_location": "L1",
+      "id": "server_utils_merkle_js",
+      "community": 6,
+      "norm_label": "merkle.js"
+    },
+    {
+      "label": "hashPair()",
+      "file_type": "code",
+      "source_file": "server\\utils\\merkle.js",
+      "source_location": "L9",
+      "id": "merkle_hashpair",
+      "community": 6,
+      "norm_label": "hashpair()"
+    },
+    {
+      "label": "buildMerkleTree()",
+      "file_type": "code",
+      "source_file": "server\\utils\\merkle.js",
+      "source_location": "L19",
+      "id": "merkle_buildmerkletree",
+      "community": 6,
+      "norm_label": "buildmerkletree()"
+    },
+    {
+      "label": "getMerkleProof()",
+      "file_type": "code",
+      "source_file": "server\\utils\\merkle.js",
+      "source_location": "L49",
+      "id": "merkle_getmerkleproof",
+      "community": 6,
+      "norm_label": "getmerkleproof()"
+    },
+    {
+      "label": "verifyMerkleProof()",
+      "file_type": "code",
+      "source_file": "server\\utils\\merkle.js",
+      "source_location": "L87",
+      "id": "merkle_verifymerkleproof",
+      "community": 6,
+      "norm_label": "verifymerkleproof()"
+    },
+    {
+      "label": "ocr.js",
+      "file_type": "code",
+      "source_file": "server\\utils\\ocr.js",
+      "source_location": "L1",
+      "id": "server_utils_ocr_js",
+      "community": 7,
+      "norm_label": "ocr.js"
+    },
+    {
+      "label": "extractText()",
+      "file_type": "code",
+      "source_file": "server\\utils\\ocr.js",
+      "source_location": "L11",
+      "id": "ocr_extracttext",
+      "community": 7,
+      "norm_label": "extracttext()"
+    },
+    {
+      "label": "levenshteinDistance()",
+      "file_type": "code",
+      "source_file": "server\\utils\\ocr.js",
+      "source_location": "L58",
+      "id": "ocr_levenshteindistance",
+      "community": 7,
+      "norm_label": "levenshteindistance()"
+    },
+    {
+      "label": "normalizeText()",
+      "file_type": "code",
+      "source_file": "server\\utils\\ocr.js",
+      "source_location": "L87",
+      "id": "ocr_normalizetext",
+      "community": 7,
+      "norm_label": "normalizetext()"
+    },
+    {
+      "label": "calculateSimilarity()",
+      "file_type": "code",
+      "source_file": "server\\utils\\ocr.js",
+      "source_location": "L101",
+      "id": "ocr_calculatesimilarity",
+      "community": 7,
+      "norm_label": "calculatesimilarity()"
+    },
+    {
+      "label": "processor.js",
+      "file_type": "code",
+      "source_file": "server\\utils\\processor.js",
+      "source_location": "L1",
+      "id": "server_utils_processor_js",
+      "community": 19,
+      "norm_label": "processor.js"
+    },
+    {
+      "label": "initProcessor()",
+      "file_type": "code",
+      "source_file": "server\\utils\\processor.js",
+      "source_location": "L16",
+      "id": "processor_initprocessor",
+      "community": 19,
+      "norm_label": "initprocessor()"
+    },
+    {
+      "label": "qr.js",
+      "file_type": "code",
+      "source_file": "server\\utils\\qr.js",
+      "source_location": "L1",
+      "id": "server_utils_qr_js",
+      "community": 39,
+      "norm_label": "qr.js"
+    },
+    {
+      "label": "queue.js",
+      "file_type": "code",
+      "source_file": "server\\utils\\queue.js",
+      "source_location": "L1",
+      "id": "server_utils_queue_js",
+      "community": 40,
+      "norm_label": "queue.js"
+    },
+    {
+      "label": "signature.js",
+      "file_type": "code",
+      "source_file": "server\\utils\\signature.js",
+      "source_location": "L1",
+      "id": "server_utils_signature_js",
+      "community": 20,
+      "norm_label": "signature.js"
+    },
+    {
+      "label": "detectSignature()",
+      "file_type": "code",
+      "source_file": "server\\utils\\signature.js",
+      "source_location": "L10",
+      "id": "signature_detectsignature",
+      "community": 20,
+      "norm_label": "detectsignature()"
+    },
+    {
+      "label": "api.js",
+      "file_type": "code",
+      "source_file": "src\\services\\api.js",
+      "source_location": "L1",
+      "id": "src_services_api_js",
+      "community": 0,
+      "norm_label": "api.js"
+    },
+    {
+      "label": "uploadDocument()",
+      "file_type": "code",
+      "source_file": "src\\services\\api.js",
+      "source_location": "L3",
+      "id": "api_uploaddocument",
+      "community": 0,
+      "norm_label": "uploaddocument()"
+    },
+    {
+      "label": "verifyDocument()",
+      "file_type": "code",
+      "source_file": "src\\services\\api.js",
+      "source_location": "L21",
+      "id": "api_verifydocument",
+      "community": 0,
+      "norm_label": "verifydocument()"
+    },
+    {
+      "label": "getChain()",
+      "file_type": "code",
+      "source_file": "src\\services\\api.js",
+      "source_location": "L39",
+      "id": "api_getchain",
+      "community": 0,
+      "norm_label": "getchain()"
+    },
+    {
+      "label": "getStats()",
+      "file_type": "code",
+      "source_file": "src\\services\\api.js",
+      "source_location": "L50",
+      "id": "api_getstats",
+      "community": 0,
+      "norm_label": "getstats()"
+    },
+    {
+      "label": "Jimp (Image Manipulation)",
+      "file_type": "code",
+      "source_file": "create_modified_ocr.js",
+      "source_location": 1,
+      "id": "jimp_lib",
+      "community": 1,
+      "norm_label": "jimp (image manipulation)"
+    },
+    {
+      "label": "MongoDB GridFS",
+      "file_type": "code",
+      "source_file": "server/db/mongodb.js",
+      "source_location": 10,
+      "id": "mongodb_gridfs",
+      "community": 1,
+      "norm_label": "mongodb gridfs"
+    },
+    {
+      "label": "SQLite Ledger (db.sqlite)",
+      "file_type": "code",
+      "source_file": "server/db/db.js",
+      "source_location": 5,
+      "id": "sqlite_ledger",
+      "community": 1,
+      "norm_label": "sqlite ledger (db.sqlite)"
+    },
+    {
+      "label": "Hasher Utility",
+      "file_type": "code",
+      "source_file": "server/utils/hasher.js",
+      "source_location": 1,
+      "id": "hasher_util",
+      "community": 1,
+      "norm_label": "hasher utility"
+    },
+    {
+      "label": "OCR Service",
+      "file_type": "code",
+      "source_file": "server/utils/ocr.js",
+      "source_location": 1,
+      "id": "ocr_service",
+      "community": 1,
+      "norm_label": "ocr service"
+    },
+    {
+      "label": "Forensics Service",
+      "file_type": "code",
+      "source_file": "server/utils/forensics.js",
+      "source_location": 1,
+      "id": "forensics_service",
+      "community": 1,
+      "norm_label": "forensics service"
+    },
+    {
+      "label": "Signature Detection Service",
+      "file_type": "code",
+      "source_file": "server/utils/signature.js",
+      "source_location": 1,
+      "id": "signature_service",
+      "community": 1,
+      "norm_label": "signature detection service"
+    },
+    {
+      "label": "Merkle Tree Utility",
+      "file_type": "code",
+      "source_file": "server/utils/merkle.js",
+      "source_location": 1,
+      "id": "merkle_util",
+      "community": 1,
+      "norm_label": "merkle tree utility"
+    },
+    {
+      "label": "Background Integrity Watcher",
+      "file_type": "code",
+      "source_file": "server/app.js",
+      "source_location": 36,
+      "id": "bg_watcher",
+      "community": 1,
+      "norm_label": "background integrity watcher"
+    },
+    {
+      "label": "Document Processing Queue",
+      "file_type": "code",
+      "source_file": "server/utils/queue.js",
+      "source_location": 1,
+      "id": "document_queue",
+      "community": 1,
+      "norm_label": "document processing queue"
+    },
+    {
+      "label": "API Key Middleware",
+      "file_type": "code",
+      "source_file": "server/middleware/apiKey.js",
+      "source_location": 5,
+      "id": "api_key_auth",
+      "community": 41,
+      "norm_label": "api key middleware"
+    },
+    {
+      "label": "SHA-256 Block Chaining",
+      "file_type": "code",
+      "source_file": "server/utils/hasher.js",
+      "source_location": 9,
+      "id": "sha256_chaining",
+      "community": 21,
+      "norm_label": "sha-256 block chaining"
+    },
+    {
+      "label": "Document Versioning System",
+      "file_type": "code",
+      "source_file": "server/db/migrate_versions.js",
+      "source_location": 1,
+      "id": "document_versioning",
+      "community": 1,
+      "norm_label": "document versioning system"
+    },
+    {
+      "label": "JSON Proof of Authenticity",
+      "file_type": "code",
+      "source_file": "server/routes/verify.js",
+      "source_location": 115,
+      "id": "proof_of_authenticity",
+      "community": 21,
+      "norm_label": "json proof of authenticity"
+    },
+    {
+      "label": "Forgery Simulation (Tamper)",
+      "file_type": "code",
+      "source_file": "tamper_cloud.js",
+      "source_location": 1,
+      "id": "forgery_simulation",
+      "community": 1,
+      "norm_label": "forgery simulation (tamper)"
+    },
+    {
+      "label": "hashPair",
+      "file_type": "code",
+      "source_file": "server/utils/merkle.js",
+      "source_location": {
+        "start_line": 8,
+        "end_line": 10
+      },
+      "id": "merkle_hashPair",
+      "community": 2,
+      "norm_label": "hashpair"
+    },
+    {
+      "label": "buildMerkleTree",
+      "file_type": "code",
+      "source_file": "server/utils/merkle.js",
+      "source_location": {
+        "start_line": 17,
+        "end_line": 37
+      },
+      "id": "merkle_buildMerkleTree",
+      "community": 2,
+      "norm_label": "buildmerkletree"
+    },
+    {
+      "label": "getMerkleProof",
+      "file_type": "code",
+      "source_file": "server/utils/merkle.js",
+      "source_location": {
+        "start_line": 45,
+        "end_line": 74
+      },
+      "id": "merkle_getMerkleProof",
+      "community": 2,
+      "norm_label": "getmerkleproof"
+    },
+    {
+      "label": "verifyMerkleProof",
+      "file_type": "code",
+      "source_file": "server/utils/merkle.js",
+      "source_location": {
+        "start_line": 82,
+        "end_line": 94
+      },
+      "id": "merkle_verifyMerkleProof",
+      "community": 2,
+      "norm_label": "verifymerkleproof"
+    },
+    {
+      "label": "extractText",
+      "file_type": "code",
+      "source_file": "server/utils/ocr.js",
+      "source_location": {
+        "start_line": 11,
+        "end_line": 49
+      },
+      "id": "ocr_extractText",
+      "community": 2,
+      "norm_label": "extracttext"
+    },
+    {
+      "label": "levenshteinDistance",
+      "file_type": "code",
+      "source_file": "server/utils/ocr.js",
+      "source_location": {
+        "start_line": 56,
+        "end_line": 78
+      },
+      "id": "ocr_levenshteinDistance",
+      "community": 10,
+      "norm_label": "levenshteindistance"
+    },
+    {
+      "label": "normalizeText",
+      "file_type": "code",
+      "source_file": "server/utils/ocr.js",
+      "source_location": {
+        "start_line": 85,
+        "end_line": 91
+      },
+      "id": "ocr_normalizeText",
+      "community": 10,
+      "norm_label": "normalizetext"
+    },
+    {
+      "label": "calculateSimilarity",
+      "file_type": "code",
+      "source_file": "server/utils/ocr.js",
+      "source_location": {
+        "start_line": 98,
+        "end_line": 108
+      },
+      "id": "ocr_calculateSimilarity",
+      "community": 10,
+      "norm_label": "calculatesimilarity"
+    },
+    {
+      "label": "initProcessor",
+      "file_type": "code",
+      "source_file": "server/utils/processor.js",
+      "source_location": {
+        "start_line": 15,
+        "end_line": 169
+      },
+      "id": "processor_initProcessor",
+      "community": 2,
+      "norm_label": "initprocessor"
+    },
+    {
+      "label": "generateQR",
+      "file_type": "code",
+      "source_file": "server/utils/qr.js",
+      "source_location": {
+        "start_line": 3,
+        "end_line": 5
+      },
+      "id": "qr_generateQR",
+      "community": 2,
+      "norm_label": "generateqr"
+    },
+    {
+      "label": "documentQueue",
+      "file_type": "code",
+      "source_file": "server/utils/queue.js",
+      "source_location": {
+        "start_line": 4,
+        "end_line": 4
+      },
+      "id": "queue_documentQueue",
+      "community": 2,
+      "norm_label": "documentqueue"
+    },
+    {
+      "label": "detectSignature",
+      "file_type": "code",
+      "source_file": "server/utils/signature.js",
+      "source_location": {
+        "start_line": 10,
+        "end_line": 84
+      },
+      "id": "signature_detectSignature",
+      "community": 2,
+      "norm_label": "detectsignature"
+    },
+    {
+      "label": "uploadDocument",
+      "file_type": "code",
+      "source_file": "src/services/api.js",
+      "source_location": {
+        "start_line": 3,
+        "end_line": 19
+      },
+      "id": "api_uploadDocument",
+      "community": 2,
+      "norm_label": "uploaddocument"
+    },
+    {
+      "label": "verifyDocument",
+      "file_type": "code",
+      "source_file": "src/services/api.js",
+      "source_location": {
+        "start_line": 21,
+        "end_line": 37
+      },
+      "id": "api_verifyDocument",
+      "community": 42,
+      "norm_label": "verifydocument"
+    },
+    {
+      "label": "The Sovereign Archive Design System",
+      "file_type": "document",
+      "source_file": "uploads/1775405458397-DESIGN.txt",
+      "id": "doc_sovereign_archive",
+      "community": 2,
+      "norm_label": "the sovereign archive design system"
+    },
+    {
+      "label": "MCP Tools: code-review-graph",
+      "file_type": "document",
+      "source_file": "AGENTS.md",
+      "id": "doc_mcp_tools",
+      "community": 43,
+      "norm_label": "mcp tools: code-review-graph"
+    },
+    {
+      "label": "Lorem Shop Receipt",
+      "file_type": "image",
+      "source_file": "alice_test.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "alice_test_receipt",
+      "community": 22,
+      "norm_label": "lorem shop receipt"
+    },
+    {
+      "label": "Cat Face Close-up",
+      "file_type": "image",
+      "source_file": "cat2.jpg",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "cat2_cat",
+      "community": 44,
+      "norm_label": "cat face close-up"
+    },
+    {
+      "label": "Indian Food Spread",
+      "file_type": "image",
+      "source_file": "food_image.jpg",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "food_image_indian_food",
+      "community": 45,
+      "norm_label": "indian food spread"
+    },
+    {
+      "label": "Modified Lorem Shop Receipt",
+      "file_type": "image",
+      "source_file": "modified.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "modified_receipt",
+      "community": 22,
+      "norm_label": "modified lorem shop receipt"
+    },
+    {
+      "label": "Cat Stretching",
+      "file_type": "image",
+      "source_file": "original_cat.jpg",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "original_cat_cat",
+      "community": 23,
+      "norm_label": "cat stretching"
+    },
+    {
+      "label": "Obscured Cat Stretching",
+      "file_type": "image",
+      "source_file": "tampered_cat.jpg",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "tampered_cat_cat",
+      "community": 23,
+      "norm_label": "obscured cat stretching"
+    },
+    {
+      "label": "Pizza",
+      "file_type": "image",
+      "source_file": "tampered_pixel.jpg",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "tampered_pixel_pizza",
+      "community": 46,
+      "norm_label": "pizza"
+    },
+    {
+      "label": "Lorem Shop Receipt",
+      "file_type": "image",
+      "source_file": "test_parallel_final.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "test_parallel_final_receipt",
+      "community": 3,
+      "norm_label": "lorem shop receipt"
+    },
+    {
+      "label": "Lorem Shop Receipt",
+      "file_type": "image",
+      "source_file": "test_p_final.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "test_p_final_receipt",
+      "community": 3,
+      "norm_label": "lorem shop receipt"
+    },
+    {
+      "label": "Four Cats Walking",
+      "file_type": "image",
+      "source_file": "test_similarity.jpg",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "test_similarity_cats",
+      "community": 11,
+      "norm_label": "four cats walking"
+    },
+    {
+      "label": "Cat in Basket",
+      "file_type": "image",
+      "source_file": "tmp/85afac6e88a1eb4dd9437479c1f92de5.jpg",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "tmp_85afac6e88a1eb4dd9437479c1f92de5_cat",
+      "community": 11,
+      "norm_label": "cat in basket"
+    },
+    {
+      "label": "Lorem Shop Receipt",
+      "file_type": "image",
+      "source_file": "tmp/test_write.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "tmp_test_write_receipt",
+      "community": 3,
+      "norm_label": "lorem shop receipt"
+    },
+    {
+      "label": "Lorem Shop Receipt",
+      "file_type": "image",
+      "source_file": "uploads/1775415035291-test.jpg",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "uploads_1775415035291_test_receipt",
+      "community": 3,
+      "norm_label": "lorem shop receipt"
+    },
+    {
+      "label": "To Do List Hello Mango",
+      "file_type": "image",
+      "source_file": "uploads/1775419443926-test.jpg",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "uploads_1775419443926_test_todo",
+      "community": 4,
+      "norm_label": "to do list hello mango"
+    },
+    {
+      "label": "Lorem Shop Receipt",
+      "file_type": "image",
+      "source_file": "uploads/1775420049639-verify_test.jpg",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "uploads_1775420049639_verify_test_receipt",
+      "community": 3,
+      "norm_label": "lorem shop receipt"
+    },
+    {
+      "label": "To Do List Hello Mango",
+      "file_type": "image",
+      "source_file": "uploads/1775420914216-test2.jpeg",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "uploads_1775420914216_test2_todo",
+      "community": 4,
+      "norm_label": "to do list hello mango"
+    },
+    {
+      "label": "To Do List Hello Mango",
+      "file_type": "image",
+      "source_file": "uploads/1775421090799-test2.jpeg",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "uploads_1775421090799_test2_todo",
+      "community": 4,
+      "norm_label": "to do list hello mango"
+    },
+    {
+      "label": "Lorem Shop Receipt",
+      "file_type": "image",
+      "source_file": "uploads/1775427228192-test.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "uploads_1775427228192_test_receipt",
+      "community": 3,
+      "norm_label": "lorem shop receipt"
+    },
+    {
+      "label": "Lorem Shop",
+      "file_type": "image",
+      "source_file": "test_parallel_final.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "concept_lorem_shop",
+      "community": 3,
+      "norm_label": "lorem shop"
+    },
+    {
+      "label": "Receipt",
+      "file_type": "image",
+      "source_file": "test_parallel_final.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "concept_receipt",
+      "community": 3,
+      "norm_label": "receipt"
+    },
+    {
+      "label": "Cat",
+      "file_type": "image",
+      "source_file": "test_similarity.jpg",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "concept_cat",
+      "community": 11,
+      "norm_label": "cat"
+    },
+    {
+      "label": "To Do List",
+      "file_type": "image",
+      "source_file": "uploads/1775419443926-test.jpg",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "concept_todo_list",
+      "community": 4,
+      "norm_label": "to do list"
+    },
+    {
+      "label": "Task: Hello",
+      "file_type": "image",
+      "source_file": "uploads/1775419443926-test.jpg",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "task_hello",
+      "community": 4,
+      "norm_label": "task: hello"
+    },
+    {
+      "label": "Task: Mango",
+      "file_type": "image",
+      "source_file": "uploads/1775419443926-test.jpg",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "task_mango",
+      "community": 4,
+      "norm_label": "task: mango"
+    },
+    {
+      "label": "Censored Receipt",
+      "file_type": "image",
+      "source_file": "tampered_test.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "tampered_test_receipt",
+      "community": 9,
+      "norm_label": "censored receipt"
+    },
+    {
+      "label": "Original Receipt",
+      "file_type": "image",
+      "source_file": "test.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "test_receipt",
+      "community": 9,
+      "norm_label": "original receipt"
+    },
+    {
+      "label": "Duplicate Receipt",
+      "file_type": "image",
+      "source_file": "test2.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "test2_receipt",
+      "community": 9,
+      "norm_label": "duplicate receipt"
+    },
+    {
+      "label": "Pizza Slice",
+      "file_type": "image",
+      "source_file": "test_b64.jpg",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "test_b64_pizza",
+      "community": 47,
+      "norm_label": "pizza slice"
+    },
+    {
+      "label": "Sleeping Kitten",
+      "file_type": "image",
+      "source_file": "test_final.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "test_final_kitten",
+      "community": 48,
+      "norm_label": "sleeping kitten"
+    },
+    {
+      "label": "Parallel Receipt",
+      "file_type": "image",
+      "source_file": "test_parallel.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "test_parallel_receipt",
+      "community": 9,
+      "norm_label": "parallel receipt"
+    }
+  ],
+  "links": [
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "create_modified_ocr.js",
+      "source_location": "L4",
+      "weight": 1.0,
+      "_src": "create_modified_ocr_js",
+      "_tgt": "create_modified_ocr_modifyimage",
+      "source": "create_modified_ocr_js",
+      "target": "create_modified_ocr_modifyimage",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tamper_cloud.js",
+      "source_location": "L6",
+      "weight": 1.0,
+      "_src": "tamper_cloud_js",
+      "_tgt": "tamper_cloud_hackcloud",
+      "source": "tamper_cloud_js",
+      "target": "tamper_cloud_hackcloud",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tamper_files_cloud.js",
+      "source_location": "L8",
+      "weight": 1.0,
+      "_src": "tamper_files_cloud_js",
+      "_tgt": "tamper_files_cloud_hackanything",
+      "source": "tamper_files_cloud_js",
+      "target": "tamper_files_cloud_hackanything",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tamper_image.js",
+      "source_location": "L3",
+      "weight": 1.0,
+      "_src": "tamper_image_js",
+      "_tgt": "tamper_image_tamper",
+      "source": "tamper_image_js",
+      "target": "tamper_image_tamper",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "public\\app.js",
+      "source_location": "L37",
+      "weight": 1.0,
+      "_src": "public_app_js",
+      "_tgt": "app_navigate",
+      "source": "public_app_js",
+      "target": "app_navigate",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "public\\app.js",
+      "source_location": "L62",
+      "weight": 1.0,
+      "_src": "public_app_js",
+      "_tgt": "app_renderstatsbar",
+      "source": "public_app_js",
+      "target": "app_renderstatsbar",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "public\\app.js",
+      "source_location": "L106",
+      "weight": 1.0,
+      "_src": "public_app_js",
+      "_tgt": "app_renderdashboard",
+      "source": "public_app_js",
+      "target": "app_renderdashboard",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "public\\app.js",
+      "source_location": "L152",
+      "weight": 1.0,
+      "_src": "public_app_js",
+      "_tgt": "app_renderupload",
+      "source": "public_app_js",
+      "target": "app_renderupload",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "public\\app.js",
+      "source_location": "L364",
+      "weight": 1.0,
+      "_src": "public_app_js",
+      "_tgt": "app_rendersuccessui",
+      "source": "public_app_js",
+      "target": "app_rendersuccessui",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "public\\app.js",
+      "source_location": "L425",
+      "weight": 1.0,
+      "_src": "public_app_js",
+      "_tgt": "app_renderverify",
+      "source": "public_app_js",
+      "target": "app_renderverify",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "public\\app.js",
+      "source_location": "L628",
+      "weight": 1.0,
+      "_src": "public_app_js",
+      "_tgt": "app_renderchain",
+      "source": "public_app_js",
+      "target": "app_renderchain",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "public\\app.js",
+      "source_location": "L677",
+      "weight": 1.0,
+      "_src": "public_app_js",
+      "_tgt": "app_loadchain",
+      "source": "public_app_js",
+      "target": "app_loadchain",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "public\\app.js",
+      "source_location": "L748",
+      "weight": 1.0,
+      "_src": "public_app_js",
+      "_tgt": "app_renderaudit",
+      "source": "public_app_js",
+      "target": "app_renderaudit",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "public\\app.js",
+      "source_location": "L791",
+      "weight": 1.0,
+      "_src": "public_app_js",
+      "_tgt": "app_loadaudit",
+      "source": "public_app_js",
+      "target": "app_loadaudit",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "public\\app.js",
+      "source_location": "L841",
+      "weight": 1.0,
+      "_src": "public_app_js",
+      "_tgt": "app_rendersettings",
+      "source": "public_app_js",
+      "target": "app_rendersettings",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "public\\app.js",
+      "source_location": "L880",
+      "weight": 1.0,
+      "_src": "public_app_js",
+      "_tgt": "app_renderhelp",
+      "source": "public_app_js",
+      "target": "app_renderhelp",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "public\\app.js",
+      "source_location": "L942",
+      "weight": 1.0,
+      "_src": "public_app_js",
+      "_tgt": "app_renderbatch",
+      "source": "public_app_js",
+      "target": "app_renderbatch",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "public\\app.js",
+      "source_location": "L1144",
+      "weight": 1.0,
+      "_src": "public_app_js",
+      "_tgt": "app_showversionhistory",
+      "source": "public_app_js",
+      "target": "app_showversionhistory",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "public\\app.js",
+      "source_location": "L45",
+      "weight": 1.0,
+      "_src": "app_navigate",
+      "_tgt": "app_renderupload",
+      "source": "app_navigate",
+      "target": "app_renderupload",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "public\\app.js",
+      "source_location": "L46",
+      "weight": 1.0,
+      "_src": "app_navigate",
+      "_tgt": "app_renderverify",
+      "source": "app_navigate",
+      "target": "app_renderverify",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "public\\app.js",
+      "source_location": "L47",
+      "weight": 1.0,
+      "_src": "app_navigate",
+      "_tgt": "app_renderchain",
+      "source": "app_navigate",
+      "target": "app_renderchain",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "public\\app.js",
+      "source_location": "L48",
+      "weight": 1.0,
+      "_src": "app_navigate",
+      "_tgt": "app_renderaudit",
+      "source": "app_navigate",
+      "target": "app_renderaudit",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "public\\app.js",
+      "source_location": "L49",
+      "weight": 1.0,
+      "_src": "app_navigate",
+      "_tgt": "app_rendersettings",
+      "source": "app_navigate",
+      "target": "app_rendersettings",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "public\\app.js",
+      "source_location": "L50",
+      "weight": 1.0,
+      "_src": "app_navigate",
+      "_tgt": "app_renderhelp",
+      "source": "app_navigate",
+      "target": "app_renderhelp",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "public\\app.js",
+      "source_location": "L51",
+      "weight": 1.0,
+      "_src": "app_navigate",
+      "_tgt": "app_renderbatch",
+      "source": "app_navigate",
+      "target": "app_renderbatch",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "public\\app.js",
+      "source_location": "L52",
+      "weight": 1.0,
+      "_src": "app_navigate",
+      "_tgt": "app_renderdashboard",
+      "source": "app_navigate",
+      "target": "app_renderdashboard",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "public\\app.js",
+      "source_location": "L119",
+      "weight": 1.0,
+      "_src": "app_renderdashboard",
+      "_tgt": "app_renderstatsbar",
+      "source": "app_renderstatsbar",
+      "target": "app_renderdashboard",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "public\\app.js",
+      "source_location": "L652",
+      "weight": 1.0,
+      "_src": "app_renderchain",
+      "_tgt": "app_renderstatsbar",
+      "source": "app_renderstatsbar",
+      "target": "app_renderchain",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "public\\app.js",
+      "source_location": "L98",
+      "weight": 1.0,
+      "_src": "app_renderstatsbar",
+      "_tgt": "api_getstats",
+      "source": "app_renderstatsbar",
+      "target": "api_getstats"
+    },
+    {
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "public\\app.js",
+      "source_location": "L139",
+      "weight": 1.0,
+      "_src": "app_renderdashboard",
+      "_tgt": "api_getchain",
+      "source": "app_renderdashboard",
+      "target": "api_getchain"
+    },
+    {
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "public\\app.js",
+      "source_location": "L476",
+      "weight": 1.0,
+      "_src": "app_renderverify",
+      "_tgt": "api_getstats",
+      "source": "app_renderverify",
+      "target": "api_getstats"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "public\\app.js",
+      "source_location": "L673",
+      "weight": 1.0,
+      "_src": "app_renderchain",
+      "_tgt": "app_loadchain",
+      "source": "app_renderchain",
+      "target": "app_loadchain",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "public\\app.js",
+      "source_location": "L681",
+      "weight": 1.0,
+      "_src": "app_loadchain",
+      "_tgt": "api_getchain",
+      "source": "app_loadchain",
+      "target": "api_getchain"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "public\\app.js",
+      "source_location": "L781",
+      "weight": 1.0,
+      "_src": "app_renderaudit",
+      "_tgt": "app_loadaudit",
+      "source": "app_renderaudit",
+      "target": "app_loadaudit",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\middleware\\apiKey.js",
+      "source_location": "L5",
+      "weight": 1.0,
+      "_src": "server_middleware_apikey_js",
+      "_tgt": "apikey_apikeymiddleware",
+      "source": "server_middleware_apikey_js",
+      "target": "apikey_apikeymiddleware",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\utils\\forensics.js",
+      "source_location": "L10",
+      "weight": 1.0,
+      "_src": "server_utils_forensics_js",
+      "_tgt": "forensics_fontconsistencycheck",
+      "source": "server_utils_forensics_js",
+      "target": "forensics_fontconsistencycheck",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\utils\\forensics.js",
+      "source_location": "L72",
+      "weight": 1.0,
+      "_src": "server_utils_forensics_js",
+      "_tgt": "forensics_alignmentcheck",
+      "source": "server_utils_forensics_js",
+      "target": "forensics_alignmentcheck",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\utils\\forensics.js",
+      "source_location": "L134",
+      "weight": 1.0,
+      "_src": "server_utils_forensics_js",
+      "_tgt": "forensics_analyzeimage",
+      "source": "server_utils_forensics_js",
+      "target": "forensics_analyzeimage",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\utils\\forensics.js",
+      "source_location": "L145",
+      "weight": 1.0,
+      "_src": "forensics_analyzeimage",
+      "_tgt": "forensics_fontconsistencycheck",
+      "source": "forensics_fontconsistencycheck",
+      "target": "forensics_analyzeimage",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\utils\\forensics.js",
+      "source_location": "L151",
+      "weight": 1.0,
+      "_src": "forensics_analyzeimage",
+      "_tgt": "forensics_alignmentcheck",
+      "source": "forensics_alignmentcheck",
+      "target": "forensics_analyzeimage",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\utils\\generateApiKey.js",
+      "source_location": "L8",
+      "weight": 1.0,
+      "_src": "server_utils_generateapikey_js",
+      "_tgt": "generateapikey_generateapikey",
+      "source": "server_utils_generateapikey_js",
+      "target": "generateapikey_generateapikey",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\utils\\generateKeys.js",
+      "source_location": "L8",
+      "weight": 1.0,
+      "_src": "server_utils_generatekeys_js",
+      "_tgt": "generatekeys_generatekeys",
+      "source": "server_utils_generatekeys_js",
+      "target": "generatekeys_generatekeys",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\utils\\hasher.js",
+      "source_location": "L4",
+      "weight": 1.0,
+      "_src": "server_utils_hasher_js",
+      "_tgt": "hasher_generatefilehash",
+      "source": "server_utils_hasher_js",
+      "target": "hasher_generatefilehash",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\utils\\hasher.js",
+      "source_location": "L9",
+      "weight": 1.0,
+      "_src": "server_utils_hasher_js",
+      "_tgt": "hasher_generateblockhash",
+      "source": "server_utils_hasher_js",
+      "target": "hasher_generateblockhash",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\utils\\hasher.js",
+      "source_location": "L14",
+      "weight": 1.0,
+      "_src": "server_utils_hasher_js",
+      "_tgt": "hasher_getlastblockhash",
+      "source": "server_utils_hasher_js",
+      "target": "hasher_getlastblockhash",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\utils\\hasher.js",
+      "source_location": "L19",
+      "weight": 1.0,
+      "_src": "server_utils_hasher_js",
+      "_tgt": "hasher_verifydocument",
+      "source": "server_utils_hasher_js",
+      "target": "hasher_verifydocument",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\utils\\hasher.js",
+      "source_location": "L25",
+      "weight": 1.0,
+      "_src": "hasher_verifydocument",
+      "_tgt": "hasher_generatefilehash",
+      "source": "hasher_generatefilehash",
+      "target": "hasher_verifydocument",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\utils\\hasher.js",
+      "source_location": "L26",
+      "weight": 1.0,
+      "_src": "hasher_verifydocument",
+      "_tgt": "hasher_generateblockhash",
+      "source": "hasher_generateblockhash",
+      "target": "hasher_verifydocument",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\utils\\merkle.js",
+      "source_location": "L9",
+      "weight": 1.0,
+      "_src": "server_utils_merkle_js",
+      "_tgt": "merkle_hashpair",
+      "source": "server_utils_merkle_js",
+      "target": "merkle_hashpair",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\utils\\merkle.js",
+      "source_location": "L19",
+      "weight": 1.0,
+      "_src": "server_utils_merkle_js",
+      "_tgt": "merkle_buildmerkletree",
+      "source": "server_utils_merkle_js",
+      "target": "merkle_buildmerkletree",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\utils\\merkle.js",
+      "source_location": "L49",
+      "weight": 1.0,
+      "_src": "server_utils_merkle_js",
+      "_tgt": "merkle_getmerkleproof",
+      "source": "server_utils_merkle_js",
+      "target": "merkle_getmerkleproof",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\utils\\merkle.js",
+      "source_location": "L87",
+      "weight": 1.0,
+      "_src": "server_utils_merkle_js",
+      "_tgt": "merkle_verifymerkleproof",
+      "source": "server_utils_merkle_js",
+      "target": "merkle_verifymerkleproof",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\utils\\merkle.js",
+      "source_location": "L31",
+      "weight": 1.0,
+      "_src": "merkle_buildmerkletree",
+      "_tgt": "merkle_hashpair",
+      "source": "merkle_hashpair",
+      "target": "merkle_buildmerkletree",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\utils\\merkle.js",
+      "source_location": "L92",
+      "weight": 1.0,
+      "_src": "merkle_verifymerkleproof",
+      "_tgt": "merkle_hashpair",
+      "source": "merkle_hashpair",
+      "target": "merkle_verifymerkleproof",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\utils\\merkle.js",
+      "source_location": "L50",
+      "weight": 1.0,
+      "_src": "merkle_getmerkleproof",
+      "_tgt": "merkle_buildmerkletree",
+      "source": "merkle_buildmerkletree",
+      "target": "merkle_getmerkleproof",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\utils\\ocr.js",
+      "source_location": "L11",
+      "weight": 1.0,
+      "_src": "server_utils_ocr_js",
+      "_tgt": "ocr_extracttext",
+      "source": "server_utils_ocr_js",
+      "target": "ocr_extracttext",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\utils\\ocr.js",
+      "source_location": "L58",
+      "weight": 1.0,
+      "_src": "server_utils_ocr_js",
+      "_tgt": "ocr_levenshteindistance",
+      "source": "server_utils_ocr_js",
+      "target": "ocr_levenshteindistance",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\utils\\ocr.js",
+      "source_location": "L87",
+      "weight": 1.0,
+      "_src": "server_utils_ocr_js",
+      "_tgt": "ocr_normalizetext",
+      "source": "server_utils_ocr_js",
+      "target": "ocr_normalizetext",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\utils\\ocr.js",
+      "source_location": "L101",
+      "weight": 1.0,
+      "_src": "server_utils_ocr_js",
+      "_tgt": "ocr_calculatesimilarity",
+      "source": "server_utils_ocr_js",
+      "target": "ocr_calculatesimilarity",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\utils\\ocr.js",
+      "source_location": "L106",
+      "weight": 1.0,
+      "_src": "ocr_calculatesimilarity",
+      "_tgt": "ocr_levenshteindistance",
+      "source": "ocr_levenshteindistance",
+      "target": "ocr_calculatesimilarity",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\utils\\ocr.js",
+      "source_location": "L102",
+      "weight": 1.0,
+      "_src": "ocr_calculatesimilarity",
+      "_tgt": "ocr_normalizetext",
+      "source": "ocr_normalizetext",
+      "target": "ocr_calculatesimilarity",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\utils\\processor.js",
+      "source_location": "L16",
+      "weight": 1.0,
+      "_src": "server_utils_processor_js",
+      "_tgt": "processor_initprocessor",
+      "source": "server_utils_processor_js",
+      "target": "processor_initprocessor",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\utils\\signature.js",
+      "source_location": "L10",
+      "weight": 1.0,
+      "_src": "server_utils_signature_js",
+      "_tgt": "signature_detectsignature",
+      "source": "server_utils_signature_js",
+      "target": "signature_detectsignature",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\services\\api.js",
+      "source_location": "L3",
+      "weight": 1.0,
+      "_src": "src_services_api_js",
+      "_tgt": "api_uploaddocument",
+      "source": "src_services_api_js",
+      "target": "api_uploaddocument",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\services\\api.js",
+      "source_location": "L21",
+      "weight": 1.0,
+      "_src": "src_services_api_js",
+      "_tgt": "api_verifydocument",
+      "source": "src_services_api_js",
+      "target": "api_verifydocument",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\services\\api.js",
+      "source_location": "L39",
+      "weight": 1.0,
+      "_src": "src_services_api_js",
+      "_tgt": "api_getchain",
+      "source": "src_services_api_js",
+      "target": "api_getchain",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\services\\api.js",
+      "source_location": "L50",
+      "weight": 1.0,
+      "_src": "src_services_api_js",
+      "_tgt": "api_getstats",
+      "source": "src_services_api_js",
+      "target": "api_getstats",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "tamper_cloud.js",
+      "_src": "forgery_simulation",
+      "_tgt": "jimp_lib",
+      "source": "jimp_lib",
+      "target": "forgery_simulation"
+    },
+    {
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.7,
+      "source_file": "server/utils/ocr.js",
+      "_src": "ocr_service",
+      "_tgt": "jimp_lib",
+      "source": "jimp_lib",
+      "target": "ocr_service"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "server/utils/forensics.js",
+      "_src": "forensics_service",
+      "_tgt": "jimp_lib",
+      "source": "jimp_lib",
+      "target": "forensics_service"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "server/app.js",
+      "_src": "bg_watcher",
+      "_tgt": "mongodb_gridfs",
+      "source": "mongodb_gridfs",
+      "target": "bg_watcher"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "tamper_cloud.js",
+      "_src": "forgery_simulation",
+      "_tgt": "mongodb_gridfs",
+      "source": "mongodb_gridfs",
+      "target": "forgery_simulation"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "server/app.js",
+      "_src": "bg_watcher",
+      "_tgt": "sqlite_ledger",
+      "source": "sqlite_ledger",
+      "target": "bg_watcher"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "tamper_cloud.js",
+      "_src": "forgery_simulation",
+      "_tgt": "sqlite_ledger",
+      "source": "sqlite_ledger",
+      "target": "forgery_simulation"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "server/db/migrate_versions.js",
+      "_src": "document_versioning",
+      "_tgt": "sqlite_ledger",
+      "source": "sqlite_ledger",
+      "target": "document_versioning"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "server/app.js",
+      "_src": "bg_watcher",
+      "_tgt": "hasher_util",
+      "source": "hasher_util",
+      "target": "bg_watcher"
+    },
+    {
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "server/routes/upload.js",
+      "_src": "document_queue",
+      "_tgt": "hasher_util",
+      "source": "hasher_util",
+      "target": "document_queue"
+    },
+    {
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "server/routes/upload.js",
+      "_src": "document_queue",
+      "_tgt": "ocr_service",
+      "source": "ocr_service",
+      "target": "document_queue"
+    },
+    {
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "server/routes/upload.js",
+      "_src": "document_queue",
+      "_tgt": "forensics_service",
+      "source": "forensics_service",
+      "target": "document_queue"
+    },
+    {
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "server/routes/upload.js",
+      "_src": "document_queue",
+      "_tgt": "signature_service",
+      "source": "signature_service",
+      "target": "document_queue"
+    },
+    {
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "server/routes/upload.js",
+      "_src": "document_queue",
+      "_tgt": "merkle_util",
+      "source": "merkle_util",
+      "target": "document_queue"
+    },
+    {
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "server/routes/verify.js",
+      "_src": "proof_of_authenticity",
+      "_tgt": "sha256_chaining",
+      "source": "sha256_chaining",
+      "target": "proof_of_authenticity"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "server/utils/merkle.js",
+      "_src": "merkle_buildMerkleTree",
+      "_tgt": "merkle_hashPair",
+      "source": "merkle_hashPair",
+      "target": "merkle_buildMerkleTree"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "server/utils/merkle.js",
+      "_src": "merkle_verifyMerkleProof",
+      "_tgt": "merkle_hashPair",
+      "source": "merkle_hashPair",
+      "target": "merkle_verifyMerkleProof"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "server/utils/processor.js",
+      "_src": "processor_initProcessor",
+      "_tgt": "merkle_buildMerkleTree",
+      "source": "merkle_buildMerkleTree",
+      "target": "processor_initProcessor"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "server/utils/merkle.js",
+      "_src": "merkle_getMerkleProof",
+      "_tgt": "merkle_buildMerkleTree",
+      "source": "merkle_buildMerkleTree",
+      "target": "merkle_getMerkleProof"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "server/utils/processor.js",
+      "_src": "processor_initProcessor",
+      "_tgt": "merkle_getMerkleProof",
+      "source": "merkle_getMerkleProof",
+      "target": "processor_initProcessor"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "server/utils/processor.js",
+      "_src": "processor_initProcessor",
+      "_tgt": "ocr_extractText",
+      "source": "ocr_extractText",
+      "target": "processor_initProcessor"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "server/utils/ocr.js",
+      "_src": "ocr_calculateSimilarity",
+      "_tgt": "ocr_levenshteinDistance",
+      "source": "ocr_levenshteinDistance",
+      "target": "ocr_calculateSimilarity"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "server/utils/ocr.js",
+      "_src": "ocr_calculateSimilarity",
+      "_tgt": "ocr_normalizeText",
+      "source": "ocr_normalizeText",
+      "target": "ocr_calculateSimilarity"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "server/utils/processor.js",
+      "_src": "processor_initProcessor",
+      "_tgt": "signature_detectSignature",
+      "source": "processor_initProcessor",
+      "target": "signature_detectSignature"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "server/utils/processor.js",
+      "_src": "processor_initProcessor",
+      "_tgt": "qr_generateQR",
+      "source": "processor_initProcessor",
+      "target": "qr_generateQR"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "server/utils/processor.js",
+      "_src": "processor_initProcessor",
+      "_tgt": "queue_documentQueue",
+      "source": "processor_initProcessor",
+      "target": "queue_documentQueue"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "src/services/api.js",
+      "_src": "api_uploadDocument",
+      "_tgt": "processor_initProcessor",
+      "source": "processor_initProcessor",
+      "target": "api_uploadDocument"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "INFERRED",
+      "confidence_score": 0.7,
+      "source_file": "uploads/1775405458397-DESIGN.txt",
+      "_src": "doc_sovereign_archive",
+      "_tgt": "api_uploadDocument",
+      "source": "api_uploadDocument",
+      "target": "doc_sovereign_archive"
+    },
+    {
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "modified.png",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "modified_receipt",
+      "_tgt": "alice_test_receipt",
+      "source": "alice_test_receipt",
+      "target": "modified_receipt"
+    },
+    {
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "tampered_cat.jpg",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "tampered_cat_cat",
+      "_tgt": "original_cat_cat",
+      "source": "original_cat_cat",
+      "target": "tampered_cat_cat"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "test_parallel_final.png",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "test_parallel_final_receipt",
+      "_tgt": "concept_lorem_shop",
+      "source": "test_parallel_final_receipt",
+      "target": "concept_lorem_shop"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "test_parallel_final.png",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "test_parallel_final_receipt",
+      "_tgt": "concept_receipt",
+      "source": "test_parallel_final_receipt",
+      "target": "concept_receipt"
+    },
+    {
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "test_parallel_final.png",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "test_parallel_final_receipt",
+      "_tgt": "test_p_final_receipt",
+      "source": "test_parallel_final_receipt",
+      "target": "test_p_final_receipt"
+    },
+    {
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "test_parallel_final.png",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "test_parallel_final_receipt",
+      "_tgt": "tmp_test_write_receipt",
+      "source": "test_parallel_final_receipt",
+      "target": "tmp_test_write_receipt"
+    },
+    {
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "test_parallel_final.png",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "test_parallel_final_receipt",
+      "_tgt": "uploads_1775415035291_test_receipt",
+      "source": "test_parallel_final_receipt",
+      "target": "uploads_1775415035291_test_receipt"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "test_p_final.png",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "test_p_final_receipt",
+      "_tgt": "concept_lorem_shop",
+      "source": "test_p_final_receipt",
+      "target": "concept_lorem_shop"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "test_p_final.png",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "test_p_final_receipt",
+      "_tgt": "concept_receipt",
+      "source": "test_p_final_receipt",
+      "target": "concept_receipt"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "test_similarity.jpg",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "test_similarity_cats",
+      "_tgt": "concept_cat",
+      "source": "test_similarity_cats",
+      "target": "concept_cat"
+    },
+    {
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "test_similarity.jpg",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "test_similarity_cats",
+      "_tgt": "tmp_85afac6e88a1eb4dd9437479c1f92de5_cat",
+      "source": "test_similarity_cats",
+      "target": "tmp_85afac6e88a1eb4dd9437479c1f92de5_cat"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "tmp/85afac6e88a1eb4dd9437479c1f92de5.jpg",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "tmp_85afac6e88a1eb4dd9437479c1f92de5_cat",
+      "_tgt": "concept_cat",
+      "source": "tmp_85afac6e88a1eb4dd9437479c1f92de5_cat",
+      "target": "concept_cat"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "tmp/test_write.png",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "tmp_test_write_receipt",
+      "_tgt": "concept_lorem_shop",
+      "source": "tmp_test_write_receipt",
+      "target": "concept_lorem_shop"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "tmp/test_write.png",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "tmp_test_write_receipt",
+      "_tgt": "concept_receipt",
+      "source": "tmp_test_write_receipt",
+      "target": "concept_receipt"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "uploads/1775415035291-test.jpg",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "uploads_1775415035291_test_receipt",
+      "_tgt": "concept_lorem_shop",
+      "source": "uploads_1775415035291_test_receipt",
+      "target": "concept_lorem_shop"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "uploads/1775415035291-test.jpg",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "uploads_1775415035291_test_receipt",
+      "_tgt": "concept_receipt",
+      "source": "uploads_1775415035291_test_receipt",
+      "target": "concept_receipt"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "uploads/1775419443926-test.jpg",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "uploads_1775419443926_test_todo",
+      "_tgt": "concept_todo_list",
+      "source": "uploads_1775419443926_test_todo",
+      "target": "concept_todo_list"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "uploads/1775419443926-test.jpg",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "uploads_1775419443926_test_todo",
+      "_tgt": "task_hello",
+      "source": "uploads_1775419443926_test_todo",
+      "target": "task_hello"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "uploads/1775419443926-test.jpg",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "uploads_1775419443926_test_todo",
+      "_tgt": "task_mango",
+      "source": "uploads_1775419443926_test_todo",
+      "target": "task_mango"
+    },
+    {
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "uploads/1775419443926-test.jpg",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "uploads_1775419443926_test_todo",
+      "_tgt": "uploads_1775420914216_test2_todo",
+      "source": "uploads_1775419443926_test_todo",
+      "target": "uploads_1775420914216_test2_todo"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "uploads/1775420049639-verify_test.jpg",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "uploads_1775420049639_verify_test_receipt",
+      "_tgt": "concept_lorem_shop",
+      "source": "uploads_1775420049639_verify_test_receipt",
+      "target": "concept_lorem_shop"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "uploads/1775420049639-verify_test.jpg",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "uploads_1775420049639_verify_test_receipt",
+      "_tgt": "concept_receipt",
+      "source": "uploads_1775420049639_verify_test_receipt",
+      "target": "concept_receipt"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "uploads/1775420914216-test2.jpeg",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "uploads_1775420914216_test2_todo",
+      "_tgt": "concept_todo_list",
+      "source": "uploads_1775420914216_test2_todo",
+      "target": "concept_todo_list"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "uploads/1775420914216-test2.jpeg",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "uploads_1775420914216_test2_todo",
+      "_tgt": "task_hello",
+      "source": "uploads_1775420914216_test2_todo",
+      "target": "task_hello"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "uploads/1775420914216-test2.jpeg",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "uploads_1775420914216_test2_todo",
+      "_tgt": "task_mango",
+      "source": "uploads_1775420914216_test2_todo",
+      "target": "task_mango"
+    },
+    {
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "uploads/1775420914216-test2.jpeg",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "uploads_1775420914216_test2_todo",
+      "_tgt": "uploads_1775421090799_test2_todo",
+      "source": "uploads_1775420914216_test2_todo",
+      "target": "uploads_1775421090799_test2_todo"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "uploads/1775421090799-test2.jpeg",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "uploads_1775421090799_test2_todo",
+      "_tgt": "concept_todo_list",
+      "source": "uploads_1775421090799_test2_todo",
+      "target": "concept_todo_list"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "uploads/1775421090799-test2.jpeg",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "uploads_1775421090799_test2_todo",
+      "_tgt": "task_hello",
+      "source": "uploads_1775421090799_test2_todo",
+      "target": "task_hello"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "uploads/1775421090799-test2.jpeg",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "uploads_1775421090799_test2_todo",
+      "_tgt": "task_mango",
+      "source": "uploads_1775421090799_test2_todo",
+      "target": "task_mango"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "uploads/1775427228192-test.png",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "uploads_1775427228192_test_receipt",
+      "_tgt": "concept_lorem_shop",
+      "source": "uploads_1775427228192_test_receipt",
+      "target": "concept_lorem_shop"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "uploads/1775427228192-test.png",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "uploads_1775427228192_test_receipt",
+      "_tgt": "concept_receipt",
+      "source": "uploads_1775427228192_test_receipt",
+      "target": "concept_receipt"
+    },
+    {
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "tampered_test.png",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "tampered_test_receipt",
+      "_tgt": "test_receipt",
+      "source": "tampered_test_receipt",
+      "target": "test_receipt"
+    },
+    {
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "test2.png",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "test2_receipt",
+      "_tgt": "test_receipt",
+      "source": "test_receipt",
+      "target": "test2_receipt"
+    },
+    {
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "test_parallel.png",
+      "source_location": null,
+      "weight": 1.0,
+      "_src": "test_parallel_receipt",
+      "_tgt": "test_receipt",
+      "source": "test_receipt",
+      "target": "test_parallel_receipt"
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "integrity_verification_engine",
+      "label": "Integrity Verification Engine",
+      "nodes": [
+        "hasher_util",
+        "ocr_service",
+        "forensics_service",
+        "signature_service",
+        "merkle_util"
+      ],
+      "relation": "participate_in",
+      "confidence": "EXTRACTED",
+      "confidence_score": 0.95,
+      "source_file": "server/routes/verify.js"
+    },
+    {
+      "id": "distributed_ledger_storage",
+      "label": "Hybrid Distributed Storage",
+      "nodes": [
+        "sqlite_ledger",
+        "mongodb_gridfs",
+        "sha256_chaining"
+      ],
+      "relation": "form",
+      "confidence": "EXTRACTED",
+      "confidence_score": 0.9,
+      "source_file": "server/app.js"
+    },
+    {
+      "id": "document_processing_flow",
+      "label": "Document Processing Pipeline",
+      "nodes": [
+        "processor_initProcessor",
+        "ocr_extractText",
+        "signature_detectSignature",
+        "merkle_buildMerkleTree",
+        "qr_generateQR"
+      ],
+      "relation": "implement",
+      "confidence": "EXTRACTED",
+      "confidence_score": 0.9,
+      "source_file": "server/utils/processor.js"
+    },
+    {
+      "id": "lorem_shop_receipts",
+      "label": "Lorem Shop Receipts",
+      "nodes": [
+        "tampered_test_receipt",
+        "test_receipt",
+        "test2_receipt",
+        "test_parallel_receipt"
+      ],
+      "relation": "participate_in",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "tampered_test.png"
+    }
+  ]
+}

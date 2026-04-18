@@ -3,7 +3,19 @@ const fs = require('fs');
 
 function generateFileHash(filePath) {
     const fileBuffer = fs.readFileSync(filePath);
-    return crypto.createHash('sha256').update(fileBuffer).digest('hex');
+    const hash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+    return hash;
+}
+
+// Stream-based version for larger files or to avoid blocking (preferred in production)
+async function generateFileHashAsync(filePath) {
+    return new Promise((resolve, reject) => {
+        const hash = crypto.createHash('sha256');
+        const stream = fs.createReadStream(filePath);
+        stream.on('data', data => hash.update(data));
+        stream.on('end', () => resolve(hash.digest('hex')));
+        stream.on('error', reject);
+    });
 }
 
 function generateBlockHash(fileHash, prevHash, timestamp) {
@@ -40,6 +52,7 @@ function verifyDocument(documentId, db, manualFilePath) {
 
 module.exports = {
     generateFileHash,
+    generateFileHashAsync,
     generateBlockHash,
     getLastBlockHash,
     verifyDocument

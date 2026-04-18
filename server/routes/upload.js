@@ -47,7 +47,7 @@ router.post('/', apiKey, (req, res) => {
 
         console.log('Upload request fields:', {
             filename: req.file?.originalname,
-            uploaded_by: req.body.uploaded_by,
+            uploaded_by: req.body.user || req.body.uploaded_by || 'anonymous',
             department: req.body.department
         });
 
@@ -66,7 +66,7 @@ router.post('/', apiKey, (req, res) => {
                 return res.status(400).json({ success: false, error: 'Empty file not allowed' });
             }
 
-            const uploadedBy = req.body.uploaded_by || req.body.user || 'anonymous';
+            const uploadedBy = req.body.user || req.body.uploaded_by || 'anonymous';
             
             // Versioning logic
             let parent_document_id = (req.body.parent_document_id && req.body.parent_document_id !== 'undefined') ? parseInt(req.body.parent_document_id) : null;
@@ -96,11 +96,9 @@ router.post('/', apiKey, (req, res) => {
             }
 
             // ── Async Processing via Queue ──
-            // We add the job to the documentQueue which has concurrency=1
-            // This ensures hashes are generated and inserted sequentially, preventing race conditions.
             const job = await documentQueue.add({
-                filePath: tmpFilePath, // Unique temp path
-                originalname: req.file.originalname, // Original name for DB
+                filePath: tmpFilePath,
+                originalname: req.file.originalname,
                 mimetype: req.file.mimetype,
                 uploadedBy: uploadedBy,
                 department: req.body.department,

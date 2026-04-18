@@ -19,11 +19,15 @@ async function detectSignature(filePath) {
         if (!fs.existsSync(filePath)) return report;
 
         const image = await Jimp.read(filePath);
+        if (!image || !image.bitmap || !image.bitmap.data) throw new Error('Invalid image data');
         image.greyscale();
-        const { width, height } = image.bitmap;
+        
+        const width = Math.floor(image.bitmap.width);
+        const height = Math.floor(image.bitmap.height);
+        if (width === 0 || height === 0) throw new Error('Image has zero dimensions');
 
         const scanHeight = Math.floor(height * 0.3);
-        const scanY = height - scanHeight;
+        const scanY = Math.floor(height - scanHeight);
         
         const inkThreshold = 120;
         const clusterMinPixels = 200;
@@ -31,29 +35,29 @@ async function detectSignature(filePath) {
         let totalInkPixels = 0;
         let bounds = { minX: width, maxX: 0, minY: height, maxY: 0 };
 
-        // Fix: Use strict object syntax for scan region in v1.6.0
-        const region = {
-            x: 0,
-            y: scanY,
-            width: width,
-            height: scanHeight
-        };
+        // Manual loop with STRICT integer indices
+        for (let y = 0; y < scanHeight; y++) {
+            const actualY = scanY + y;
+            if (actualY >= height) break;
 
-        image.scan(region, (x, y, idx) => {
-            if (x % 2 === 0 && y % 2 === 0) {
-                const lum = image.bitmap.data[idx + 0];
+            const rowOffset = actualY * width;
+            for (let x = 0; x < width; x++) {
+                if (x % 2 === 0 && y % 2 === 0) {
+                    const idx = (rowOffset + x) * 4;
+                    const lum = image.bitmap.data[idx + 0];
 
-                if (lum < inkThreshold) {
-                    if (x > 10 && x < width - 10 && y > 10 && y < height - 10) {
-                        totalInkPixels++;
-                        if (x < bounds.minX) bounds.minX = x;
-                        if (x > bounds.maxX) bounds.maxX = x;
-                        if (y < bounds.minY) bounds.minY = y;
-                        if (y > bounds.maxY) bounds.maxY = y;
+                    if (lum < inkThreshold) {
+                        if (x > 10 && x < width - 10 && actualY > 10 && actualY < height - 10) {
+                            totalInkPixels++;
+                            if (x < bounds.minX) bounds.minX = x;
+                            if (x > bounds.maxX) bounds.maxX = x;
+                            if (actualY < bounds.minY) bounds.minY = actualY;
+                            if (actualY > bounds.maxY) bounds.maxY = actualY;
+                        }
                     }
                 }
             }
-        });
+        }
 
         if (totalInkPixels > clusterMinPixels) {
             const clusterW = bounds.maxX - bounds.minX;

@@ -185,7 +185,15 @@ function renderUpload(app) {
                                 <div class="relative flex items-center">
                                     <span class="material-symbols-outlined absolute left-3 text-outline text-lg">corporate_fare</span>
                                     <select id="upload-dept" class="w-full bg-surface pl-10 pr-4 py-3 rounded-xl border-none focus:ring-2 focus:ring-secondary/20 text-on-surface text-sm appearance-none">
-                                        <option>Legal & Compliance</option><option>Public Records</option><option>Financial Oversight</option><option>Administration</option>
+                                        <option>Executive Office</option>
+                                        <option>Legal & Compliance</option>
+                                        <option>Operations & Logistics</option>
+                                        <option>Human Resources</option>
+                                        <option>Information Technology</option>
+                                        <option>Strategy & Planning</option>
+                                        <option>Finance & Audit</option>
+                                        <option>Public Relations</option>
+                                        <option>Research & Development</option>
                                     </select>
                                 </div>
                             </div>
@@ -300,19 +308,63 @@ function renderUpload(app) {
 
                             if (status.state === 'completed' && status.result) {
                                 clearInterval(checkJob);
-                                // The result now contains the correct block_index and qr_image_base64
-                                const finalResult = {
-                                    ...status.result,
-                                    block_index: status.result.document_id, // Map for UI consistency
-                                    upload_timestamp: new Date().toISOString() // Fallback
-                                };
-                                renderSuccessUI(resultDiv, finalResult);
+                                
+                                if (status.result.success === false) {
+                                    // Handle non-success results from processor (e.g. Duplicates)
+                                    if (status.result.error === 'Duplicate') {
+                                        resultDiv.innerHTML = `<div class="result-card bg-orange-50 border border-orange-200 rounded-xl p-6 fade-in relative">
+                                            <div class="flex items-center gap-3 mb-3">
+                                                <span class="material-symbols-outlined text-orange-600 text-2xl">warning</span>
+                                                <span class="text-sm font-extrabold text-orange-800 uppercase tracking-widest">Duplicate Detected — This document already exists in the registry</span>
+                                            </div>
+                                            <div class="space-y-1 text-sm text-orange-900/80 mb-5 ml-9">
+                                                <p>Originally uploaded: Document ID <strong class="font-bold">#${status.result.existing_id}</strong></p>
+                                            </div>
+                                            <div class="ml-9">
+                                                <button id="view-original-btn-q" type="button" class="bg-orange-600 text-white px-5 py-2.5 rounded-lg font-bold text-sm shadow-sm hover:bg-orange-700 active:scale-95 transition-all flex items-center gap-2">
+                                                    <span class="material-symbols-outlined text-sm">visibility</span> View Original
+                                                </button>
+                                            </div>
+                                        </div>`;
+                                        document.getElementById('view-original-btn-q').addEventListener('click', () => {
+                                            window.location.hash = '#verify';
+                                            setTimeout(() => {
+                                                const input = document.getElementById('verify-id');
+                                                if (input) {
+                                                    input.value = status.result.existing_id;
+                                                    document.getElementById('verify-form').dispatchEvent(new Event('submit', { cancelable: true }));
+                                                }
+                                            }, 50);
+                                        });
+                                    } else {
+                                        resultDiv.innerHTML = `<div class="result-card bg-red-50 border border-red-200 rounded-xl p-6 fade-in">
+                                            <div class="flex items-center gap-3 mb-2"><span class="material-symbols-outlined text-red-600">error</span><span class="text-xs font-bold text-red-700 uppercase">Processing Error</span></div>
+                                            <p class="text-sm text-red-800/70">${status.result.error || 'System failed to secure document.'}</p>
+                                        </div>`;
+                                    }
+                                } else {
+                                    // The result now contains the correct block_index and qr_image_base64
+                                    const finalResult = {
+                                        ...status.result,
+                                        block_index: status.result.document_id, // Map for UI consistency
+                                        upload_timestamp: new Date().toISOString() // Fallback
+                                    };
+                                    renderSuccessUI(resultDiv, finalResult);
+                                }
+                                
+                                // Reset button
+                                submitBtn.disabled = false;
+                                submitBtn.innerHTML = '<span class="material-symbols-outlined">upload_file</span> Submit Record';
                             } else if (status.state === 'failed' || attempts > 20) {
                                 clearInterval(checkJob);
                                 resultDiv.innerHTML = `<div class="result-card bg-red-50 border border-red-200 rounded-xl p-6 fade-in">
                                     <div class="flex items-center gap-3 mb-2"><span class="material-symbols-outlined text-red-600">error</span><span class="text-xs font-bold text-red-700 uppercase">Processing Failed</span></div>
                                     <p class="text-sm text-red-800/70">${status.error || 'The background processor failed to secure this document.'}</p>
                                 </div>`;
+                                
+                                // Reset button
+                                submitBtn.disabled = false;
+                                submitBtn.innerHTML = '<span class="material-symbols-outlined">upload_file</span> Submit Record';
                             }
                         } catch (e) {
                             console.error('Polling error:', e);

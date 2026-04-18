@@ -18,7 +18,7 @@ function initProcessor() {
     isInitialized = true;
 
     documentQueue.process(1, async (job) => {
-        const { filePath, originalname, mimetype, uploadedBy } = job.data;
+        const { filePath, originalname, mimetype, uploadedBy, parent_document_id, version_number, version_note } = job.data;
 
         try {
             // Validate file exists
@@ -49,7 +49,7 @@ function initProcessor() {
             await job.progress(25);
 
             // ── Step 2: Generate Hashes (25→50%) ──
-            const fileHash = hasher.generateFileHash(filePath);
+            const fileHash = await hasher.generateFileHashAsync(filePath);
             const prevHash = hasher.getLastBlockHash(db);
             const timestamp = new Date().toISOString();
             const blockHash = hasher.generateBlockHash(fileHash, prevHash, timestamp);
@@ -105,18 +105,23 @@ function initProcessor() {
 
             // ── Step 4: Store in SQLite + Audit Log (75→100%) ──
             // Final Duplicate Check (Atomic within processor concurrency=1)
-            const finalExisting = db.prepare('SELECT block_index FROM documents WHERE filename = ? AND uploaded_by = ?').get(originalname, uploadedBy);
-            if (finalExisting) {
-                console.log(`[PROCESSOR] ⚠ Skipping duplicate document: ${originalname} for ${uploadedBy}`);
-                if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-                return { success: false, error: 'Duplicate', existing_id: finalExisting.block_index };
+            // ONLY if NOT a version update
+            if (!parent_document_id) {
+                const finalExisting = db.prepare('SELECT block_index FROM documents WHERE filename = ? AND uploaded_by = ?').get(originalname, uploadedBy);
+                if (finalExisting) {
+                    console.log(`[PROCESSOR] ⚠ Skipping duplicate document: ${originalname} for ${uploadedBy}`);
+                    if (fs.existsSync(filePath)) {
+                        try { fs.unlinkSync(filePath); } catch (e) {}
+                    }
+                    return { success: false, error: 'Duplicate', existing_id: finalExisting.block_index, filename: originalname };
+                }
             }
 
             const insertDoc = db.prepare(`
-                INSERT INTO documents (filename, file_type, uploaded_by, upload_timestamp, file_hash, prev_hash, block_hash, ocr_text, ocr_hash, forensic_score, signature_score, storage_id, signature, merkle_root, merkle_proof)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO documents (filename, file_type, uploaded_by, upload_timestamp, file_hash, prev_hash, block_hash, ocr_text, ocr_hash, forensic_score, signature_score, storage_id, signature, merkle_root, merkle_proof, parent_document_id, version_number, version_note)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `);
-            const result = insertDoc.run(originalname, mimetype, uploadedBy, timestamp, fileHash, prevHash, blockHash, ocrText, ocrHash, forensicScore, signatureScore, gridfsId, documentSignature, merkleRoot, JSON.stringify(merkleProof));
+            const result = insertDoc.run(originalname, mimetype, uploadedBy, timestamp, fileHash, prevHash, blockHash, ocrText, ocrHash, forensicScore, signatureScore, gridfsId, documentSignature, merkleRoot, JSON.stringify(merkleProof), parent_document_id, version_number || 1, version_note);
             const documentId = result.lastInsertRowid;
 
             // ── Step 4.5: Update Global Merkle Root ──
@@ -133,8 +138,14 @@ function initProcessor() {
             db.prepare(`INSERT INTO audit_log (document_id, action, actor, details) VALUES (?, ?, ?, ?)`)
                 .run(documentId, 'UPLOAD', uploadedBy, `File ${originalname} processed via batch queue`);
 
-            // Cleanup temp file
-            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+            // Cleanup temp file ONLY on success
+            if (fs.existsSync(filePath)) {
+                try {
+                    fs.unlinkSync(filePath);
+                } catch (unlinkError) {
+                    console.warn(`[PROCESSOR] Failed to cleanup temp file: ${filePath}`, unlinkError.message);
+                }
+            }
 
             await job.progress(100);
 
@@ -149,12 +160,24 @@ function initProcessor() {
                 block_hash: blockHash,
                 gridfs_id: gridfsId,
                 filename: originalname,
-                qr_image_base64: qrImageBase64
+                qr_image_base64: qrImageBase64,
+                version_number: version_number || 1,
+                parent_document_id: parent_document_id
             };
 
         } catch (error) {
-            // Cleanup temp file on failure
-            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+            // Cleanup temp file on failure ONLY if we have no more attempts
+            const attemptsMade = job.attemptsMade || 0;
+            const maxAttempts = job.opts.attempts || 1;
+            
+            if (attemptsMade + 1 >= maxAttempts) {
+                if (fs.existsSync(filePath)) {
+                    try {
+                        fs.unlinkSync(filePath);
+                    } catch (e) {}
+                }
+            }
+            
             console.error(`[PROCESSOR] ✗ Job #${job.id} failed (${originalname}):`, error.message);
             throw error; // Bull marks the job as failed
         }
