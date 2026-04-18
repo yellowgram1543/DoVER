@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db/db');
 const documentQueue = require('../utils/queue');
+const gemini = require('../utils/gemini');
 
 /**
  * Helper to check if a user can access a specific document.
@@ -226,6 +227,47 @@ router.get('/document/:id/versions', (req, res) => {
     } catch (error) {
         console.error('[VERSIONS_ERROR]', error);
         res.status(500).json({ success: false, error: 'Failed to retrieve version history' });
+    }
+});
+
+/**
+ * Manual trigger for Gemini AI analysis.
+ * Restricted to authorities.
+ */
+router.post('/document/:id/analyze', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        const document = db.prepare('SELECT block_index, ocr_text, forensic_score FROM documents WHERE block_index = ?').get(id);
+
+        if (!document) {
+            return res.status(404).json({ success: false, error: 'Document not found' });
+        }
+
+        // RBAC: Only authorities can trigger manual AI analysis
+        if (!req.user || req.user.role !== 'authority') {
+            return res.status(403).json({ success: false, error: 'Authority privileges required' });
+        }
+
+        if (!document.ocr_text) {
+            return res.status(400).json({ success: false, error: 'Document lacks OCR text for analysis' });
+        }
+
+        const forensicReport = document.forensic_score ? JSON.parse(document.forensic_score) : {};
+        const summary = await gemini.generateDocumentSummary(document.ocr_text, forensicReport);
+
+        db.prepare('UPDATE documents SET ai_summary = ? WHERE block_index = ?').run(JSON.stringify(summary), id);
+
+        db.prepare(`INSERT INTO audit_log (document_id, action, actor, details) VALUES (?, ?, ?, ?)`)
+            .run(id, 'AI_REANALYZE', req.user.name, 'Manual Gemini AI analysis triggered by authority');
+
+        res.json({
+            success: true,
+            summary
+        });
+
+    } catch (error) {
+        console.error('[AI_ANALYZE_ERROR]', error);
+        res.status(500).json({ success: false, error: 'AI Analysis failed: ' + error.message });
     }
 });
 
