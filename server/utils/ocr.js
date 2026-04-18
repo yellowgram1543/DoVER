@@ -4,56 +4,156 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * Extracts text from an image (PNG, JPG) using Tesseract.js with Jimp preprocessing.
+ * WorkerPool manages persistent Tesseract workers for different language groups.
+ */
+class WorkerPool {
+    constructor() {
+        this.workers = {
+            eng: null,
+            hin: null,
+            indic: null
+        };
+        this.initialized = false;
+        this.initializing = false;
+    }
+
+    /**
+     * Pre-initializes the workers to avoid delay on first request.
+     */
+    async init() {
+        if (this.initialized || this.initializing) return;
+        this.initializing = true;
+        console.log('[OCR] Initializing worker pool (eng, hin, kan+tam)...');
+        try {
+            // engWorker
+            this.workers.eng = await Tesseract.createWorker('eng');
+            
+            // hinWorker
+            this.workers.hin = await Tesseract.createWorker('hin');
+            
+            // indicWorker (Kannada + Tamil)
+            this.workers.indic = await Tesseract.createWorker('kan+tam');
+            
+            this.initialized = true;
+            console.log('[OCR] Worker pool ready.');
+        } catch (error) {
+            console.error('[OCR] Worker pool initialization failed:', error.message);
+        } finally {
+            this.initializing = false;
+        }
+    }
+
+    /**
+     * Returns the appropriate worker for the given language tag.
+     * @param {string} lang - 'eng', 'hin', or 'indic'.
+     */
+    async getWorker(lang) {
+        if (!this.initialized) await this.init();
+        return this.workers[lang] || this.workers.eng;
+    }
+}
+
+const pool = new WorkerPool();
+
+/**
+ * Performs Orientation and Script Detection (OSD) to identify the primary script.
+ * @param {string} filePath - Path to image file.
+ * @returns {Promise<string>} - Detected script (e.g., 'Latin', 'Devanagari', 'Kannada', 'Tamil').
+ */
+async function detectScript(filePath) {
+    let osdWorker = null;
+    try {
+        // OSD requires legacyCore and legacyLang in Tesseract.js v5+ for .detect()
+        // OEM 0 is Legacy, which is required for OSD.
+        osdWorker = await Tesseract.createWorker('osd', 0, {
+            legacyCore: true,
+            legacyLang: true,
+            logger: m => {}
+        });
+        const { data } = await osdWorker.detect(filePath);
+        await osdWorker.terminate();
+        return data.script || 'Latin';
+    } catch (error) {
+        console.warn('[OCR] Script detection failed, defaulting to Latin:', error.message);
+        if (osdWorker) {
+            try { await osdWorker.terminate(); } catch (e) {}
+        }
+        return 'Latin';
+    }
+}
+
+/**
+ * Extracts text from an image with script detection and worker routing.
  * @param {string} filePath - Absolute path to the file.
- * @returns {Promise<string>} - Extracted text or empty string on failure.
+ * @returns {Promise<string>} - Extracted text.
  */
 async function extractText(filePath) {
     let tempPath = '';
     try {
         if (!fs.existsSync(filePath)) return '';
 
+        // 1. Pre-process for better OCR
         const image = await Jimp.read(filePath);
-        
-        // Fix 4: Split fluent chain and await write separately
         image.greyscale();
         image.contrast(0.8);
         image.brightness(0.1);
         image.normalize();
         image.scale(2);
         
-        tempPath = path.join(path.dirname(filePath), 'temp_ocr_' + Date.now() + '_' + path.basename(filePath));
+        tempPath = path.join(path.dirname(filePath), 'temp_poly_' + Date.now() + '_' + path.basename(filePath));
         await image.write(tempPath);
 
-        // Perform OCR on the cleaned image
-        const { data: { text } } = await Tesseract.recognize(
-            tempPath,
-            'eng',
-            { logger: m => {} }
-        );
+        // 2. Detect Script
+        const script = await detectScript(tempPath);
+        console.log(`[OCR] Detected script: ${script} for ${path.basename(filePath)}`);
 
-        // Cleanup temp file
-        if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+        // 3. Route to specialized worker
+        let workerKey = 'eng';
+        if (script === 'Devanagari') workerKey = 'hin';
+        else if (script === 'Kannada' || script === 'Tamil') workerKey = 'indic';
         
-        // Fallback to original if needed
-        if (!text || text.trim().length === 0) {
-            const rawResult = await Tesseract.recognize(filePath, 'eng', { logger: m => {} });
-            return rawResult.data.text || '';
+        console.log(`[OCR] Routing to ${workerKey}Worker`);
+        const worker = await pool.getWorker(workerKey);
+        
+        const { data: { text, confidence } } = await worker.recognize(tempPath);
+
+        // 4. Cleanup
+        if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+
+        // 5. Fallback if specialized worker had low confidence
+        if (confidence < 30 && workerKey !== 'eng') {
+            console.log(`[OCR] Low confidence (${confidence}), falling back to engWorker`);
+            const engWorker = await pool.getWorker('eng');
+            const { data: { text: engText } } = await engWorker.recognize(filePath);
+            return engText || text || '';
         }
         
         return text || '';
     } catch (error) {
-        console.error('[OCR_ERROR] Failed during preprocessing or extraction:', error.message);
-        if (tempPath && fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
-        return '';
+        console.error('[OCR_ERROR] Polyglot extraction failed:', error.message);
+        if (tempPath && fs.existsSync(tempPath)) {
+            try { fs.unlinkSync(tempPath); } catch (e) {}
+        }
+        // Last-ditch attempt on original file with eng
+        try {
+            const engWorker = await pool.getWorker('eng');
+            const { data } = await engWorker.recognize(filePath);
+            return data.text || '';
+        } catch (e) {
+            return '';
+        }
     }
 }
 
 /**
+ * Initializes the OCR worker pool. Should be called at server start.
+ */
+async function initWorkers() {
+    await pool.init();
+}
+
+/**
  * Calculates the Levenshtein distance between two strings using dynamic programming.
- * @param {string} str1 - First string.
- * @param {string} str2 - Second string.
- * @returns {number} - Levenshtein distance.
  */
 function levenshteinDistance(str1, str2) {
     if (str1 === str2) return 0;
@@ -81,8 +181,6 @@ function levenshteinDistance(str1, str2) {
 
 /**
  * Normalizes text by converting to lowercase, removing extra whitespace/line breaks, and trimming.
- * @param {string} text - The text to normalize.
- * @returns {string} - The normalized text.
  */
 function normalizeText(text) {
     if (!text) return '';
@@ -94,9 +192,6 @@ function normalizeText(text) {
 
 /**
  * Calculates the percentage similarity between two strings using Levenshtein distance.
- * @param {string} str1 - First string.
- * @param {string} str2 - Second string.
- * @returns {number} - Similarity score (0-100).
  */
 function calculateSimilarity(str1, str2) {
     const s1 = normalizeText(str1);
@@ -111,6 +206,7 @@ function calculateSimilarity(str1, str2) {
 
 module.exports = {
     extractText,
+    initWorkers,
     levenshteinDistance,
     calculateSimilarity,
     normalizeText

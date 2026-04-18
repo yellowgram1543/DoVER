@@ -128,6 +128,10 @@ setInterval(async () => {
 const { initProcessor } = require('./utils/processor');
 initProcessor();
 
+// ── Polyglot OCR Workers ──
+const ocr = require('./utils/ocr');
+ocr.initWorkers();
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
