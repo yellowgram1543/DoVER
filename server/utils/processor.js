@@ -3,6 +3,7 @@ const db = require('../db/db');
 const hasher = require('./hasher');
 const ocr = require('./ocr');
 const forensics = require('./forensics');
+const gemini = require('./gemini');
 const signature = require('./signature');
 const { buildMerkleTree, getMerkleProof } = require('./merkle');
 const qr = require('./qr');
@@ -102,6 +103,7 @@ function initProcessor() {
             let ocrHash = null;
             let forensicScore = null;
             let signatureScore = null;
+            let aiSummary = null;
 
             if (/png|jpg|jpeg/.test(mimetype)) {
                 // OCR stays on main (it's mostly I/O waiting for the Tesseract process)
@@ -118,6 +120,12 @@ function initProcessor() {
 
                 forensicScore = JSON.stringify(forensicReport);
                 signatureScore = JSON.stringify(sigReport);
+
+                // Gemini Intelligence Analysis
+                if (ocrText) {
+                    const summary = await gemini.generateDocumentSummary(ocrText, forensicReport);
+                    aiSummary = JSON.stringify(summary);
+                }
             }
 
             await job.progress(75);
@@ -145,10 +153,10 @@ function initProcessor() {
             }
 
             const insertDoc = db.prepare(`
-                INSERT INTO documents (filename, file_type, uploaded_by, uploader_email, upload_timestamp, file_hash, prev_hash, block_hash, ocr_text, ocr_hash, forensic_score, signature_score, storage_id, signature, merkle_root, merkle_proof, parent_document_id, version_number, version_note)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO documents (filename, file_type, uploaded_by, uploader_email, upload_timestamp, file_hash, prev_hash, block_hash, ocr_text, ocr_hash, forensic_score, signature_score, storage_id, signature, merkle_root, merkle_proof, parent_document_id, version_number, version_note, ai_summary)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `);
-            const result = insertDoc.run(originalname, mimetype, uploadedBy, uploaderEmail, timestamp, fileHash, prevHash, blockHash, ocrText, ocrHash, forensicScore, signatureScore, gridfsId, documentSignature, merkleRoot, JSON.stringify(merkleProof), parent_document_id, version_number || 1, version_note);
+            const result = insertDoc.run(originalname, mimetype, uploadedBy, uploaderEmail, timestamp, fileHash, prevHash, blockHash, ocrText, ocrHash, forensicScore, signatureScore, gridfsId, documentSignature, merkleRoot, JSON.stringify(merkleProof), parent_document_id, version_number || 1, version_note, aiSummary);
             const documentId = result.lastInsertRowid;
 
             // ── Step 4.5: Update Global Merkle Root ──
