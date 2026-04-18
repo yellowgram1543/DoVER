@@ -4,6 +4,9 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const app = express();
+const session = require('express-session');
+const MongoStore = require('connect-mongo');
+const passport = require('./utils/passport');
 const apiKey = require('./middleware/apiKey');
 
 app.use((req, res, next) => {
@@ -14,6 +17,23 @@ app.use((req, res, next) => {
 app.use(cors());
 app.use(express.json());
 
+// Session Configuration
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'dover_vault_secret',
+    resave: false,
+    saveUninitialized: false,
+    store: (MongoStore.create || MongoStore.default.create)({
+        mongoUrl: process.env.MONGODB_URI || 'mongodb://localhost:27017/docvault'
+    }),
+    cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 24 * 60 * 60 * 1000 // 1 day
+    }
+}));
+
+app.use(passport.initialize());
+app.use(passport.session());
+
 // Serve static frontend files
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
@@ -21,12 +41,17 @@ const uploadRoutes = require('./routes/upload');
 const verifyRoutes = require('./routes/verify');
 const chainRoutes = require('./routes/chain');
 const statsRoutes = require('./routes/stats');
+const authRoutes = require('./routes/auth');
+const { requireAuth } = require('./middleware/auth');
 
-app.use('/api/upload', apiKey, uploadRoutes);
+app.use('/auth', authRoutes);
+
+// Apply requireAuth + apiKey to sensitive routes
+app.use('/api/upload', requireAuth, apiKey, uploadRoutes);
 app.use('/api/verify', (req, res, next) => {
-    // Apply apiKey only to POST /api/verify or GET /api/verify/:id/proof
+    // Apply requireAuth and apiKey only to POST /api/verify or GET /api/verify/:id/proof
     if (req.method === 'POST' || req.path.endsWith('/proof')) {
-        return apiKey(req, res, next);
+        return requireAuth(req, res, () => apiKey(req, res, next));
     }
     next();
 }, verifyRoutes);

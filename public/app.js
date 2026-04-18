@@ -20,6 +20,11 @@ const API = {
         })).json();
     },
     async getAudit() { return (await fetch('/api/chain/audit')).json(); },
+    async getMe() {
+        const r = await fetch('/auth/me');
+        if (r.status === 401) return null;
+        return r.json();
+    },
     async getDocumentHistory(id) { return (await fetch(`/api/chain/document/${id}/history`)).json(); },
     async batchUpload(formData) {
         return (await fetch('/api/upload/batch-upload', { 
@@ -33,8 +38,93 @@ const API = {
     }
 };
 
+// ── Auth State ──
+let currentUser = null;
+
+async function checkAuth() {
+    currentUser = await API.getMe();
+    const app = document.getElementById('app');
+    const sidebar = document.getElementById('sidebar');
+    const header = document.querySelector('header');
+
+    if (!currentUser) {
+        if (sidebar) sidebar.style.display = 'none';
+        if (header) header.style.display = 'none';
+        renderLogin(app);
+    } else {
+        if (sidebar) sidebar.style.display = 'flex';
+        if (header) {
+            header.style.display = 'flex';
+            updateHeaderUI(header, currentUser);
+        }
+        navigate();
+    }
+}
+
+function renderLogin(container) {
+    container.innerHTML = `
+        <div class="min-h-[80vh] flex items-center justify-center fade-in">
+            <div class="bg-white dark:bg-[#1C2A41] p-12 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 max-w-md w-full text-center space-y-8">
+                <div class="flex flex-col items-center gap-4">
+                    <div class="w-20 h-20 bg-gradient-to-br from-[#001e40] to-[#0059bb] rounded-2xl flex items-center justify-center text-white shadow-xl">
+                        <span class="material-symbols-outlined text-5xl" style="font-variation-settings:'FILL' 1;">verified_user</span>
+                    </div>
+                    <div>
+                        <h1 class="text-3xl font-black text-primary dark:text-[#E9C176] tracking-tighter">DoVER</h1>
+                        <p class="text-xs uppercase tracking-widest text-slate-500 dark:text-[#D6E3FF]/60 font-black">Official Vault Portal</p>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <h2 class="text-xl font-bold text-slate-700 dark:text-[#D6E3FF]">Authentication Required</h2>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">Access to the decentralized registry is restricted to authorized personnel.</p>
+                </div>
+
+                <button onclick="window.location='/auth/google'" class="w-full flex items-center justify-center gap-3 bg-white dark:bg-[#0F1B33] border border-slate-300 dark:border-slate-600 py-3.5 rounded-xl font-bold text-slate-700 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-700 transition-all active:scale-[0.98] shadow-sm">
+                    <img src="https://www.gstatic.com/images/branding/product/1x/gsa_512dp.png" class="w-5 h-5" alt="Google"/>
+                    Sign in with Google
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function updateHeaderUI(header, user) {
+    const isDark = document.documentElement.classList.contains('dark');
+    const badge = user.role === 'authority' ? `<span class="px-2 py-0.5 rounded bg-[#E9C176]/20 text-[#E9C176] text-[9px] font-black uppercase border border-[#E9C176]/30">Authority</span>` : '';
+    
+    header.innerHTML = `
+        <div class="flex items-center gap-4">
+            <span class="md:hidden material-symbols-outlined text-blue-900 dark:text-[#E9C176] cursor-pointer" id="menu-toggle">menu</span>
+            <div class="flex items-center gap-2">
+                <h2 id="page-title" class="font-sans tracking-tight text-slate-500 dark:text-[#D6E3FF] font-medium text-sm">Welcome back, ${user.name.split(' ')[0]}</h2>
+                ${badge}
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-3 pr-4 border-r border-slate-200 dark:border-slate-700">
+                <div class="text-right hidden sm:block">
+                    <p class="text-xs font-bold text-slate-700 dark:text-white leading-none">${user.name}</p>
+                    <p class="text-[10px] text-slate-400 font-medium">${user.email}</p>
+                </div>
+                <img src="${user.picture}" class="h-9 w-9 rounded-full border-2 border-primary/10 shadow-sm" alt="Profile"/>
+            </div>
+            <a href="/auth/logout" class="flex items-center gap-2 text-slate-500 hover:text-error transition-colors text-xs font-bold uppercase tracking-wider">
+                <span class="material-symbols-outlined text-lg">logout</span>
+                <span class="hidden sm:inline">Logout</span>
+            </a>
+        </div>
+    `;
+
+    // Re-attach menu toggle event
+    document.getElementById('menu-toggle')?.addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('mobile-open');
+    });
+}
+
 // ── Router ──
 function navigate() {
+    if (!currentUser) return checkAuth();
     const page = (location.hash.slice(1) || 'dashboard');
     document.querySelectorAll('.nav-link').forEach(l => {
         l.classList.toggle('active', l.dataset.page === page);
@@ -53,7 +143,7 @@ function navigate() {
     }
 }
 window.addEventListener('hashchange', navigate);
-window.addEventListener('DOMContentLoaded', navigate);
+window.addEventListener('DOMContentLoaded', checkAuth);
 document.getElementById('menu-toggle')?.addEventListener('click', () => {
     document.getElementById('sidebar').classList.toggle('mobile-open');
 });
@@ -177,7 +267,7 @@ function renderUpload(app) {
                                 <label class="block text-sm font-semibold text-primary px-1">Uploaded By</label>
                                 <div class="relative flex items-center">
                                     <span class="material-symbols-outlined absolute left-3 text-outline text-lg">person</span>
-                                    <input id="upload-user" class="w-full bg-surface pl-10 pr-4 py-3 rounded-xl border-none focus:ring-2 focus:ring-secondary/20 text-on-surface text-sm" placeholder="Full legal name" type="text"/>
+                                    <input id="upload-user" class="w-full bg-surface pl-10 pr-4 py-3 rounded-xl border-none focus:ring-2 focus:ring-secondary/20 text-on-surface text-sm" placeholder="Full legal name" type="text" value="${currentUser?.name || ''}" ${currentUser ? 'readonly' : ''}/>
                                 </div>
                             </div>
                             <div class="space-y-2">
@@ -1020,7 +1110,7 @@ function renderBatch(app) {
                     <label class="block text-sm font-semibold text-primary px-1">Uploaded By</label>
                     <div class="relative flex items-center">
                         <span class="material-symbols-outlined absolute left-3 text-outline text-lg">person</span>
-                        <input id="batch-user" class="w-full bg-surface pl-10 pr-4 py-3 rounded-xl border border-outline-variant/30 focus:ring-2 focus:ring-secondary/20 text-on-surface text-sm" placeholder="Full legal name" type="text"/>
+                        <input id="batch-user" class="w-full bg-surface pl-10 pr-4 py-3 rounded-xl border border-outline-variant/30 focus:ring-2 focus:ring-secondary/20 text-on-surface text-sm" placeholder="Full legal name" type="text" value="${currentUser?.name || ''}" ${currentUser ? 'readonly' : ''}/>
                     </div>
                 </div>
 
