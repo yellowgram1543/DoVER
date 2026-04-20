@@ -59,7 +59,11 @@ router.get('/public/verify/:hash', async (req, res) => {
             is_tampered: doc.is_tampered,
             signature_status: signature_status,
             ocr_similarity_score: doc.ocr_hash ? 100 : null, // Default to 100 for verified blocks
-            verdict: doc.is_tampered ? "TAMPERED" : "ORIGINAL"
+            verdict: doc.is_tampered ? "TAMPERED" : "ORIGINAL",
+            polygon_txid: doc.polygon_txid,
+            forensic_summary: doc.is_tampered 
+                ? "Potential anomalies detected in document structure." 
+                : "No forensic anomalies detected. Document integrity verified."
         });
     } catch (error) {
         console.error('[PUBLIC_VERIFY_ERROR]', error);
@@ -107,7 +111,11 @@ router.get('/public/verify/qr/:document_id', async (req, res) => {
             is_tampered: doc.is_tampered,
             signature_status: signature_status,
             ocr_similarity_score: doc.ocr_hash ? 100 : null,
-            verdict: doc.is_tampered ? "TAMPERED" : "ORIGINAL"
+            verdict: doc.is_tampered ? "TAMPERED" : "ORIGINAL",
+            polygon_txid: doc.polygon_txid,
+            forensic_summary: doc.is_tampered 
+                ? "Potential anomalies detected in document structure." 
+                : "No forensic anomalies detected. Document integrity verified."
         });
     } catch (error) {
         console.error('[PUBLIC_QR_VERIFY_ERROR]', error);
