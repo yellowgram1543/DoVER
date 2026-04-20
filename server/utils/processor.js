@@ -40,7 +40,7 @@ function initProcessor() {
     isInitialized = true;
 
     documentQueue.process(1, async (job) => {
-        const { filePath, originalname, mimetype, uploadedBy, uploaderEmail, parent_document_id, version_number, version_note } = job.data;
+        const { filePath, originalname, mimetype, uploadedBy, uploaderEmail, department, parent_document_id, version_number, version_note } = job.data;
 
         try {
             // Validate file exists
@@ -134,8 +134,8 @@ function initProcessor() {
             // Final Duplicate Check (Atomic within processor concurrency=1)
             // ONLY if NOT a version update
             if (!parent_document_id) {
-                // NEW: Check by file_hash AND uploadedBy
-                const finalExisting = db.prepare('SELECT block_index, filename, upload_timestamp FROM documents WHERE file_hash = ? AND uploaded_by = ?').get(fileHash, uploadedBy);
+                // NEW: Check by file_hash AND uploaderEmail
+                const finalExisting = db.prepare('SELECT block_index, filename, upload_timestamp FROM documents WHERE file_hash = ? AND uploader_email = ?').get(fileHash, uploaderEmail);
                 if (finalExisting) {
                     console.log(`[PROCESSOR] ⚠ Skipping duplicate content: ${originalname} matches Block #${finalExisting.block_index}`);
                     if (fs.existsSync(filePath)) {
@@ -153,10 +153,10 @@ function initProcessor() {
             }
 
             const insertDoc = db.prepare(`
-                INSERT INTO documents (filename, file_type, uploaded_by, uploader_email, upload_timestamp, file_hash, prev_hash, block_hash, ocr_text, ocr_hash, forensic_score, signature_score, storage_id, signature, merkle_root, merkle_proof, parent_document_id, version_number, version_note, ai_summary)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO documents (filename, file_type, uploaded_by, uploader_email, department, upload_timestamp, file_hash, prev_hash, block_hash, ocr_text, ocr_hash, forensic_score, signature_score, storage_id, signature, merkle_root, merkle_proof, parent_document_id, version_number, version_note, ai_summary)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `);
-            const result = insertDoc.run(originalname, mimetype, uploadedBy, uploaderEmail, timestamp, fileHash, prevHash, blockHash, ocrText, ocrHash, forensicScore, signatureScore, gridfsId, documentSignature, merkleRoot, JSON.stringify(merkleProof), parent_document_id, version_number || 1, version_note, aiSummary);
+            const result = insertDoc.run(originalname, mimetype, uploadedBy, uploaderEmail, department, timestamp, fileHash, prevHash, blockHash, ocrText, ocrHash, forensicScore, signatureScore, gridfsId, documentSignature, merkleRoot, JSON.stringify(merkleProof), parent_document_id, version_number || 1, version_note, aiSummary);
             const documentId = result.lastInsertRowid;
 
             // ── Step 4.5: Update Global Merkle Root ──

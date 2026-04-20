@@ -74,6 +74,19 @@ router.post('/', apiKey, (req, res) => {
                 if (fs.existsSync(tmpFilePath)) fs.unlinkSync(tmpFilePath);
                 return res.status(403).json({ success: false, error: 'Verified identity required' });
             }
+
+            // DEPARTMENT LOCKING: Check if user has a department set
+            let userDept = null;
+            const userInDb = db.prepare('SELECT department FROM users WHERE email = ?').get(uploaderEmail);
+            
+            if (userInDb && userInDb.department) {
+                userDept = userInDb.department;
+            } else {
+                // First upload or no department set, use provided department and LOCK it
+                userDept = req.body.department || 'General';
+                db.prepare('UPDATE users SET department = ? WHERE email = ?').run(userDept, uploaderEmail);
+                console.log(`[AUTH] Department locked to "${userDept}" for user ${uploaderEmail}`);
+            }
             
             // Calculate hash for duplicate pre-check
             const fileHash = await hasher.generateFileHashAsync(tmpFilePath);
@@ -92,7 +105,7 @@ router.post('/', apiKey, (req, res) => {
 
                 // HIJACKING PROTECTION: Check ownership or department match
                 const isOwner = parent.uploader_email === uploaderEmail;
-                const isSameDept = parent.department === req.body.department;
+                const isSameDept = parent.department === userDept;
 
                 if (!isOwner && !isSameDept) {
                     if (fs.existsSync(tmpFilePath)) fs.unlinkSync(tmpFilePath);
@@ -106,8 +119,8 @@ router.post('/', apiKey, (req, res) => {
                 version_number = (parent.version_number || 1) + 1;
             } else {
                 // Duplicate check ONLY for initial uploads
-                // NEW: Check by file_hash AND uploaded_by
-                const existing = db.prepare('SELECT * FROM documents WHERE file_hash = ? AND uploaded_by = ?').get(fileHash, uploadedBy);
+                // NEW: Check by file_hash AND uploaderEmail
+                const existing = db.prepare('SELECT * FROM documents WHERE file_hash = ? AND uploader_email = ?').get(fileHash, uploaderEmail);
                 if (existing) {
                     if (fs.existsSync(tmpFilePath)) fs.unlinkSync(tmpFilePath);
                     return res.status(409).json({
@@ -128,7 +141,7 @@ router.post('/', apiKey, (req, res) => {
                 mimetype: req.file.mimetype,
                 uploadedBy: uploadedBy,
                 uploaderEmail: uploaderEmail,
-                department: req.body.department,
+                department: userDept,
                 version_number,
                 parent_document_id,
                 version_note,
@@ -172,6 +185,19 @@ router.post('/batch-upload', apiKey, (req, res) => {
                 return res.status(403).json({ success: false, error: 'Verified identity required' });
             }
 
+            // DEPARTMENT LOCKING: Check if user has a department set
+            let userDept = null;
+            const userInDb = db.prepare('SELECT department FROM users WHERE email = ?').get(uploaderEmail);
+            
+            if (userInDb && userInDb.department) {
+                userDept = userInDb.department;
+            } else {
+                // First upload or no department set, use provided department (from first file or general) and LOCK it
+                userDept = req.body.department || 'General';
+                db.prepare('UPDATE users SET department = ? WHERE email = ?').run(userDept, uploaderEmail);
+                console.log(`[AUTH] Batch-upload: Department locked to "${userDept}" for user ${uploaderEmail}`);
+            }
+
             const batchId = Date.now();
             const jobIds = [];
 
@@ -183,6 +209,7 @@ router.post('/batch-upload', apiKey, (req, res) => {
                     mimetype: file.mimetype,
                     uploadedBy,
                     uploaderEmail: uploaderEmail,
+                    department: userDept,
                     batch_id: batchId
                 });
                 jobIds.push(job.id);
