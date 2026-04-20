@@ -12,7 +12,7 @@ const report = require('../utils/report');
 function canAccessDocument(user, document) {
     if (!user) return false;
     if (user.role === 'authority') return true;
-    return document.uploaded_by === user.name || document.uploader_email === user.email;
+    return document.uploader_email === user.email;
 }
 
 router.get('/', (req, res) => {
@@ -22,8 +22,7 @@ router.get('/', (req, res) => {
         if (isAuthority) {
             documents = db.prepare('SELECT * FROM documents ORDER BY block_index ASC').all();
         } else {
-            // Check both name and email for robustness, as some legacy docs might lack email
-            documents = db.prepare('SELECT * FROM documents WHERE uploaded_by = ? OR uploader_email = ? ORDER BY block_index ASC').all(req.user.name, req.user.email);
+            documents = db.prepare('SELECT * FROM documents WHERE uploader_email = ? ORDER BY block_index ASC').all(req.user.email);
         }
         res.json(documents);
     } catch (error) {
@@ -48,9 +47,9 @@ router.get('/audit', (req, res) => {
                 SELECT a.document_id, d.filename, a.action, a.actor, a.timestamp, a.details
                 FROM audit_log a
                 LEFT JOIN documents d ON a.document_id = d.block_index
-                WHERE d.uploaded_by = ? OR d.uploader_email = ?
+                WHERE d.uploader_email = ?
                 ORDER BY a.timestamp DESC
-            `).all(req.user.name, req.user.email);
+            `).all(req.user.email);
         }
         res.json(auditLogs);
     } catch (error) {
@@ -129,7 +128,7 @@ router.get('/batch/:batch_id/status', async (req, res) => {
 
         // RBAC: Ensure user owns this batch OR is authority
         const isAuthority = req.user && req.user.role === 'authority';
-        const ownsBatch = batchJobs.every(j => j.data.uploadedBy === req.user.name || j.data.uploaderEmail === req.user.email);
+        const ownsBatch = batchJobs.every(j => j.data.uploaderEmail === req.user.email);
         
         if (!isAuthority && !ownsBatch) {
             return res.status(403).json({ success: false, error: 'Permission denied' });

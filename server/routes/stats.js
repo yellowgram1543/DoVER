@@ -18,11 +18,11 @@ router.get('/', (req, res) => {
                 "SELECT COUNT(*) as count FROM documents WHERE date(upload_timestamp) = ? AND is_tampered = 0"
             ).get(today).count;
         } else {
-            totalDocs = db.prepare('SELECT COUNT(*) as count FROM documents WHERE uploaded_by = ? OR uploader_email = ?').get(userName, userEmail).count;
-            tamperedCount = db.prepare('SELECT COUNT(*) as count FROM documents WHERE (uploaded_by = ? OR uploader_email = ?) AND is_tampered = 1').get(userName, userEmail).count;
+            totalDocs = db.prepare('SELECT COUNT(*) as count FROM documents WHERE uploader_email = ?').get(userEmail).count;
+            tamperedCount = db.prepare('SELECT COUNT(*) as count FROM documents WHERE uploader_email = ? AND is_tampered = 1').get(userEmail).count;
             verifiedToday = db.prepare(
-                "SELECT COUNT(*) as count FROM documents WHERE (uploaded_by = ? OR uploader_email = ?) AND date(upload_timestamp) = ? AND is_tampered = 0"
-            ).get(userName, userEmail, today).count;
+                "SELECT COUNT(*) as count FROM documents WHERE uploader_email = ? AND date(upload_timestamp) = ? AND is_tampered = 0"
+            ).get(userEmail, today).count;
         }
 
         res.json({
