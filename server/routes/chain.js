@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../db/db');
 const documentQueue = require('../utils/queue');
 const gemini = require('../utils/gemini');
+const report = require('../utils/report');
 
 /**
  * Helper to check if a user can access a specific document.
@@ -268,6 +269,30 @@ router.post('/document/:id/analyze', async (req, res) => {
     } catch (error) {
         console.error('[AI_ANALYZE_ERROR]', error);
         res.status(500).json({ success: false, error: 'AI Analysis failed: ' + error.message });
+    }
+});
+
+/**
+ * Official Audit Report Export.
+ * Restricted to authorities.
+ */
+router.get('/document/:id/report', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        
+        // RBAC: Authority only
+        if (!req.user || req.user.role !== 'authority') {
+            return res.status(403).json({ success: false, error: 'Authority privileges required' });
+        }
+
+        const pdfBuffer = await report.generateAuditReport(id);
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename=DoVER_Audit_Report_${id}.pdf`);
+        res.send(pdfBuffer);
+    } catch (error) {
+        console.error('[REPORT_ENDPOINT_ERROR]', error);
+        res.status(500).json({ success: false, error: 'Failed to generate report: ' + error.message });
     }
 });
 
