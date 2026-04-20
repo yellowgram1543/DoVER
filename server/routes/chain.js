@@ -179,7 +179,7 @@ router.get('/document/:id/versions', (req, res) => {
         const id = parseInt(req.params.id);
         
         // 1. Find the current document
-        let currentDoc = db.prepare('SELECT block_index, parent_document_id, uploaded_by, uploader_email FROM documents WHERE block_index = ?').get(id);
+        let currentDoc = db.prepare('SELECT block_index, parent_document_id, uploaded_by, uploader_email, filename FROM documents WHERE block_index = ?').get(id);
         if (!currentDoc) {
             return res.status(404).json({ success: false, error: 'Document not found' });
         }
@@ -189,26 +189,37 @@ router.get('/document/:id/versions', (req, res) => {
             return res.status(403).json({ success: false, error: 'Permission denied' });
         }
 
+        const targetFilename = currentDoc.filename;
+        const targetEmail = currentDoc.uploader_email;
+
         // 2. Trace back to the root document (parent_document_id is NULL)
         let rootId = currentDoc.block_index;
         let parentId = currentDoc.parent_document_id;
         let safety = 0;
         
         while (parentId !== null && safety < 50) {
-            const parent = db.prepare('SELECT block_index, parent_document_id FROM documents WHERE block_index = ?').get(parentId);
-            if (!parent) break;
+            const parent = db.prepare('SELECT block_index, parent_document_id, filename, uploader_email FROM documents WHERE block_index = ?').get(parentId);
+            
+            // STRICT LINEAGE: Stop if parent metadata mismatch
+            if (!parent || parent.filename !== targetFilename || parent.uploader_email !== targetEmail) {
+                break;
+            }
+
             rootId = parent.block_index;
             parentId = parent.parent_document_id;
             safety++;
         }
 
         // 3. Fetch all documents in the version chain starting from root
-        // Using a recursive CTE to find all descendants
+        // Using a recursive CTE to find all descendants, filtering by metadata for safety
         const versions = db.prepare(`
             WITH RECURSIVE descendants(id) AS (
                 SELECT block_index FROM documents WHERE block_index = ?
                 UNION
-                SELECT block_index FROM documents JOIN descendants ON documents.parent_document_id = descendants.id
+                SELECT d.block_index 
+                FROM documents d 
+                JOIN descendants ON d.parent_document_id = descendants.id
+                WHERE d.filename = ? AND (d.uploader_email = ? OR (d.uploader_email IS NULL AND ? IS NULL))
             )
             SELECT 
                 version_number,
@@ -222,7 +233,7 @@ router.get('/document/:id/versions', (req, res) => {
             FROM documents 
             WHERE block_index IN descendants 
             ORDER BY version_number ASC
-        `).all(rootId);
+        `).all(rootId, targetFilename, targetEmail, targetEmail);
 
         res.json(versions);
     } catch (error) {
