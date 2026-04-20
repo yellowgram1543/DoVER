@@ -42,6 +42,7 @@ const verifyRoutes = require('./routes/verify');
 const chainRoutes = require('./routes/chain');
 const statsRoutes = require('./routes/stats');
 const authRoutes = require('./routes/auth');
+const adminRoutes = require('./routes/admin');
 const { requireAuth } = require('./middleware/auth');
 
 app.use('/auth', authRoutes);
@@ -57,6 +58,7 @@ app.use('/api/verify', (req, res, next) => {
 }, verifyRoutes);
 app.use('/api/chain', requireAuth, chainRoutes);
 app.use('/api/stats', requireAuth, statsRoutes);
+app.use('/api/admin', requireAuth, adminRoutes);
 
 // SPA fallback: serve index.html for any non-API route
 app.get('*', (req, res) => {

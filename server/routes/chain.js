@@ -40,14 +40,14 @@ router.get('/audit', (req, res) => {
             auditLogs = db.prepare(`
                 SELECT a.document_id, d.filename, a.action, a.actor, a.timestamp, a.details
                 FROM audit_log a
-                JOIN documents d ON a.document_id = d.block_index
+                LEFT JOIN documents d ON a.document_id = d.block_index
                 ORDER BY a.timestamp DESC
             `).all();
         } else {
             auditLogs = db.prepare(`
                 SELECT a.document_id, d.filename, a.action, a.actor, a.timestamp, a.details
                 FROM audit_log a
-                JOIN documents d ON a.document_id = d.block_index
+                LEFT JOIN documents d ON a.document_id = d.block_index
                 WHERE d.uploaded_by = ? OR d.uploader_email = ?
                 ORDER BY a.timestamp DESC
             `).all(req.user.name, req.user.email);
