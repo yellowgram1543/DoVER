@@ -18,8 +18,15 @@ Focus: Scaling the AI analysis pipeline.
 ### Phase 3: Public Access & Export
 Focus: Accessibility and legal usability.
 - [x] **Mobile-First Public Portal**: Create the high-performance verification interface for citizens.
-- [ ] **QR Mobile Scanner**: Integrate camera-based scanning for instant on-device verification.
-- [ ] **Court-Ready PDF Export**: Generate the ISO-standard audit trail report with Bates numbering.
+- [x] **QR Mobile Scanner**: Integrate camera-based scanning for instant on-device verification.
+- [x] **Court-Ready PDF Export**: Generate the ISO-standard audit trail report with Bates numbering.
+
+### Phase 4: Admin Console & Security Hardening
+Focus: Zero-trust architecture and governance.
+- [ ] **Department & Identity Locks**: Permanently link users to their departments and enforce strict email-based privacy.
+- [x] **Strict Lineage Validation**: Fix version history logic to prevent unrelated documents from merging.
+- [x] **Authority Admin Dashboard**: Build the in-app UI for managing user roles and system-wide promotions.
+- [ ] **Audit Trail Hardening**: Ensure all administrative actions (promotions, role changes) are recorded on-chain.
 
 ## Future Milestones (v2+)
 - **Milestone 2**: Digital Sovereignty (PAdES Signatures, KMS).
