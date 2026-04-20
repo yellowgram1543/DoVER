@@ -19,7 +19,7 @@ Requirements focused on establishing the "Official Vault" foundation and securit
 - [x] **Gemini Summary:** AI-generated natural language explanation of document history and status.
 
 ### R4: Accessibility
-- [ ] **Public Portal:** Search and verify any document by ID or file hash without logging in.
+- [x] **Public Portal:** Search and verify any document by ID or file hash without logging in.
 - [ ] **Mobile QR Scanner:** Mobile-responsive interface for instant "Scan-to-Verify" from phone cameras.
 - [ ] **Audit Export:** Export a "Court-Ready" PDF report containing the full chain of custody and forensic scores.
 

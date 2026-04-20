@@ -17,7 +17,7 @@ Focus: Scaling the AI analysis pipeline.
 
 ### Phase 3: Public Access & Export
 Focus: Accessibility and legal usability.
-- [ ] **Mobile-First Public Portal**: Create the high-performance verification interface for citizens.
+- [x] **Mobile-First Public Portal**: Create the high-performance verification interface for citizens.
 - [ ] **QR Mobile Scanner**: Integrate camera-based scanning for instant on-device verification.
 - [ ] **Court-Ready PDF Export**: Generate the ISO-standard audit trail report with Bates numbering.
 
