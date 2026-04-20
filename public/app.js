@@ -281,19 +281,21 @@ function renderUpload(app) {
                                 </div>
                             </div>
                             <div class="space-y-2">
-                                <label class="block text-sm font-semibold text-primary px-1">Department</label>
+                                <label class="block text-sm font-semibold text-primary px-1">Department ${currentUser?.department ? '<span class="text-[10px] text-emerald-600 font-black uppercase ml-2 border border-emerald-200 px-1.5 py-0.5 rounded-md">Locked</span>' : ''}</label>
                                 <div class="relative flex items-center">
                                     <span class="material-symbols-outlined absolute left-3 text-outline text-lg">corporate_fare</span>
-                                    <select id="upload-dept" class="w-full bg-surface pl-10 pr-4 py-3 rounded-xl border-none focus:ring-2 focus:ring-secondary/20 text-on-surface text-sm appearance-none">
-                                        <option>Executive Office</option>
-                                        <option>Legal & Compliance</option>
-                                        <option>Operations & Logistics</option>
-                                        <option>Human Resources</option>
-                                        <option>Information Technology</option>
-                                        <option>Strategy & Planning</option>
-                                        <option>Finance & Audit</option>
-                                        <option>Public Relations</option>
-                                        <option>Research & Development</option>
+                                    <select id="upload-dept" class="w-full bg-surface pl-10 pr-4 py-3 rounded-xl border-none focus:ring-2 focus:ring-secondary/20 text-on-surface text-sm appearance-none ${currentUser?.department ? 'opacity-70 cursor-not-allowed' : ''}" ${currentUser?.department ? 'disabled' : ''}>
+                                        ${currentUser?.department ? `<option selected>${currentUser.department}</option>` : `
+                                            <option>Executive Office</option>
+                                            <option>Legal & Compliance</option>
+                                            <option>Operations & Logistics</option>
+                                            <option>Human Resources</option>
+                                            <option>Information Technology</option>
+                                            <option>Strategy & Planning</option>
+                                            <option>Finance & Audit</option>
+                                            <option>Public Relations</option>
+                                            <option>Research & Development</option>
+                                        `}
                                     </select>
                                 </div>
                             </div>
@@ -1054,53 +1056,53 @@ function renderHelp(app) {
 
     wrap.innerHTML = `
         <div class="text-center space-y-4">
-            <div class="inline-flex items-center gap-2 px-3 py-1 bg-primary text-white rounded-full text-[10px] font-black tracking-widest uppercase mb-2">Protocol v2.4 Active</div>
-            <h1 class="text-5xl font-black text-primary tracking-tight">How <span class="text-secondary">DoVER</span> Works</h1>
-            <p class="text-on-surface-variant text-lg max-w-2xl mx-auto">A comprehensive guide to decentralized document integrity and verified identity management.</p>
+            <div class="inline-flex items-center gap-2 px-3 py-1 bg-primary text-white rounded-full text-[10px] font-black tracking-widest uppercase mb-2">Protocol v3.0 Active</div>
+            <h1 class="text-5xl font-black text-primary tracking-tight">The <span class="text-secondary">DoVER</span> Standard</h1>
+            <p class="text-on-surface-variant text-lg max-w-2xl mx-auto">Establishing the global benchmark for decentralized document integrity and verified legal evidence.</p>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm hover:shadow-md transition-shadow space-y-4 group">
-                <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">fingerprint</span></div>
-                <h3 class="text-xl font-bold text-primary">1. Verified Identity</h3>
-                <p class="text-sm text-slate-500 leading-relaxed">Every action is tied to your <strong>Google Workspace Identity</strong>. The system strictly enforces verified sessions, ensuring absolute accountability for every block added to the chain.</p>
+                <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">public</span></div>
+                <h3 class="text-xl font-bold text-primary">1. Public Trust Layer</h3>
+                <p class="text-sm text-slate-500 leading-relaxed">Our <strong>Public Portal</strong> allows citizens to verify any document instantly via QR code without logging in. It displays blockchain confirmation and forensic health without exposing sensitive data.</p>
             </div>
 
             <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm hover:shadow-md transition-shadow space-y-4 group">
-                <div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">copy_all</span></div>
-                <h3 class="text-xl font-bold text-primary">2. Hash-Based Duplication</h3>
-                <p class="text-sm text-slate-500 leading-relaxed">We don't just check filenames. Our <strong>Content-Fingerprinting</strong> logic detects duplicate files by their cryptographic hash, preventing redundant records even if the file is renamed.</p>
+                <div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">picture_as_pdf</span></div>
+                <h3 class="text-xl font-bold text-primary">2. Court-Ready Export</h3>
+                <p class="text-sm text-slate-500 leading-relaxed">Authorities can export <strong>RSA-Signed PDF Reports</strong>. These include full chain of custody, Merkle proofs, and Bates numbering, designed to be admissible as digital evidence in court.</p>
             </div>
 
             <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm hover:shadow-md transition-shadow space-y-4 group">
-                <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">shield_person</span></div>
-                <h3 class="text-xl font-bold text-primary">3. Privacy Isolation</h3>
-                <p class="text-sm text-slate-500 leading-relaxed">Secure multi-tenancy ensures you only see your own records. Only users with <strong>Authority-level</strong> clearance can view the global registry and unrestricted audit logs.</p>
+                <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">link</span></div>
+                <h3 class="text-xl font-bold text-primary">3. Polygon Anchoring</h3>
+                <p class="text-sm text-slate-500 leading-relaxed">Every document block is anchored to the <strong>Polygon Blockchain</strong>. This provides immutable proof-of-existence that is independent of our servers and verifiable globally.</p>
             </div>
 
             <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm hover:shadow-md transition-shadow space-y-4 group">
-                <div class="w-12 h-12 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">memory</span></div>
-                <h3 class="text-xl font-bold text-primary">4. Worker-Powered AI</h3>
-                <p class="text-sm text-slate-500 leading-relaxed">Forensic analysis is offloaded to <strong>Worker Threads</strong>. This keeps the main system responsive while our AI crunches pixels to detect font shifts and baseline jitter.</p>
+                <div class="w-12 h-12 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">smart_toy</span></div>
+                <h3 class="text-xl font-bold text-primary">4. Gemini AI Insights</h3>
+                <p class="text-sm text-slate-500 leading-relaxed">Leveraging <strong>Gemini 1.5 Pro</strong>, the system generates natural language summaries, extracts key entities, and provides automated risk assessments for every registered record.</p>
             </div>
 
             <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm hover:shadow-md transition-shadow space-y-4 group">
-                <div class="w-12 h-12 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">history</span></div>
-                <h3 class="text-xl font-bold text-primary">5. Lineage Protection</h3>
-                <p class="text-sm text-slate-500 leading-relaxed">Document versioning is protected. New versions can only be added by the <strong>Original Author</strong> or members of the <strong>Same Department</strong>, preventing version hijacking.</p>
+                <div class="w-12 h-12 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">shield_person</span></div>
+                <h3 class="text-xl font-bold text-primary">5. Identity Isolation</h3>
+                <p class="text-sm text-slate-500 leading-relaxed">Strict **Google OAuth** identity enforcement ensures that users only see their own records, while providing <strong>Authority Clearance</strong> for system-wide auditing.</p>
             </div>
 
             <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm hover:shadow-md transition-shadow space-y-4 group">
-                <div class="w-12 h-12 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">account_tree</span></div>
-                <h3 class="text-xl font-bold text-primary">6. Merkle Proofs</h3>
-                <p class="text-sm text-slate-500 leading-relaxed">Every document includes a <strong>Merkle Proof</strong>. This mathematical evidence links your record to the global root, allowing anyone to verify authenticity without needing the entire database.</p>
+                <div class="w-12 h-12 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">memory</span></div>
+                <h3 class="text-xl font-bold text-primary">6. Parallel Forensics</h3>
+                <p class="text-sm text-slate-500 leading-relaxed">Computational analysis is offloaded to <strong>Worker Threads</strong>. Our AI crunches pixel data for font consistency and baseline jitter without ever slowing down the user experience.</p>
             </div>
         </div>
 
         <div class="bg-primary p-12 rounded-[3rem] text-white text-center space-y-6 shadow-2xl shadow-primary/30 relative overflow-hidden mt-8">
             <div class="relative z-10">
                 <h2 class="text-3xl font-black uppercase tracking-tight">Enterprise Compliance Standards</h2>
-                <p class="opacity-70 max-w-lg mx-auto text-sm leading-relaxed">DoVER adheres to strict immutable ledger standards, ensuring every document registration is legally traceable and cryptographically secure.</p>
+                <p class="opacity-70 max-w-lg mx-auto text-sm leading-relaxed">DoVER adheres to strict ISO-standard immutable ledger protocols, ensuring every document registration is legally traceable and cryptographically secure.</p>
                 <div class="flex justify-center gap-4 mt-6">
                     <a href="#upload" class="inline-flex bg-white text-primary px-10 py-4 rounded-2xl font-black hover:scale-105 active:scale-95 transition-transform shadow-xl">Start Secure Upload</a>
                 </div>
@@ -1136,11 +1138,32 @@ function renderBatch(app) {
                     <button type="button" id="batch-browse-btn" class="bg-gradient-to-r from-primary to-primary-container text-white px-8 py-3 rounded-xl font-semibold shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all">Browse Files</button>
                 </div>
 
-                <div class="space-y-2">
-                    <label class="block text-sm font-semibold text-primary px-1">Uploaded By</label>
-                    <div class="relative flex items-center">
-                        <span class="material-symbols-outlined absolute left-3 text-outline text-lg">person</span>
-                        <input id="batch-user" class="w-full bg-surface pl-10 pr-4 py-3 rounded-xl border border-outline-variant/30 focus:ring-2 focus:ring-secondary/20 text-on-surface text-sm" placeholder="Full legal name" type="text" value="${currentUser?.name || ''}" ${currentUser ? 'readonly' : ''}/>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-2">
+                        <label class="block text-sm font-semibold text-primary px-1">Uploaded By</label>
+                        <div class="relative flex items-center">
+                            <span class="material-symbols-outlined absolute left-3 text-outline text-lg">person</span>
+                            <input id="batch-user" class="w-full bg-surface pl-10 pr-4 py-3 rounded-xl border border-outline-variant/30 focus:ring-2 focus:ring-secondary/20 text-on-surface text-sm" placeholder="Full legal name" type="text" value="${currentUser?.name || ''}" ${currentUser ? 'readonly' : ''}/>
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="block text-sm font-semibold text-primary px-1">Department ${currentUser?.department ? '<span class="text-[10px] text-emerald-600 font-black uppercase ml-2 border border-emerald-200 px-1.5 py-0.5 rounded-md">Locked</span>' : ''}</label>
+                        <div class="relative flex items-center">
+                            <span class="material-symbols-outlined absolute left-3 text-outline text-lg">corporate_fare</span>
+                            <select id="batch-dept" class="w-full bg-surface pl-10 pr-4 py-3 rounded-xl border border-outline-variant/30 focus:ring-2 focus:ring-secondary/20 text-on-surface text-sm appearance-none ${currentUser?.department ? 'opacity-70 cursor-not-allowed' : ''}" ${currentUser?.department ? 'disabled' : ''}>
+                                ${currentUser?.department ? `<option selected>${currentUser.department}</option>` : `
+                                    <option>Executive Office</option>
+                                    <option>Legal & Compliance</option>
+                                    <option>Operations & Logistics</option>
+                                    <option>Human Resources</option>
+                                    <option>Information Technology</option>
+                                    <option>Strategy & Planning</option>
+                                    <option>Finance & Audit</option>
+                                    <option>Public Relations</option>
+                                    <option>Research & Development</option>
+                                `}
+                            </select>
+                        </div>
                     </div>
                 </div>
 
@@ -1188,6 +1211,7 @@ function renderBatch(app) {
         const fd = new FormData();
         for (const file of fileInput.files) fd.append('files', file);
         fd.append('user', document.getElementById('batch-user').value || 'anonymous');
+        fd.append('department', document.getElementById('batch-dept').value);
 
         try {
             const res = await API.batchUpload(fd);
@@ -1389,9 +1413,16 @@ async function renderIntegrityModal(id) {
                         <p class="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em]">Cryptographic Consensus Audit</p>
                     </div>
                 </div>
-                <button onclick="document.getElementById('integrity-overlay').remove()" class="w-12 h-12 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-all active:scale-90">
-                    <span class="material-symbols-outlined text-slate-400">close</span>
-                </button>
+                <div class="flex items-center gap-3">
+                    ${currentUser?.role === 'authority' ? `
+                        <button onclick="downloadReport(${id})" class="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl font-bold text-xs hover:bg-emerald-100 transition-all border border-emerald-100">
+                            <span class="material-symbols-outlined text-sm">download</span> Export Official Report
+                        </button>
+                    ` : ''}
+                    <button onclick="document.getElementById('integrity-overlay').remove()" class="w-12 h-12 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-all active:scale-90">
+                        <span class="material-symbols-outlined text-slate-400">close</span>
+                    </button>
+                </div>
             </div>
             <div id="integrity-modal-content" class="p-10 overflow-y-auto flex-1 space-y-10 custom-scrollbar">
                 <div class="flex justify-center py-20"><div class="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div></div>
@@ -1524,6 +1555,9 @@ async function renderDocumentIntelligence(id) {
                 </div>
                 <div class="flex items-center gap-3">
                     ${currentUser?.role === 'authority' ? `
+                        <button onclick="downloadReport(${id})" class="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl font-bold text-xs hover:bg-emerald-100 transition-all border border-emerald-100">
+                            <span class="material-symbols-outlined text-sm">download</span> Export Official Report
+                        </button>
                         <button id="refresh-ai-btn" class="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-xl font-bold text-xs hover:bg-blue-100 transition-all border border-blue-100">
                             <span class="material-symbols-outlined text-sm">refresh</span> Refresh Intelligence
                         </button>
@@ -1743,6 +1777,37 @@ async function renderIntelligenceContent(id, isRefresh = false) {
                 <p class="text-slate-400 font-medium">Failed to load intelligence report. ${e.message}</p>
             </div>
         `;
+    }
+}
+
+// ── Export Official Report ──
+async function downloadReport(id) {
+    const btn = event.currentTarget;
+    const originalContent = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-symbols-outlined text-sm animate-spin">progress_activity</span> Exporting...';
+    
+    try {
+        const response = await fetch(`/api/chain/document/${id}/report`);
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || "Failed to generate report");
+        }
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `DoVER_Audit_Report_${id}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        a.remove();
+    } catch (e) {
+        alert("Export failed: " + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalContent;
     }
 }
 
