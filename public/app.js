@@ -43,6 +43,19 @@ const API = {
         return (await fetch(`/api/chain/document/${id}/analyze`, { 
             method: 'POST'
         })).json();
+    },
+    async getUsers() {
+        return (await fetch('/api/admin/users')).json();
+    },
+    async promoteUser(userId, newRole) {
+        return (await fetch('/api/admin/promote', {
+            method: 'POST',
+            headers: { 
+                'x-api-key': API_KEY,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ userId, newRole })
+        })).json();
     }
 };
 
@@ -65,7 +78,36 @@ async function checkAuth() {
             header.style.display = 'flex';
             updateHeaderUI(header, currentUser);
         }
+        updateSidebarUI(currentUser);
         navigate();
+    }
+}
+
+function updateSidebarUI(user) {
+    const navLinks = document.getElementById('nav-links');
+    if (!navLinks) return;
+
+    // Remove existing admin link if any to avoid duplicates
+    const existingAdminLink = navLinks.querySelector('a[data-page="admin"]');
+    if (existingAdminLink) existingAdminLink.remove();
+
+    if (user.role === 'authority') {
+        const settingsLink = navLinks.querySelector('a[data-page="settings"]');
+        const adminLink = document.createElement('a');
+        adminLink.href = '#admin';
+        adminLink.dataset.page = 'admin';
+        adminLink.className = 'nav-link flex items-center px-4 py-3 mx-2 rounded-lg transition-all group';
+        adminLink.innerHTML = `
+            <span class="material-symbols-outlined mr-3 text-xl">admin_panel_settings</span>
+            <span class="font-medium text-sm">System Admin</span>
+        `;
+        
+        // Insert before settings
+        if (settingsLink) {
+            navLinks.insertBefore(adminLink, settingsLink);
+        } else {
+            navLinks.appendChild(adminLink);
+        }
     }
 }
 
@@ -149,6 +191,13 @@ function navigate() {
         case 'settings': renderSettings(app); break;
         case 'help':     renderHelp(app); break;
         case 'batch':    renderBatch(app); break;
+        case 'admin':
+            if (currentUser.role === 'authority') {
+                renderAdmin(app);
+            } else {
+                location.hash = '#dashboard';
+            }
+            break;
         default:         renderDashboard(app); break;
     }
 }
@@ -1806,6 +1855,177 @@ async function downloadReport(id) {
     } catch (e) {
         alert("Export failed: " + e.message);
     } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalContent;
+    }
+}
+
+// ── Admin Page ──
+async function renderAdmin(app) {
+    document.getElementById('page-title').textContent = 'System Administration';
+    const wrap = document.createElement('div');
+    wrap.className = 'max-w-7xl mx-auto space-y-8 fade-in';
+    wrap.innerHTML = `
+        <div class="flex flex-col md:flex-row md:items-end justify-between mb-2 gap-6">
+            <div class="space-y-2">
+                <h1 class="text-4xl font-extrabold tracking-tight text-primary dark:text-white">User Management</h1>
+                <p class="text-on-surface-variant dark:text-slate-400 max-w-lg">Manage system roles and authority elevations. Changes take effect immediately.</p>
+            </div>
+            <div class="flex flex-col items-end gap-3">
+                <div class="bg-surface-container-lowest dark:bg-[#1C2A41] px-5 py-3 rounded-xl flex items-center gap-4 shadow-sm border border-slate-100 dark:border-slate-800">
+                    <div class="text-right">
+                        <p class="text-[9px] uppercase font-black text-slate-400 tracking-widest">Active Authorities</p>
+                        <p id="auth-count" class="text-lg font-bold text-primary dark:text-[#E9C176]">--</p>
+                    </div>
+                    <div class="w-10 h-10 bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center">
+                        <span class="material-symbols-outlined text-xl">admin_panel_settings</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-surface-container-lowest dark:bg-[#1C2A41] rounded-2xl overflow-hidden shadow-sm border border-slate-100 dark:border-slate-800">
+            <div class="px-8 py-6 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <h3 class="text-lg font-bold text-primary dark:text-white">Registered Personnel</h3>
+                <div class="relative max-w-md w-full">
+                    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
+                    <input type="text" id="user-search" placeholder="Search by name, email or department..." class="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-[#0A192F] border-none rounded-xl text-sm focus:ring-2 focus:ring-primary/10 dark:text-white transition-all"/>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 dark:bg-[#0A192F]/50">
+                            <th class="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Personnel</th>
+                            <th class="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Department</th>
+                            <th class="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Access Role</th>
+                            <th class="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Last Activity</th>
+                            <th class="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="user-table-body" class="divide-y divide-slate-100 dark:divide-slate-800/50">
+                        <tr><td colspan="5" class="px-8 py-12 text-center text-slate-400">Loading personnel records...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="px-8 py-4 bg-slate-50 dark:bg-[#0A192F]/30 border-t border-slate-100 dark:border-slate-800">
+                <p id="user-count" class="text-xs text-slate-500 font-medium tracking-tight">-- total registered users</p>
+            </div>
+        </div>
+    `;
+    app.appendChild(wrap);
+
+    const users = await API.getUsers();
+    renderUserTable(users);
+
+    const searchInput = document.getElementById('user-search');
+    searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase();
+        const filtered = users.filter(u => 
+            u.name.toLowerCase().includes(query) || 
+            u.email.toLowerCase().includes(query) || 
+            (u.department && u.department.toLowerCase().includes(query))
+        );
+        renderUserTable(filtered);
+    });
+}
+
+function renderUserTable(users) {
+    const body = document.getElementById('user-table-body');
+    const authCountEl = document.getElementById('auth-count');
+    const userCountEl = document.getElementById('user-count');
+    
+    if (!body) return;
+
+    if (!users.length) {
+        body.innerHTML = '<tr><td colspan="5" class="px-8 py-12 text-center text-slate-400">No users found matching your search.</td></tr>';
+        return;
+    }
+
+    const authoritiesCount = users.filter(u => u.role === 'authority').length;
+    if (authCountEl) authCountEl.textContent = authoritiesCount;
+    if (userCountEl) userCountEl.textContent = `${users.length} total registered users`;
+
+    body.innerHTML = users.map(user => {
+        const isSelf = user.email === currentUser.email;
+        const roleBadge = user.role === 'authority' 
+            ? '<span class="px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 text-[9px] font-black uppercase tracking-tighter border border-blue-200 dark:border-blue-800">Authority</span>'
+            : '<span class="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 text-[9px] font-black uppercase tracking-tighter border border-slate-200 dark:border-slate-700">Standard User</span>';
+
+        return `
+            <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                <td class="px-8 py-5">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-primary dark:text-[#E9C176] font-black text-sm uppercase">
+                            ${user.name.charAt(0)}
+                        </div>
+                        <div>
+                            <p class="text-sm font-bold text-primary dark:text-white leading-tight">${user.name}${isSelf ? ' <span class="text-[9px] text-slate-400 font-normal italic">(You)</span>' : ''}</p>
+                            <p class="text-xs text-slate-400 dark:text-slate-500 font-medium">${user.email}</p>
+                        </div>
+                    </div>
+                </td>
+                <td class="px-8 py-5">
+                    <span class="text-xs font-semibold text-slate-600 dark:text-slate-400">${user.department || 'General'}</span>
+                </td>
+                <td class="px-8 py-5">
+                    ${roleBadge}
+                </td>
+                <td class="px-8 py-5">
+                    <p class="text-[11px] font-medium text-slate-500 dark:text-slate-400">${user.last_login ? new Date(user.last_login).toLocaleString() : 'Never'}</p>
+                </td>
+                <td class="px-8 py-5 text-right">
+                    ${isSelf ? `
+                        <span class="text-[10px] font-black text-slate-300 uppercase">Immutable</span>
+                    ` : `
+                        <button 
+                            onclick="toggleAuthority(${user.id}, '${user.role === 'authority' ? 'user' : 'authority'}', this)"
+                            class="inline-flex items-center gap-2 px-4 py-2 ${user.role === 'authority' ? 'bg-red-50 text-red-600 hover:bg-red-100 border-red-100' : 'bg-blue-50 text-blue-600 hover:bg-blue-100 border-blue-100'} rounded-xl font-bold text-[10px] uppercase tracking-wider transition-all border active:scale-95"
+                        >
+                            <span class="material-symbols-outlined text-sm">${user.role === 'authority' ? 'person_remove' : 'verified'}</span>
+                            ${user.role === 'authority' ? 'Revoke' : 'Promote'}
+                        </button>
+                    `}
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+async function toggleAuthority(userId, newRole, btn) {
+    const originalContent = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-symbols-outlined text-sm animate-spin">progress_activity</span> Updating...';
+
+    try {
+        const res = await API.promoteUser(userId, newRole);
+        if (res.success) {
+            // Success Toast or inline update
+            const toast = document.createElement('div');
+            toast.className = 'fixed bottom-8 right-8 bg-emerald-600 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 z-[200] fade-in slide-up';
+            toast.innerHTML = `
+                <span class="material-symbols-outlined">check_circle</span>
+                <div>
+                    <p class="font-bold text-sm">Update Successful</p>
+                    <p class="text-[10px] opacity-80 uppercase font-black">${res.message}</p>
+                </div>
+            `;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.add('fade-out');
+                setTimeout(() => toast.remove(), 500);
+            }, 3000);
+
+            // Re-render the table by re-fetching
+            const users = await API.getUsers();
+            renderUserTable(users);
+        } else {
+            alert('Failed to update role: ' + res.error);
+            btn.disabled = false;
+            btn.innerHTML = originalContent;
+        }
+    } catch (e) {
+        alert('Error: ' + e.message);
         btn.disabled = false;
         btn.innerHTML = originalContent;
     }
