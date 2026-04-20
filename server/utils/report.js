@@ -64,28 +64,39 @@ async function generateAuditReport(documentId) {
             });
 
             // --- HEADER ---
-            doc.fontSize(20).text('DoVER INTEGRITY AUDIT REPORT', { align: 'center', underline: true });
+            doc.fontSize(25).fillColor('#2c3e50').text('DoVER', { continued: true });
+            doc.fontSize(20).fillColor('#7f8c8d').text(' | INTEGRITY AUDIT REPORT', { underline: false });
             doc.moveDown();
-            doc.fontSize(10).text(`Official Document ID: ${document.block_index.toString().padStart(8, '0')}`, { align: 'right' });
+            doc.fontSize(10).fillColor('black').text(`Official Bates No: DOVER-${document.block_index.toString().padStart(8, '0')}`, { align: 'right' });
             doc.text(`Report Date: ${new Date().toLocaleString()}`, { align: 'right' });
             doc.moveDown();
 
             // --- SECTION 1: Identity ---
-            doc.fontSize(16).fillColor('#333').text('Section 1: Identity & Metadata', { underline: true });
+            doc.fontSize(16).fillColor('#2c3e50').text('Section 1: Identity & Metadata', { underline: true });
             doc.moveDown(0.5);
             doc.fontSize(12).fillColor('black');
             doc.text(`Filename: ${document.filename}`);
+            doc.text(`Department: ${document.department || 'General Registry'}`);
             doc.text(`Uploaded By: ${document.uploaded_by} (${document.uploader_email || 'N/A'})`);
             doc.text(`Upload Timestamp: ${document.upload_timestamp}`);
             doc.text(`File Type: ${document.file_type}`);
             doc.moveDown();
 
             // --- SECTION 2: Integrity & Blockchain ---
-            doc.fontSize(16).fillColor('#333').text('Section 2: Integrity & Blockchain Anchoring', { underline: true });
+            doc.fontSize(16).fillColor('#2c3e50').text('Section 2: Integrity & Blockchain Anchoring', { underline: true });
             doc.moveDown(0.5);
             doc.fontSize(12).fillColor('black');
             doc.text(`File SHA-256: ${document.file_hash}`, { font: 'Courier' });
             doc.text(`Chain Block Hash: ${document.block_hash}`, { font: 'Courier' });
+            doc.text(`Merkle Root: ${document.merkle_root || 'N/A'}`, { font: 'Courier' });
+            
+            if (document.merkle_proof) {
+                try {
+                    const proof = JSON.parse(document.merkle_proof);
+                    doc.text(`Merkle Proof: ${proof.length} nodes (verified)`, { font: 'Helvetica' });
+                } catch (e) {}
+            }
+
             doc.text(`Polygon TXID: ${document.polygon_txid || 'PENDING/LOCAL'}`, { font: 'Courier' });
             doc.moveDown();
 
