@@ -2,11 +2,39 @@ const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const db = require('../db/db');
 const { v4: uuidv4 } = require('uuid');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 
+// ── Google OAuth Configuration ──
+let clientID = process.env.GOOGLE_CLIENT_ID;
+let clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+try {
+    // Look for client_secret JSON file in the project root
+    const rootDir = path.resolve(__dirname, '..', '..');
+    const files = fs.readdirSync(rootDir);
+    const secretFile = files.find(f => f.startsWith('client_secret_') && f.endsWith('.json'));
+
+    if (secretFile) {
+        console.log(`[AUTH] Using credentials from: ${secretFile}`);
+        const config = JSON.parse(fs.readFileSync(path.join(rootDir, secretFile), 'utf8'));
+        if (config.web) {
+            clientID = config.web.client_id;
+            clientSecret = config.web.client_secret;
+        }
+    }
+} catch (e) {
+    console.warn('[AUTH] Failed to read client_secret.json, falling back to .env:', e.message);
+}
+
+if (!clientID || !clientSecret) {
+    console.error('[AUTH] CRITICAL ERROR: Google OAuth credentials not found in JSON or .env');
+}
+
 passport.use(new GoogleStrategy({
-    clientID: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    clientID: clientID,
+    clientSecret: clientSecret,
     callbackURL: '/auth/google/callback',
     scope: ['profile', 'email']
 }, (accessToken, refreshToken, profile, done) => {
@@ -19,7 +47,7 @@ passport.use(new GoogleStrategy({
 
         if (!user) {
             // Create new user
-            const userId = profile.id; // Or uuidv4() if you want a separate internal ID
+            const userId = profile.id; 
             db.prepare(`
                 INSERT INTO users (id, google_id, name, email, picture, last_login)
                 VALUES (?, ?, ?, ?, ?, datetime('now'))

@@ -8,6 +8,7 @@
     "dev": "nodemon server/app.js"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@tensorflow/tfjs": "^4.22.0",
     "better-sqlite3": "^11.8.1",
     "bull": "^4.16.5",
@@ -17,6 +18,7 @@
     "ethers": "^6.16.0",
     "express": "^4.21.2",
     "express-session": "^1.19.0",
+    "google-auth-library": "^10.6.2",
     "gridfs-stream": "^1.1.1",
     "jimp": "^1.6.0",
     "mongoose": "^9.4.1",

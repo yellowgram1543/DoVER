@@ -1,3 +1,17 @@
 node_modules/
 .env
+
+# Google credentials & secrets
 google-credentials.json
+dover-*.json
+dover-*.json.bak
+client_secret_*.json
+
+# Database
+db.sqlite
+
+# OCR trained data (large binary files)
+*.traineddata
+
+# Graphify cache
+graphify-out/
