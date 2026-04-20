@@ -23,10 +23,10 @@ Focus: Accessibility and legal usability.
 
 ### Phase 4: Admin Console & Security Hardening
 Focus: Zero-trust architecture and governance.
-- [ ] **Department & Identity Locks**: Permanently link users to their departments and enforce strict email-based privacy.
+- [x] **Department & Identity Locks**: Permanently link users to their departments and enforce strict email-based privacy.
 - [x] **Strict Lineage Validation**: Fix version history logic to prevent unrelated documents from merging.
 - [x] **Authority Admin Dashboard**: Build the in-app UI for managing user roles and system-wide promotions.
-- [ ] **Audit Trail Hardening**: Ensure all administrative actions (promotions, role changes) are recorded on-chain.
+- [x] **Audit Trail Hardening**: Ensure all administrative actions (promotions, role changes) are recorded on-chain.
 
 ## Future Milestones (v2+)
 - **Milestone 2**: Digital Sovereignty (PAdES Signatures, KMS).

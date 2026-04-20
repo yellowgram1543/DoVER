@@ -13,9 +13,19 @@ try {
 
     if (!existingColumns.includes('department')) {
         db.prepare("ALTER TABLE users ADD COLUMN department TEXT").run();
-        console.log('✓ department column added.');
+        console.log('✓ department column added to users table.');
     } else {
-        console.log('- department column already exists.');
+        console.log('- department column already exists in users table.');
+    }
+
+    const docTableInfo = db.prepare("PRAGMA table_info(documents)").all();
+    const docExistingColumns = docTableInfo.map(col => col.name);
+
+    if (!docExistingColumns.includes('department')) {
+        db.prepare("ALTER TABLE documents ADD COLUMN department TEXT").run();
+        console.log('✓ department column added to documents table.');
+    } else {
+        console.log('- department column already exists in documents table.');
     }
 
     console.log('Migration completed successfully.');

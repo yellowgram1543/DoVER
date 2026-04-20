@@ -64,15 +64,15 @@ async function generateAuditReport(documentId) {
             });
 
             // --- HEADER ---
-            doc.fontSize(25).fillColor('#2c3e50').text('DoVER', { continued: true });
-            doc.fontSize(20).fillColor('#7f8c8d').text(' | INTEGRITY AUDIT REPORT', { underline: false });
+            doc.fontSize(25).fillColor('#001e40').text('DoVER', { continued: true });
+            doc.fontSize(20).fillColor('#0059bb').text(' | INTEGRITY AUDIT REPORT', { underline: false });
             doc.moveDown();
             doc.fontSize(10).fillColor('black').text(`Official Bates No: DOVER-${document.block_index.toString().padStart(8, '0')}`, { align: 'right' });
             doc.text(`Report Date: ${new Date().toLocaleString()}`, { align: 'right' });
             doc.moveDown();
 
             // --- SECTION 1: Identity ---
-            doc.fontSize(16).fillColor('#2c3e50').text('Section 1: Identity & Metadata', { underline: true });
+            doc.fontSize(16).fillColor('#001e40').text('Section 1: Identity & Metadata', { underline: true });
             doc.moveDown(0.5);
             doc.fontSize(12).fillColor('black');
             doc.text(`Filename: ${document.filename}`);
@@ -83,7 +83,7 @@ async function generateAuditReport(documentId) {
             doc.moveDown();
 
             // --- SECTION 2: Integrity & Blockchain ---
-            doc.fontSize(16).fillColor('#2c3e50').text('Section 2: Integrity & Blockchain Anchoring', { underline: true });
+            doc.fontSize(16).fillColor('#001e40').text('Section 2: Integrity & Blockchain Anchoring', { underline: true });
             doc.moveDown(0.5);
             doc.fontSize(12).fillColor('black');
             doc.text(`File SHA-256: ${document.file_hash}`, { font: 'Courier' });
@@ -101,7 +101,7 @@ async function generateAuditReport(documentId) {
             doc.moveDown();
 
             // --- SECTION 3: AI Forensic Analysis ---
-            doc.fontSize(16).fillColor('#333').text('Section 3: Document Intelligence & AI Forensics', { underline: true });
+            doc.fontSize(16).fillColor('#001e40').text('Section 3: Document Intelligence & AI Forensics', { underline: true });
             doc.moveDown(0.5);
             doc.fontSize(12).fillColor('black');
             
@@ -117,7 +117,7 @@ async function generateAuditReport(documentId) {
             doc.moveDown();
 
             // --- SECTION 4: Timeline & History ---
-            doc.fontSize(16).fillColor('#333').text('Section 4: Complete Version History', { underline: true });
+            doc.fontSize(16).fillColor('#001e40').text('Section 4: Complete Version History', { underline: true });
             doc.moveDown(0.5);
             doc.fontSize(10).fillColor('black');
             
@@ -130,7 +130,7 @@ async function generateAuditReport(documentId) {
 
             // --- FOOTER & SIGNATURE ---
             doc.addPage();
-            doc.fontSize(16).text('Authorization & Digital Signature', { underline: true });
+            doc.fontSize(16).fillColor('#001e40').text('Authorization & Digital Signature', { underline: true });
             doc.moveDown();
             
             // Cryptographic Signing
@@ -145,7 +145,7 @@ async function generateAuditReport(documentId) {
                 signatureText = signature;
             }
 
-            doc.fontSize(10).text('This document is cryptographically signed by the DoVER Authority.', { italic: true });
+            doc.fontSize(10).fillColor('black').text('This document is cryptographically signed by the DoVER Authority.', { italic: true });
             doc.moveDown();
             doc.fontSize(8).text('AUTHORITY SIGNATURE:', { bold: true });
             doc.text(signatureText, { font: 'Courier', width: 450 });
@@ -166,7 +166,7 @@ async function generateAuditReport(documentId) {
             });
 
             doc.moveDown();
-            doc.fontSize(12).fillColor('red').text('OFFICIAL DOVER SEAL', { align: 'center' });
+            doc.fontSize(12).fillColor('#ba1a1a').text('OFFICIAL DOVER SEAL', { align: 'center' });
             doc.fontSize(10).fillColor('black').text('Authenticated via Blockchain & AI-Forensics', { align: 'center' });
 
             // Finalize
