@@ -3,6 +3,8 @@ const router = express.Router();
 const db = require('../db/db');
 const { requireAuthority } = require('../middleware/auth');
 
+const crypto = require('crypto');
+
 /**
  * GET /api/admin/users
  * Returns a list of all users.
@@ -10,11 +12,50 @@ const { requireAuthority } = require('../middleware/auth');
  */
 router.get('/users', requireAuthority, (req, res) => {
     try {
-        const users = db.prepare('SELECT id, name, email, role, last_login, created_at, department FROM users ORDER BY created_at DESC').all();
-        res.json(users);
+        const users = db.prepare('SELECT id, name, email, role, last_login, created_at, department, is_flagged, abuse_score, api_secret FROM users ORDER BY created_at DESC').all();
+        // Mask API secret
+        const maskedUsers = users.map(u => ({
+            ...u,
+            api_secret: u.api_secret ? `${u.api_secret.substring(0, 4)}...${u.api_secret.substring(u.api_secret.length - 4)}` : null
+        }));
+        res.json(maskedUsers);
     } catch (error) {
         console.error('[ADMIN_USERS_ERROR]', error);
         res.status(500).json({ success: false, error: 'Failed to retrieve users' });
+    }
+});
+
+/**
+ * POST /api/admin/generate-secret
+ * Generates or resets a user's API secret.
+ */
+router.post('/generate-secret', requireAuthority, (req, res) => {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId is required' });
+
+    try {
+        const secret = crypto.randomBytes(32).toString('hex');
+        db.prepare('UPDATE users SET api_secret = ? WHERE id = ?').run(secret, userId);
+        
+        res.json({ success: true, secret });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to generate secret' });
+    }
+});
+
+/**
+ * POST /api/admin/unflag
+ * Clears the flagged status of a user.
+ */
+router.post('/unflag', requireAuthority, (req, res) => {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId is required' });
+
+    try {
+        db.prepare('UPDATE users SET is_flagged = 0, abuse_score = 0 WHERE id = ?').run(userId);
+        res.json({ success: true, message: 'User unflagged' });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to unflag user' });
     }
 });
 

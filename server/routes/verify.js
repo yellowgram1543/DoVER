@@ -15,6 +15,7 @@ const { calculateSimilarity } = require('../utils/ocr');
 const apiKey = require('../middleware/apiKey');
 const { verifyMerkleProof } = require('../utils/merkle');
 const { verifyLimiter } = require('../middleware/limiters');
+const { recordSignal } = require('../utils/abuse');
 
 if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
 if (!fs.existsSync('tmp')) fs.mkdirSync('tmp');
@@ -489,6 +490,10 @@ router.post('/', verifyLimiter, apiKey, upload.single('file'), async (req, res) 
 
         if (isTampered) {
             db.prepare('UPDATE documents SET is_tampered = 1 WHERE block_index = ?').run(doc.block_index);
+            // Record abuse signal
+            if (req.user) {
+                recordSignal(req.user.id, 'FAILED_VERIFICATION');
+            }
         }
 
         if (tmpPath && fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);

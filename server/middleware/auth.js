@@ -2,7 +2,7 @@
  * Middleware to ensure the request is authenticated via Passport.js
  */
 function requireAuth(req, res, next) {
-    if (req.isAuthenticated()) {
+    if (req.isAuthenticated() || req.user) {
         return next();
     }
     res.status(401).json({ error: "Login required" });

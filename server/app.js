@@ -11,6 +11,8 @@ const { rateLimit } = require('express-rate-limit');
 const { RedisStore } = require('rate-limit-redis');
 const { createClient } = require('redis');
 const nonceMiddleware = require('./middleware/nonce');
+const blocklist = require('./middleware/blocklist');
+const hmacMiddleware = require('./middleware/hmac');
 const db = require('./db/db');
 
 const app = express();
@@ -18,6 +20,9 @@ const app = express();
 // Redis Client for Rate Limiting
 const redisClient = createClient({ url: process.env.REDIS_URL || 'redis://127.0.0.1:6379' });
 redisClient.connect().catch(console.error);
+
+// Global IP Blocklist
+app.use(blocklist);
 
 // Global Rate Limiter: 100 requests per 15 minutes
 const globalLimiter = rateLimit({
@@ -81,19 +86,18 @@ const adminRoutes = require('./routes/admin');
 const { requireAuth } = require('./middleware/auth');
 
 app.use('/auth', authRoutes);
-
-// Apply requireAuth + apiKey to sensitive routes
-app.use('/api/upload', requireAuth, apiKey, uploadRoutes);
+// Apply hmac + requireAuth + apiKey to sensitive routes
+app.use('/api/upload', hmacMiddleware, requireAuth, apiKey, uploadRoutes);
 app.use('/api/verify', (req, res, next) => {
-    // Apply requireAuth and apiKey only to POST /api/verify or GET /api/verify/:id/proof
+    // Apply hmac, requireAuth, and apiKey only to POST /api/verify or GET /api/verify/:id/proof
     if (req.method === 'POST' || req.path.endsWith('/proof')) {
-        return requireAuth(req, res, () => apiKey(req, res, next));
+        return hmacMiddleware(req, res, () => requireAuth(req, res, () => apiKey(req, res, next)));
     }
     next();
 }, verifyRoutes);
-app.use('/api/chain', requireAuth, chainRoutes);
-app.use('/api/stats', requireAuth, statsRoutes);
-app.use('/api/admin', requireAuth, adminRoutes);
+app.use('/api/chain', hmacMiddleware, requireAuth, chainRoutes);
+app.use('/api/stats', hmacMiddleware, requireAuth, statsRoutes);
+app.use('/api/admin', hmacMiddleware, requireAuth, adminRoutes);
 
 // SPA fallback: serve index.html for any non-API route
 app.get('*', (req, res) => {

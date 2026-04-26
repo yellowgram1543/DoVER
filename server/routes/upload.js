@@ -16,6 +16,7 @@ const { getBucket } = require('../db/mongodb');
 const documentQueue = require('../utils/queue');
 const apiKey = require('../middleware/apiKey');
 const { uploadLimiter } = require('../middleware/limiters');
+const { recordSignal } = require('../utils/abuse');
 
 // Configure multer for temp storage
 const storage = multer.diskStorage({
@@ -43,6 +44,9 @@ const upload = multer({
 });
 
 router.post('/', uploadLimiter, (req, res) => {
+    // Record upload attempt for abuse scoring
+    if (req.user) recordSignal(req.user.id, 'RAPID_UPLOAD');
+
     upload.single('file')(req, res, async (err) => {
         if (err) return res.status(400).json({ success: false, error: err.message });
 
@@ -124,6 +128,9 @@ router.post('/', uploadLimiter, (req, res) => {
                 const existing = db.prepare('SELECT * FROM documents WHERE file_hash = ? AND uploader_email = ?').get(fileHash, uploaderEmail);
                 if (existing) {
                     if (fs.existsSync(tmpFilePath)) fs.unlinkSync(tmpFilePath);
+                    // Record hash collision signal
+                    if (req.user) recordSignal(req.user.id, 'HASH_COLLISION');
+
                     return res.status(409).json({
                         success: false,
                         error: "Duplicate document content",
