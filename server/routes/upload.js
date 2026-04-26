@@ -15,6 +15,7 @@ const { rgbaToInt } = require('@jimp/utils');
 const { getBucket } = require('../db/mongodb');
 const documentQueue = require('../utils/queue');
 const apiKey = require('../middleware/apiKey');
+const { uploadLimiter } = require('../middleware/limiters');
 
 // Configure multer for temp storage
 const storage = multer.diskStorage({
@@ -41,7 +42,7 @@ const upload = multer({
     }
 });
 
-router.post('/', (req, res) => {
+router.post('/', uploadLimiter, (req, res) => {
     upload.single('file')(req, res, async (err) => {
         if (err) return res.status(400).json({ success: false, error: err.message });
 
@@ -166,7 +167,7 @@ router.post('/', (req, res) => {
 });
 
 // ── Batch Upload (Queue-Based) ──
-router.post('/batch-upload', apiKey, (req, res) => {
+router.post('/batch-upload', uploadLimiter, apiKey, (req, res) => {
     upload.array('files', 20)(req, res, async (err) => {
         if (err) return res.status(400).json({ success: false, error: err.message });
 

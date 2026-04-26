@@ -14,13 +14,14 @@ const { getBucket, mongoose } = require('../db/mongodb');
 const { calculateSimilarity } = require('../utils/ocr');
 const apiKey = require('../middleware/apiKey');
 const { verifyMerkleProof } = require('../utils/merkle');
+const { verifyLimiter } = require('../middleware/limiters');
 
 if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
 if (!fs.existsSync('tmp')) fs.mkdirSync('tmp');
 
 const upload = multer({ dest: 'tmp/' });
 
-router.get('/public/verify/:hash', async (req, res) => {
+router.get('/public/verify/:hash', verifyLimiter, async (req, res) => {
     try {
         const hash = req.params.hash;
         const doc = db.prepare('SELECT * FROM documents WHERE block_hash = ?').get(hash);
@@ -73,7 +74,7 @@ router.get('/public/verify/:hash', async (req, res) => {
     }
 });
 
-router.get('/public/verify/qr/:document_id', async (req, res) => {
+router.get('/public/verify/qr/:document_id', verifyLimiter, async (req, res) => {
     try {
         const id = req.params.document_id;
         const doc = db.prepare('SELECT * FROM documents WHERE block_index = ?').get(id);
@@ -125,7 +126,7 @@ router.get('/public/verify/qr/:document_id', async (req, res) => {
     }
 });
 
-router.get('/:id/proof', apiKey, (req, res) => {
+router.get('/:id/proof', verifyLimiter, apiKey, (req, res) => {
     try {
         const id = req.params.id;
         const doc = db.prepare('SELECT * FROM documents WHERE block_index = ?').get(id);
@@ -163,7 +164,7 @@ router.get('/:id/proof', apiKey, (req, res) => {
 });
 
 // Quick Verification via Hash
-router.get('/:hash', apiKey, async (req, res) => {
+router.get('/:hash', verifyLimiter, apiKey, async (req, res) => {
     try {
         const hash = req.params.hash;
         const doc = db.prepare('SELECT * FROM documents WHERE block_hash = ?').get(hash);
@@ -249,7 +250,7 @@ router.get('/:hash', apiKey, async (req, res) => {
     }
 });
 
-router.post('/', apiKey, upload.single('file'), async (req, res) => {
+router.post('/', verifyLimiter, apiKey, upload.single('file'), async (req, res) => {
     let tmpPath = '';
     try {
         let newPath = null;

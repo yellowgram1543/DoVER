@@ -44,6 +44,30 @@ Focus: Fix critical OCR, processing, and security bugs found during audit.
 #### 🟡 Low
 - [x] **Middleware & Security Cleanup**: Remove duplicate `apiKey` application, restrict CORS origins, remove hardcoded session secret fallback, ensure credential files are gitignored. (`server/app.js`, `server/routes/upload.js`)
 
+### Phase 8: Adversarial Hardening
+Focus: Defend the platform against active attackers and abuse.
+
+#### 🔴 Critical
+- [ ] **Rate Limiting**: Per-IP and per-user throttling on upload/verify endpoints. (`server/app.js`, `server/routes/`)
+- [ ] **Nonce / Anti-Replay**: Unique nonce per signed request; reject duplicates within TTL window. (`server/routes/verify.js`, `server/routes/upload.js`)
+
+#### 🟠 Medium
+- [ ] **HMAC Request Signing**: B2B API consumers must sign requests with their private key. (`server/middleware/`)
+- [ ] **Abuse Detection**: Flag accounts with bulk failed verifications or excessive upload rates. (`server/utils/abuse.js`)
+- [ ] **IP Blocklist**: Temporary lockout after repeated authentication/verification failures. (`server/middleware/`)
+
+### Phase 9: Identity & PKI
+Focus: Establish verifiable issuer identity with certificate lifecycle management.
+
+#### 🔴 Critical
+- [ ] **Key Registry Table**: Track issued keys with `issuer_id`, `public_key`, `issued_at`, `verified_by`, `revoked_at`. (`server/db/`)
+- [ ] **Business Onboarding Verification**: Admin approval workflow before issuing signing keys. (`server/routes/admin.js`)
+
+#### 🟠 Medium
+- [ ] **Key Revocation Endpoint**: Revoke compromised keys and check revocation status during verification. (`server/routes/admin.js`, `server/routes/verify.js`)
+- [ ] **Certificate Chain in PDFs**: Embed full certificate path in signed exports for cross-platform validation. (`server/utils/signature_engine.js`)
+- [ ] **Audit Trail for PKI Events**: Log all key issuance, revocation, and override decisions on-chain. (`server/utils/processor.js`)
+
 ## Future Milestones (v2+)
 - **Milestone 2**: Digital Sovereignty (PAdES Signatures, KMS).
 - **Milestone 3**: Decentralized Storage (IPFS Integration).

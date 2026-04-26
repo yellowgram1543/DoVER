@@ -3,11 +3,46 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const app = express();
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
 const passport = require('./utils/passport');
 const apiKey = require('./middleware/apiKey');
+const { rateLimit } = require('express-rate-limit');
+const { RedisStore } = require('rate-limit-redis');
+const { createClient } = require('redis');
+const nonceMiddleware = require('./middleware/nonce');
+const db = require('./db/db');
+
+const app = express();
+
+// Redis Client for Rate Limiting
+const redisClient = createClient({ url: process.env.REDIS_URL || 'redis://127.0.0.1:6379' });
+redisClient.connect().catch(console.error);
+
+// Global Rate Limiter: 100 requests per 15 minutes
+const globalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 100,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    validate: { keyGeneratorIpFallback: false },
+    store: new RedisStore({
+        sendCommand: (...args) => redisClient.sendCommand(args),
+    }),
+    handler: (req, res, next, options) => {
+        db.prepare(`INSERT INTO audit_log (document_id, action, actor, details) VALUES (?, ?, ?, ?)`)
+          .run(0, 'RATE_LIMIT_EXCEEDED', req.ip, `Global limit hit: ${req.method} ${req.url}`);
+        res.status(options.statusCode).json({
+            success: false,
+            error: 'Too many requests',
+            message: options.message,
+            retry_after: Math.ceil(options.windowMs / 1000)
+        });
+    }
+});
+
+app.use(globalLimiter);
+app.use(nonceMiddleware);
 
 app.use((req, res, next) => {
   console.log("REQUEST_RECEIVED:", req.method, req.url);
@@ -69,7 +104,6 @@ app.get('*', (req, res) => {
 
 // ── Background Integrity Watcher ──
 // Automatically checks files every 30 seconds to detect tampering
-const db = require('./db/db');
 const hasher = require('./utils/hasher');
 const { getBucket } = require('./db/mongodb');
 
