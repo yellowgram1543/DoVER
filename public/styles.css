@@ -98,5 +98,34 @@ html.dark .bg-primary { background-color: var(--accent) !important; color: #0A19
 html.dark .text-primary { color: var(--text-primary) !important; }
 
 @media (max-width: 768px) {
-    #sidebar.mobile-open { display: flex !important; }
+    #sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: none !important;
+    }
+    #sidebar.mobile-open {
+        display: flex !important;
+        transform: translateX(0);
+        width: 100% !important;
+        position: fixed;
+        inset: 0;
+    }
+    main { margin-left: 0 !important; padding-top: 100px !important; }
+    .result-card { padding: 1rem !important; }
+}
+
+/* ── Verification Journey Animations ── */
+@keyframes journey-pulse {
+    0%, 100% { background-color: rgba(59, 130, 246, 0.05); }
+    50% { background-color: rgba(59, 130, 246, 0.15); }
+}
+.animate-journey-pulse { animation: journey-pulse 2s infinite; }
+
+/* ── Table Responsiveness ── */
+.overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+}
+table {
+    min-width: 800px;
 }

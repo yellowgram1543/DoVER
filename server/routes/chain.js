@@ -4,6 +4,10 @@ const db = require('../db/db');
 const documentQueue = require('../utils/queue');
 const gemini = require('../utils/gemini');
 const report = require('../utils/report');
+const signatureEngine = require('../utils/signature_engine');
+const { getBucket, mongoose } = require('../db/mongodb');
+const fs = require('fs');
+const path = require('path');
 
 /**
  * Helper to check if a user can access a specific document.
@@ -303,6 +307,86 @@ router.get('/document/:id/report', async (req, res) => {
     } catch (error) {
         console.error('[REPORT_ENDPOINT_ERROR]', error);
         res.status(500).json({ success: false, error: 'Failed to generate report: ' + error.message });
+    }
+});
+
+const { PDFDocument } = require('pdf-lib');
+
+/**
+ * Official Certified Document Export (Signed PDF).
+ * Restricted to authorities.
+ */
+router.get('/document/:id/certified', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        
+        // 1. Fetch metadata from SQLite
+        const doc = db.prepare('SELECT * FROM documents WHERE block_index = ?').get(id);
+        if (!doc) {
+            return res.status(404).json({ success: false, error: 'Document not found' });
+        }
+
+        // RBAC: Authority only
+        if (!req.user || req.user.role !== 'authority') {
+            return res.status(403).json({ success: false, error: 'Authority privileges required' });
+        }
+
+        // 2. Fetch original file from GridFS
+        const bucket = getBucket();
+        const storageId = doc.storage_id || doc.filename;
+        
+        if (!mongoose.Types.ObjectId.isValid(storageId)) {
+            throw new Error('Invalid storage ID for certification');
+        }
+
+        const downloadStream = bucket.openDownloadStream(new mongoose.Types.ObjectId(storageId));
+        const chunks = [];
+        for await (const chunk of downloadStream) {
+            chunks.push(chunk);
+        }
+        let fileBuffer = Buffer.concat(chunks);
+
+        // ── Image-to-PDF Conversion (CRITICAL FIX) ──
+        // If the file is an image, we MUST wrap it in a PDF before signing.
+        if (doc.file_type.includes('image') || /jpg|jpeg|png/.test(doc.filename.toLowerCase())) {
+            console.log(`[CERTIFY] Converting ${doc.file_type} to PDF container...`);
+            const pdfDoc = await PDFDocument.create();
+            const image = doc.file_type.includes('png') ? await pdfDoc.embedPng(fileBuffer) : await pdfDoc.embedJpg(fileBuffer);
+            
+            const page = pdfDoc.addPage([image.width, image.height]);
+            page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+            
+            fileBuffer = Buffer.from(await pdfDoc.save());
+        }
+
+        // 3. Prepare Proof Data for embedding
+        const proof = {
+            block_index: doc.block_index,
+            block_hash: doc.block_hash,
+            file_hash: doc.file_hash,
+            timestamp: doc.upload_timestamp,
+            uploaded_by: doc.uploaded_by,
+            forensic_score: doc.forensic_score ? JSON.parse(doc.forensic_score) : null,
+            ocr_hash: doc.ocr_hash,
+            system: 'DoVER Decentralized Vault'
+        };
+
+        // 4. Sign and Certify
+        console.log(`[CERTIFY] Generating signed PDF for Block #${id}...`);
+        const signedBuffer = await signatureEngine.signPdf(fileBuffer, {
+            reason: 'Official Document Certification',
+            location: 'DoVER Digital Vault',
+            proof: proof
+        });
+
+        // 5. Send Result
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename=DoVER_Certified_${id}.pdf`);
+        res.send(signedBuffer);
+
+    } catch (error) {
+        console.error('[CERTIFY_ENDPOINT_ERROR]', error);
+        res.status(500).json({ success: false, error: 'Certification failed: ' + error.message });
     }
 });
 

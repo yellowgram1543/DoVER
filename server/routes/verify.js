@@ -56,6 +56,7 @@ router.get('/public/verify/:hash', async (req, res) => {
             upload_timestamp: doc.upload_timestamp,
             block_index: doc.block_index,
             block_hash: doc.block_hash,
+            ipfs_cid: doc.ipfs_cid, // Added IPFS CID
             is_tampered: doc.is_tampered,
             signature_status: signature_status,
             ocr_similarity_score: doc.ocr_hash ? 100 : null, // Default to 100 for verified blocks
@@ -490,6 +491,13 @@ router.post('/', apiKey, upload.single('file'), async (req, res) => {
 
         if (tmpPath && fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
 
+        // 4.6 Gemini AI Integrity Report
+        let ai_report = null;
+        if (!currentOcrLowConfidence && current_ocr_text !== 'extraction_failed') {
+            console.log('[VERIFY] Generating AI Integrity Report via Gemini...');
+            ai_report = await ocr.generateDocumentSummary(current_ocr_text, verificationResult.forensics || {});
+        }
+
         const merkle_warning = (merkle_valid === false) ? "Merkle proof mismatch (legacy data)" : null;
         const chain_warning = historical_tamper_detected ? `Historical tamper detected in ancestry (Block #${tampered_block_id}). Current version integrity verified independently.` : null;
 
@@ -511,7 +519,8 @@ router.post('/', apiKey, upload.single('file'), async (req, res) => {
             forensic_comparison,
             signature_comparison,
             merkle_warning,
-            chain_warning
+            chain_warning,
+            ai_report // Added Gemini report
         });
 
     } catch (error) {

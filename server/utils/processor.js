@@ -13,6 +13,7 @@ const path = require('path');
 const { getBucket } = require('../db/mongodb');
 const { Worker } = require('worker_threads');
 const { anchorBatch } = require('./polygon');
+const ipfs = require('./ipfs');
 
 /**
  * Helper to run heavy analysis in a separate thread.
@@ -158,11 +159,22 @@ function initProcessor() {
             }
 
             const insertDoc = db.prepare(`
-                INSERT INTO documents (filename, file_type, uploaded_by, uploader_email, department, upload_timestamp, file_hash, prev_hash, block_hash, ocr_text, ocr_hash, forensic_score, signature_score, storage_id, signature, merkle_root, merkle_proof, parent_document_id, version_number, version_note, ai_summary)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO documents (filename, file_type, uploaded_by, uploader_email, department, upload_timestamp, file_hash, prev_hash, block_hash, ocr_text, ocr_hash, forensic_score, signature_score, storage_id, signature, merkle_root, merkle_proof, parent_document_id, version_number, version_note, ai_summary, ipfs_cid)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `);
-            const result = insertDoc.run(originalname, mimetype, uploadedBy, uploaderEmail, department, timestamp, fileHash, prevHash, blockHash, ocrText, ocrHash, forensicScore, signatureScore, gridfsId, documentSignature, merkleRoot, JSON.stringify(merkleProof), parent_document_id, version_number || 1, version_note, aiSummary);
+            const result = insertDoc.run(originalname, mimetype, uploadedBy, uploaderEmail, department, timestamp, fileHash, prevHash, blockHash, ocrText, ocrHash, forensicScore, signatureScore, gridfsId, documentSignature, merkleRoot, JSON.stringify(merkleProof), parent_document_id, version_number || 1, version_note, aiSummary, null);
             const documentId = result.lastInsertRowid;
+
+            // ── Step 4.2: Decentralized Storage (IPFS) ──
+            try {
+                const ipfsCid = await ipfs.uploadFile(filePath);
+                if (ipfsCid) {
+                    db.prepare('UPDATE documents SET ipfs_cid = ? WHERE block_index = ?').run(ipfsCid, documentId);
+                    console.log(`[PROCESSOR] 🌐 Decentralized backup: ${ipfsCid}`);
+                }
+            } catch (ipfsErr) {
+                console.warn('[PROCESSOR] IPFS backup skipped:', ipfsErr.message);
+            }
 
             // ── Step 4.5: Update Global Merkle Root ──
             // The Merkle Root represents the entire chain state; it must be updated globally

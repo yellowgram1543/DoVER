@@ -62,6 +62,47 @@ const API = {
 // ── Auth State ──
 let currentUser = null;
 
+// ── Role State ──
+let currentMode = localStorage.getItem('dover_mode') || 'b2c'; // Default to Citizen
+
+function switchMode(mode) {
+    currentMode = mode;
+    localStorage.setItem('dover_mode', mode);
+    
+    // Update Buttons
+    const btnB2c = document.getElementById('btn-b2c');
+    const btnB2b = document.getElementById('btn-b2b');
+    
+    if (mode === 'b2c') {
+        btnB2c.className = 'flex-1 py-1.5 px-2 rounded-lg text-[10px] font-black uppercase bg-primary text-white shadow-md transition-all';
+        btnB2b.className = 'flex-1 py-1.5 px-2 rounded-lg text-[10px] font-black uppercase text-slate-400 hover:text-slate-600 transition-all';
+    } else {
+        btnB2b.className = 'flex-1 py-1.5 px-2 rounded-lg text-[10px] font-black uppercase bg-primary text-white shadow-md transition-all';
+        btnB2c.className = 'flex-1 py-1.5 px-2 rounded-lg text-[10px] font-black uppercase text-slate-400 hover:text-slate-600 transition-all';
+    }
+
+    updateSidebarUI(currentUser);
+    navigate();
+
+    // Close mobile sidebar after mode switch
+    document.getElementById('sidebar')?.classList.remove('mobile-open');
+}
+
+// ── Mobile Toggle ──
+document.addEventListener('click', e => {
+    const btn = e.target.closest('#mobile-menu-btn');
+    const sidebar = document.getElementById('sidebar');
+    const navLink = e.target.closest('.nav-link');
+
+    if (btn) {
+        sidebar.classList.toggle('mobile-open');
+    } else if (navLink) {
+        sidebar.classList.remove('mobile-open');
+    } else if (sidebar?.classList.contains('mobile-open') && !e.target.closest('#sidebar')) {
+        sidebar.classList.remove('mobile-open');
+    }
+});
+
 async function checkAuth() {
     currentUser = await API.getMe();
     const app = document.getElementById('app');
@@ -78,8 +119,8 @@ async function checkAuth() {
             header.style.display = 'flex';
             updateHeaderUI(header, currentUser);
         }
-        updateSidebarUI(currentUser);
-        navigate();
+        // Initialize Mode UI
+        switchMode(currentMode);
     }
 }
 
@@ -87,25 +128,48 @@ function updateSidebarUI(user) {
     const navLinks = document.getElementById('nav-links');
     if (!navLinks) return;
 
-    // Remove existing admin link if any to avoid duplicates
-    const existingAdminLink = navLinks.querySelector('a[data-page="admin"]');
-    if (existingAdminLink) existingAdminLink.remove();
-
-    if (user.role === 'authority') {
-        const settingsLink = navLinks.querySelector('a[data-page="settings"]');
-        const adminLink = document.createElement('a');
-        adminLink.href = '#admin';
-        adminLink.dataset.page = 'admin';
-        adminLink.className = 'nav-link flex items-center px-4 py-3 mx-2 rounded-lg transition-all group';
-        adminLink.innerHTML = `
-            <span class="material-symbols-outlined mr-3 text-xl">admin_panel_settings</span>
-            <span class="font-medium text-sm">System Admin</span>
+    if (currentMode === 'b2c') {
+        // Citizen Navigation
+        navLinks.innerHTML = `
+            <a href="#dashboard" data-page="dashboard" class="nav-link flex items-center px-4 py-3 mx-2 rounded-lg transition-all group">
+                <span class="material-symbols-outlined mr-3 text-xl">account_balance_wallet</span><span class="font-medium text-sm">My Vault</span>
+            </a>
+            <a href="#upload" data-page="upload" class="nav-link flex items-center px-4 py-3 mx-2 rounded-lg transition-all group">
+                <span class="material-symbols-outlined mr-3 text-xl">add_moderator</span><span class="font-medium text-sm">Secure Personal Doc</span>
+            </a>
+            <a href="#verify" data-page="verify" class="nav-link flex items-center px-4 py-3 mx-2 rounded-lg transition-all group">
+                <span class="material-symbols-outlined mr-3 text-xl">verified_user</span><span class="font-medium text-sm">Quick Verify</span>
+            </a>
+            <a href="#chain" data-page="chain" class="nav-link flex items-center px-4 py-3 mx-2 rounded-lg transition-all group">
+                <span class="material-symbols-outlined mr-3 text-xl">account_tree</span><span class="font-medium text-sm">Global Ledger</span>
+            </a>
         `;
-        
-        // Insert before settings
-        if (settingsLink) {
-            navLinks.insertBefore(adminLink, settingsLink);
-        } else {
+    } else {
+        // Institutional Navigation
+        navLinks.innerHTML = `
+            <a href="#dashboard" data-page="dashboard" class="nav-link flex items-center px-4 py-3 mx-2 rounded-lg transition-all group">
+                <span class="material-symbols-outlined mr-3 text-xl">analytics</span><span class="font-medium text-sm">Admin Dashboard</span>
+            </a>
+            <a href="#upload" data-page="upload" class="nav-link flex items-center px-4 py-3 mx-2 rounded-lg transition-all group">
+                <span class="material-symbols-outlined mr-3 text-xl">upload_file</span><span class="font-medium text-sm">Institutional Upload</span>
+            </a>
+            <a href="#batch" data-page="batch" class="nav-link flex items-center px-4 py-3 mx-2 rounded-lg transition-all group">
+                <span class="material-symbols-outlined mr-3 text-xl">folder_managed</span><span class="font-medium text-sm">Batch Ingestion</span>
+            </a>
+            <a href="#audit" data-page="audit" class="nav-link flex items-center px-4 py-3 mx-2 rounded-lg transition-all group">
+                <span class="material-symbols-outlined mr-3 text-xl">history_edu</span><span class="font-medium text-sm">Compliance Logs</span>
+            </a>
+        `;
+
+        if (user.role === 'authority') {
+            const adminLink = document.createElement('a');
+            adminLink.href = '#admin';
+            adminLink.dataset.page = 'admin';
+            adminLink.className = 'nav-link flex items-center px-4 py-3 mx-2 rounded-lg transition-all group';
+            adminLink.innerHTML = `
+                <span class="material-symbols-outlined mr-3 text-xl">admin_panel_settings</span>
+                <span class="font-medium text-sm">Personnel Control</span>
+            `;
             navLinks.appendChild(adminLink);
         }
     }
@@ -178,9 +242,16 @@ function updateHeaderUI(header, user) {
 function navigate() {
     if (!currentUser) return checkAuth();
     const page = (location.hash.slice(1) || 'dashboard');
+    
+    // Updated selector to match dynamic links
     document.querySelectorAll('.nav-link').forEach(l => {
-        l.classList.toggle('active', l.dataset.page === page);
+        const isPageMatch = l.dataset.page === page || l.getAttribute('href') === `#${page}`;
+        l.classList.toggle('bg-white/60', isPageMatch);
+        l.classList.toggle('dark:bg-white/10', isPageMatch);
+        l.classList.toggle('text-primary', isPageMatch);
+        l.classList.toggle('shadow-sm', isPageMatch);
     });
+
     const app = document.getElementById('app');
     app.innerHTML = '';
     switch (page) {
@@ -253,16 +324,20 @@ function renderStatsBar(container) {
 
 // ── Dashboard Page ──
 function renderDashboard(app) {
-    document.getElementById('page-title').textContent = 'Welcome back, Admin';
+    const isB2b = currentMode === 'b2b';
+    const titleText = isB2b ? 'Institutional Portal' : 'My Personal Vault';
+    const subTitle = isB2b ? 'Corporate Governance & Employee Records' : 'Self-Sovereign Identity & Life Records';
+
+    document.getElementById('page-title').textContent = titleText;
     const wrap = document.createElement('div');
     wrap.className = 'max-w-7xl mx-auto space-y-8 fade-in';
 
     const header = document.createElement('div');
     header.innerHTML = `<div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
-        <div><span class="text-secondary font-bold tracking-widest uppercase text-xs">Overview</span>
-        <h1 class="text-3xl font-extrabold text-primary tracking-tight mt-1">Dashboard Analytics</h1></div>
+        <div><span class="text-secondary font-bold tracking-widest uppercase text-xs">${subTitle}</span>
+        <h1 class="text-3xl font-extrabold text-primary tracking-tight mt-1">${isB2b ? 'Admin Overview' : 'Secure Document Storage'}</h1></div>
         <a href="#upload" class="bg-gradient-to-r from-primary to-primary-container text-on-primary px-6 py-3 rounded-xl font-semibold flex items-center gap-2 shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all">
-            <span class="material-symbols-outlined text-lg">add</span> Upload New Document</a>
+            <span class="material-symbols-outlined text-lg">add</span> ${isB2b ? 'Issue New Certificate' : 'Protect New Document'}</a>
     </div>`;
     wrap.appendChild(header);
     renderStatsBar(wrap);
@@ -330,20 +405,24 @@ function renderUpload(app) {
                                 </div>
                             </div>
                             <div class="space-y-2">
-                                <label class="block text-sm font-semibold text-primary px-1">Department ${currentUser?.department ? '<span class="text-[10px] text-emerald-600 font-black uppercase ml-2 border border-emerald-200 px-1.5 py-0.5 rounded-md">Locked</span>' : ''}</label>
+                                <label class="block text-sm font-semibold text-primary px-1">Document Category</label>
                                 <div class="relative flex items-center">
-                                    <span class="material-symbols-outlined absolute left-3 text-outline text-lg">corporate_fare</span>
-                                    <select id="upload-dept" class="w-full bg-surface pl-10 pr-4 py-3 rounded-xl border-none focus:ring-2 focus:ring-secondary/20 text-on-surface text-sm appearance-none ${currentUser?.department ? 'opacity-70 cursor-not-allowed' : ''}" ${currentUser?.department ? 'disabled' : ''}>
-                                        ${currentUser?.department ? `<option selected>${currentUser.department}</option>` : `
-                                            <option>Executive Office</option>
-                                            <option>Legal & Compliance</option>
-                                            <option>Operations & Logistics</option>
-                                            <option>Human Resources</option>
-                                            <option>Information Technology</option>
-                                            <option>Strategy & Planning</option>
-                                            <option>Finance & Audit</option>
-                                            <option>Public Relations</option>
-                                            <option>Research & Development</option>
+                                    <span class="material-symbols-outlined absolute left-3 text-outline text-lg">category</span>
+                                    <select id="upload-dept" class="w-full bg-surface pl-10 pr-4 py-3 rounded-xl border-none focus:ring-2 focus:ring-secondary/20 text-on-surface text-sm appearance-none">
+                                        ${currentMode === 'b2c' ? `
+                                            <option>Personal Identity (Passport/ID)</option>
+                                            <option>Family Records (Birth/Marriage)</option>
+                                            <option>Financial Assets</option>
+                                            <option>Academic Certificates</option>
+                                            <option>Medical Reports</option>
+                                            <option>Office Records</option>
+                                        ` : `
+                                            <option>Employee Contract</option>
+                                            <option>Personnel ID / KYC</option>
+                                            <option>Payroll & Tax</option>
+                                            <option>Experience Letters</option>
+                                            <option>Non-Disclosure Agreements</option>
+                                            <option>Termination Records</option>
                                         `}
                                     </select>
                                 </div>
@@ -606,27 +685,27 @@ function renderSuccessUI(resultDiv, res) {
         <div class="flex items-center gap-3 mb-4"><span class="material-symbols-outlined text-green-600">verified</span><span class="text-xs font-bold text-green-700 uppercase tracking-widest">Upload Successful</span></div>
         <div class="flex flex-col md:flex-row gap-6 items-start">
             <div class="flex-1">
-                <h4 class="text-lg font-bold text-green-900 mb-2">Document Secured</h4>
+                <h4 class="text-lg font-bold text-green-900 mb-2">${currentMode === 'b2c' ? 'Identity Record Secured' : 'Institutional Certificate Issued'}</h4>
                 <div class="flex items-center gap-2 mb-3">
                     <p class="text-sm text-green-800/70 text-sm">Block Index: <strong>#${res.block_index}</strong></p>
                     <span class="px-2 py-0.5 rounded bg-green-200 text-green-800 text-[10px] font-black uppercase">Version ${res.version_number || 1}</span>
                 </div>
                 <code class="hash-text bg-green-100 px-3 py-2 rounded block text-green-800 mb-2">${res.block_hash}</code>
                 ${res.parent_document_id ? `<p class="text-[10px] font-bold text-green-600 mb-2 uppercase">Supersedes Block #${res.parent_document_id}</p>` : ''}
-                <div class="flex gap-2 mt-4">
-                    <button onclick="renderIntegrityModal(${res.block_index})" class="bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-[10px] uppercase tracking-wider flex items-center gap-2 hover:bg-green-700 transition-colors">
-                        <span class="material-symbols-outlined text-xs">analytics</span> Verify Integrity
-                    </button>
-                    <button onclick="renderDocumentIntelligence(${res.block_index})" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold text-[10px] uppercase tracking-wider flex items-center gap-2 hover:bg-blue-700 transition-colors">
-                        <span class="material-symbols-outlined text-xs">psychology</span> Intelligence
-                    </button>
+                <div class="flex flex-wrap gap-2 mt-4">
+                    <a href="/api/chain/document/${res.block_index}/certified" target="_blank" class="bg-primary text-on-primary px-3 py-1.5 rounded-lg text-[10px] font-black uppercase flex items-center gap-2 hover:opacity-90 transition-all shadow-md">
+                        <span class="material-symbols-outlined text-[14px]">verified</span> Certified PDF
+                    </a>
+                    <a href="/api/verify/${res.block_index}/proof?api_key=${API_KEY}" target="_blank" class="bg-white text-primary px-3 py-1.5 rounded-lg text-[10px] font-black uppercase flex items-center gap-2 hover:bg-slate-50 transition-all border border-primary/20">
+                        <span class="material-symbols-outlined text-[14px]">terminal</span> JSON Proof
+                    </a>
                 </div>
                 ${signatureHtml}
                 ${forensicHtml}
             </div>
-            <div class="bg-white p-2 rounded-lg shadow-sm border border-green-100">
-                <img src="${res.qr_image_base64 || ''}" class="w-32 h-32" alt="Verification QR"/>
-                <p class="text-[10px] text-center mt-1 text-green-600 font-bold">SCAN TO VERIFY</p>
+            <div class="bg-white p-2 rounded-lg shadow-sm border border-green-100 flex-shrink-0">
+                <img src="${res.qr_image_base64 || ''}" class="w-24 h-24" alt="Verification QR"/>
+                <p class="text-[8px] text-center mt-1 text-green-600 font-black tracking-widest">SCAN TO VERIFY</p>
             </div>
         </div>
     </div>`;
@@ -703,19 +782,90 @@ function renderVerify(app) {
     document.getElementById('verify-form').addEventListener('submit', async e => {
         e.preventDefault();
         const btn = document.getElementById('verify-btn');
+        const resultDiv = document.getElementById('verify-result');
+        
         btn.disabled = true;
-        btn.innerHTML = '<span class="material-symbols-outlined animate-spin">progress_activity</span> Verifying...';
+        resultDiv.classList.remove('hidden');
+        
+        // ── Trust Journey Animation ──
+        const steps = [
+            { id: 'hash', label: 'Generating Content Fingerprint', icon: 'fingerprint' },
+            { id: 'vision', label: 'AI Forensic Texture Analysis', icon: 'biotech' },
+            { id: 'ocr', label: 'Multi-Lingual OCR Transcription', icon: 'translate' },
+            { id: 'chain', label: 'Blockchain Ancestry Validation', icon: 'link' },
+            { id: 'gemini', label: 'Gemini Generative AI Audit', icon: 'psychology' }
+        ];
+
+        resultDiv.innerHTML = `
+            <div class="bg-white dark:bg-[#1C2A41] rounded-2xl p-8 border border-slate-100 dark:border-slate-800 shadow-xl space-y-6 fade-in">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-black text-primary dark:text-[#E9C176] uppercase tracking-[0.2em]">System Verification in Progress</h3>
+                    <div class="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                </div>
+                <div class="space-y-4" id="journey-steps">
+                    ${steps.map(s => `
+                        <div id="step-${s.id}" class="flex items-center gap-4 opacity-30 grayscale transition-all duration-500">
+                            <div class="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                                <span class="material-symbols-outlined text-xl text-slate-400">${s.icon}</span>
+                            </div>
+                            <span class="text-xs font-bold text-slate-500">${s.label}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+
+        const updateStep = (id, status = 'loading') => {
+            const el = document.getElementById(`step-${id}`);
+            if (!el) return;
+            el.classList.remove('opacity-30', 'grayscale');
+            const iconWrap = el.querySelector('div');
+            const icon = el.querySelector('span');
+            
+            if (status === 'loading') {
+                iconWrap.className = 'w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center animate-pulse';
+                el.querySelector('span:last-child').className = 'text-xs font-bold text-blue-600';
+            } else {
+                iconWrap.className = 'w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-sm border border-emerald-100';
+                icon.textContent = 'check_circle';
+                el.querySelector('span:last-child').className = 'text-xs font-bold text-slate-700 dark:text-slate-300';
+            }
+        };
+
         const fd = new FormData();
         const docId = document.getElementById('verify-id').value.trim();
         const compareWith = document.getElementById('verify-compare')?.value.trim();
         if (docId) fd.append('document_id', docId);
         if (verifyFile.files.length) fd.append('file', verifyFile.files[0]);
         if (compareWith) fd.append('compare_with', compareWith);
-        try {
-            const res = await API.verify(fd);
-            const r = document.getElementById('verify-result');
-            r.classList.remove('hidden');
 
+        try {
+            // Start the sequence
+            updateStep('hash', 'loading');
+            const resPromise = API.verify(fd);
+            
+            await new Promise(r => setTimeout(r, 800));
+            updateStep('hash', 'done');
+            updateStep('vision', 'loading');
+            
+            await new Promise(r => setTimeout(r, 1200));
+            updateStep('vision', 'done');
+            updateStep('ocr', 'loading');
+
+            await new Promise(r => setTimeout(r, 1000));
+            updateStep('ocr', 'done');
+            updateStep('chain', 'loading');
+
+            const res = await resPromise;
+            
+            updateStep('chain', 'done');
+            updateStep('gemini', 'loading');
+            await new Promise(r => setTimeout(r, 600));
+            updateStep('gemini', 'done');
+
+            // ── Render Final Result ──
+            const r = document.getElementById('verify-result');
+            
             let sigBadge = '';
             if (res.signature_status === 'VERIFIED') {
                 sigBadge = `<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-extrabold uppercase mb-4 shadow-sm border border-emerald-200">
@@ -731,152 +881,108 @@ function renderVerify(app) {
                 </div>`;
             }
 
-            if (res.valid) {
-                r.innerHTML = `<div class="result-card bg-green-50/50 border border-green-200 rounded-xl p-6 relative overflow-hidden fade-in">
-                    <div class="flex items-center gap-3 mb-4"><span class="material-symbols-outlined text-green-600">verified</span><span class="text-xs font-bold text-green-700 uppercase tracking-widest">Status: Valid</span></div>
-                    ${sigBadge}
-                    <h4 class="text-lg font-bold text-green-900 mb-2">Original Document</h4>
-                    <p class="text-[10px] font-black text-emerald-600 uppercase mb-2">Compared against: ${res.uploaded_by || 'Unknown'}'s upload from ${res.upload_timestamp ? new Date(res.upload_timestamp).toLocaleDateString() : 'Original Date'}</p>
-                    <p class="text-sm text-green-800/70 leading-relaxed">Hash matches the registry record.</p>
-                    <code class="hash-text bg-green-100 px-3 py-2 rounded block mt-3 text-green-800 mb-4">${res.file_hash || 'Verified'}</code>
-                    ${res.merkle_root ? `<div class="mb-4 text-[10px] text-slate-500 font-mono bg-slate-50 p-2 rounded border border-slate-100">
-                        <span class="block font-black uppercase text-slate-400 mb-1">Merkle Root Inclusion:</span>
-                        ${res.merkle_root}
-                    </div>` : ''}
-                    ${res.ocr_valid ? '<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-700 text-[10px] font-extrabold uppercase"><span class="material-symbols-outlined text-xs">description</span>Text Content Verified</div>' : ''}
-                </div>`;
-            } else if (res.error) {
-                r.innerHTML = `<div class="result-card bg-yellow-50/50 border border-yellow-200 rounded-xl p-6 fade-in">
-                    <div class="flex items-center gap-3 mb-2"><span class="material-symbols-outlined text-yellow-600">search_off</span><span class="text-xs font-bold text-yellow-700 uppercase">Not Found</span></div>
-                    <p class="text-sm text-yellow-800/70">${res.error}</p></div>`;
-            } else {
-                let ocrDisplay = '';
-                if (res.ocr_change_detected) {
-                    ocrDisplay = `
-                        <div class="mt-6 p-4 bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800/30 rounded-xl">
-                            <div class="flex items-center gap-2 mb-3 text-orange-700 dark:text-orange-400 font-bold text-xs uppercase tracking-wider">
-                                <span class="material-symbols-outlined text-sm">warning</span> Text Content Change Detected via OCR
+            // Gemini AI Section
+            let geminiHtml = '';
+            if (res.ai_report && res.ai_report.status !== 'error') {
+                const ai = res.ai_report;
+                const riskColors = { 'LOW': 'text-emerald-500', 'MEDIUM': 'text-orange-500', 'HIGH': 'text-red-500' };
+                geminiHtml = `
+                    <div class="mt-6 bg-slate-900 rounded-2xl p-6 border border-white/10 shadow-2xl relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                            <span class="material-symbols-outlined text-6xl text-white">psychology</span>
+                        </div>
+                        <div class="relative z-10 space-y-4">
+                            <div class="flex items-center justify-between">
+                                <h5 class="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">Gemini AI Integrity Audit</h5>
+                                <span class="text-[9px] font-black uppercase ${riskColors[ai.risk_assessment?.rating] || 'text-slate-400'}">${ai.risk_assessment?.rating || 'N/A'} Risk Profile</span>
                             </div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div class="bg-white dark:bg-slate-900/50 p-3 rounded border border-orange-100 dark:border-orange-800/20">
-                                    <p class="text-[9px] font-black text-slate-400 uppercase mb-2">Stored Registry Content</p>
-                                    <pre class="text-[10px] text-slate-600 dark:text-slate-400 whitespace-pre-wrap font-mono leading-relaxed">${res.stored_ocr_text || 'None'}</pre>
+                            <p class="text-white text-sm leading-relaxed font-medium">"${ai.summary}"</p>
+                            <div class="grid grid-cols-2 gap-4 pt-2">
+                                <div class="space-y-1">
+                                    <p class="text-[8px] font-black text-slate-500 uppercase">Classification</p>
+                                    <p class="text-xs text-slate-300 font-bold">${ai.classification}</p>
                                 </div>
-                                <div class="bg-orange-100/50 dark:bg-orange-900/20 p-3 rounded border border-orange-200 dark:border-orange-800/20">
-                                    <p class="text-[9px] font-black text-orange-600 dark:text-orange-400 uppercase mb-2">Current File Content</p>
-                                    <pre class="text-[10px] text-orange-900 dark:text-orange-200 whitespace-pre-wrap font-mono leading-relaxed font-bold">${res.ocr_text || 'None'}</pre>
+                                <div class="space-y-1">
+                                    <p class="text-[8px] font-black text-slate-500 uppercase">Parties Detected</p>
+                                    <p class="text-xs text-slate-300 font-bold truncate">${ai.entities?.parties?.[0] || 'Unknown'}</p>
                                 </div>
                             </div>
-                        </div>
-                    `;
-                }
-
-                let forensicDiff = '';
-                if (res.forensic_comparison) {
-                    const fc = res.forensic_comparison;
-                    forensicDiff = `
-                        <div class="mt-4 p-4 bg-slate-100 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
-                            <div class="flex items-center gap-2 mb-2 text-slate-700 dark:text-slate-300 font-bold text-xs uppercase">
-                                <span class="material-symbols-outlined text-sm">analytics</span> Forensic Technical Comparison
-                            </div>
-                            <div class="flex gap-4 text-[10px] font-medium text-slate-500">
-                                <span>Font Score Diff: <strong class="${fc.font_diff>10?'text-orange-500':''}">${fc.font_diff}</strong></span>
-                                <span>Alignment Score Diff: <strong class="${fc.align_diff>10?'text-orange-500':''}">${fc.align_diff}</strong></span>
-                            </div>
-                            ${fc.new_flags.length ? `<p class="text-[9px] mt-2 text-red-500 font-bold uppercase">New Forensic Flags Detected: ${fc.new_flags.join(', ')}</p>` : ''}
-                        </div>
-                    `;
-                }
-
-                let signatureDiff = '';
-                if (res.signature_comparison) {
-                    const sc = res.signature_comparison;
-                    if (sc.status_change) {
-                        signatureDiff = `
-                            <div class="mt-4 p-4 bg-emerald-50 dark:bg-emerald-900/10 rounded-xl border border-emerald-200 dark:border-emerald-800/30">
-                                <div class="flex items-center gap-2 mb-2 text-emerald-700 dark:text-emerald-400 font-bold text-xs uppercase">
-                                    <span class="material-symbols-outlined text-sm">history_edu</span> Authorization Status Mismatch
-                                </div>
-                                <div class="text-[10px] text-emerald-800 dark:text-emerald-300">
-                                    <p>Registry: <strong>${sc.original_had_signature?'Signed':'No Signature'}</strong> | <strong>${sc.original_had_seal?'Sealed':'No Seal'}</strong></p>
-                                    <p>Current: <strong>${sc.current_has_signature?'Signed':'No Signature'}</strong> | <strong>${sc.current_has_seal?'Sealed':'No Seal'}</strong></p>
-                                </div>
-                            </div>
-                        `;
-                    }
-                }
-
-                const reasons = res.tamper_reasons ? res.tamper_reasons.map(r => `<li class="flex items-center gap-2 text-red-800/80"><span class="w-1.5 h-1.5 rounded-full bg-red-400"></span> ${r}</li>`).join('') : '';
-                const blockId = res.document_id || res.block_index || 'N/A';
-
-                const chainWarning = res.chain_warning ? `
-                    <div class="bg-orange-50 border border-orange-100 p-4 rounded-lg my-4 flex gap-3">
-                        <span class="material-symbols-outlined text-orange-500">warning</span>
-                        <div>
-                            <p class="text-[10px] font-black text-orange-700 uppercase mb-1">Historical Integrity Warning</p>
-                            <p class="text-[10px] text-orange-800/80 leading-tight">${res.chain_warning}</p>
-                        </div>
-                    </div>
-                ` : '';
-
-                // Technical Integrity Specs
-                const specs = `
-                    <div class="mt-4 grid grid-cols-2 gap-3">
-                        <div class="bg-white/40 border border-red-100 p-3 rounded-lg">
-                            <p class="text-[8px] font-black text-slate-400 uppercase mb-1">File Hash Match</p>
-                            <p class="text-xs font-bold ${res.tamper_reasons.includes('File hash mismatch') ? 'text-red-500' : 'text-emerald-600'}">
-                                ${res.tamper_reasons.includes('File hash mismatch') ? 'FAILED' : 'SUCCESS (MATCH)'}
-                            </p>
-                        </div>
-                        <div class="bg-white/40 border border-red-100 p-3 rounded-lg">
-                            <p class="text-[8px] font-black text-slate-400 uppercase mb-1">OCR Similarity</p>
-                            <p class="text-xs font-bold ${res.ocr_tampered ? 'text-red-500' : 'text-emerald-600'}">
-                                ${res.ocr_similarity_score !== null ? res.ocr_similarity_score.toFixed(2) + '%' : 'SKIPPED'}
-                            </p>
-                        </div>
-                        <div class="bg-white/40 border border-red-100 p-3 rounded-lg">
-                            <p class="text-[8px] font-black text-slate-400 uppercase mb-1">Forensic Status</p>
-                            <p class="text-xs font-bold ${res.tamper_reasons.includes('Forensic analysis detected modifications') ? 'text-red-500' : 'text-emerald-600'}">
-                                ${res.tamper_reasons.includes('Forensic analysis detected modifications') ? 'SUSPICIOUS' : 'CLEAN'}
-                            </p>
-                        </div>
-                        <div class="bg-white/40 border border-red-100 p-3 rounded-lg">
-                            <p class="text-[8px] font-black text-slate-400 uppercase mb-1">Signature Valid</p>
-                            <p class="text-xs font-bold ${res.signature_status === 'VERIFIED' ? 'text-emerald-600' : 'text-red-500'}">
-                                ${res.signature_status === 'VERIFIED' ? 'YES' : 'NO/INVALID'}
-                            </p>
                         </div>
                     </div>
                 `;
+            }
 
-                r.innerHTML = `<div class="result-card ${res.status === 'tampered' ? 'bg-red-50/50 border border-red-200' : 'bg-emerald-50/50 border border-emerald-200'} rounded-xl p-6 relative overflow-hidden fade-in">
-                    <div class="flex items-center gap-3 mb-4">
-                        <span class="material-symbols-outlined ${res.status === 'tampered' ? 'text-red-600' : 'text-emerald-600'}">${res.status === 'tampered' ? 'error' : 'verified'}</span>
-                        <span class="text-xs font-bold ${res.status === 'tampered' ? 'text-red-700' : 'text-emerald-700'} uppercase tracking-widest">Status: ${res.status}</span>
+            const reasons = res.tamper_reasons ? res.tamper_reasons.map(r => `<li class="flex items-center gap-2 text-red-800/80"><span class="w-1.5 h-1.5 rounded-full bg-red-400"></span> ${r}</li>`).join('') : '';
+            const blockId = res.document_id || res.block_index || 'N/A';
+
+            const chainWarning = res.chain_warning ? `
+                <div class="bg-orange-50 border border-orange-100 p-4 rounded-lg my-4 flex gap-3">
+                    <span class="material-symbols-outlined text-orange-500">warning</span>
+                    <div>
+                        <p class="text-[10px] font-black text-orange-700 uppercase mb-1">Historical Integrity Warning</p>
+                        <p class="text-[10px] text-orange-800/80 leading-tight">${res.chain_warning}</p>
                     </div>
-                    ${sigBadge}
-                    <h4 class="text-lg font-bold ${res.status === 'tampered' ? 'text-red-900' : 'text-emerald-900'} mb-2">${res.status === 'tampered' ? 'Deep Verification Failed' : 'Document Verified'}</h4>
-                    <p class="text-[10px] font-black ${res.status === 'tampered' ? 'text-red-600' : 'text-emerald-600'} uppercase mb-2">Reference: Block #${blockId}</p>
-                    <p class="text-sm ${res.status === 'tampered' ? 'text-red-800/70' : 'text-emerald-800/70'} leading-relaxed mb-4">
-                        ${res.status === 'tampered' ? 'System has detected unauthorized modifications via multi-layered analysis.' : 'Multi-layered analysis confirms the integrity of this document version.'}
-                    </p>
-                    
-                    ${chainWarning}
-                    ${specs}
+                </div>
+            ` : '';
 
-                    ${reasons ? `<div class="bg-white/50 p-4 rounded-lg border border-red-100 my-4">
-                        <p class="text-[9px] font-black text-red-400 uppercase mb-2">Tamper Reasons Identified:</p>
-                        <ul class="space-y-1 text-xs">${reasons}</ul>
-                    </div>` : ''}
+            // Technical Integrity Specs
+            const specs = `
+                <div class="mt-4 grid grid-cols-2 gap-3">
+                    <div class="bg-white/40 border border-slate-200/50 p-3 rounded-lg">
+                        <p class="text-[8px] font-black text-slate-400 uppercase mb-1">File Hash Match</p>
+                        <p class="text-xs font-bold ${res.tamper_reasons.includes('File hash mismatch') ? 'text-red-500' : 'text-emerald-600'}">
+                            ${res.tamper_reasons.includes('File hash mismatch') ? 'FAILED' : 'SUCCESS (MATCH)'}
+                        </p>
+                    </div>
+                    <div class="bg-white/40 border border-slate-200/50 p-3 rounded-lg">
+                        <p class="text-[8px] font-black text-slate-400 uppercase mb-1">OCR Similarity</p>
+                        <p class="text-xs font-bold ${res.ocr_tampered ? 'text-red-500' : 'text-emerald-600'}">
+                            ${res.ocr_similarity_score !== null ? res.ocr_similarity_score.toFixed(2) + '%' : 'SKIPPED'}
+                        </p>
+                    </div>
+                    <div class="bg-white/40 border border-slate-200/50 p-3 rounded-lg">
+                        <p class="text-[8px] font-black text-slate-400 uppercase mb-1">Forensic Status</p>
+                        <p class="text-xs font-bold ${res.tamper_reasons.includes('Forensic analysis detected modifications') ? 'text-red-500' : 'text-emerald-600'}">
+                            ${res.tamper_reasons.includes('Forensic analysis detected modifications') ? 'SUSPICIOUS' : 'CLEAN'}
+                        </p>
+                    </div>
+                    <div class="bg-white/40 border border-slate-200/50 p-3 rounded-lg">
+                        <p class="text-[8px] font-black text-slate-400 uppercase mb-1">Signature Valid</p>
+                        <p class="text-xs font-bold ${res.signature_status === 'VERIFIED' ? 'text-emerald-600' : 'text-red-500'}">
+                            ${res.signature_status === 'VERIFIED' ? 'YES' : 'NO/INVALID'}
+                        </p>
+                    </div>
+                </div>
+            `;
 
+            r.innerHTML = `<div class="result-card ${res.status === 'tampered' ? 'bg-red-50/50 border border-red-200' : 'bg-emerald-50/50 border border-emerald-200'} rounded-xl p-8 relative overflow-hidden fade-in shadow-2xl">
+                <div class="flex items-center gap-3 mb-4">
+                    <span class="material-symbols-outlined ${res.status === 'tampered' ? 'text-red-600' : 'text-emerald-600'}">${res.status === 'tampered' ? 'error' : 'verified'}</span>
+                    <span class="text-xs font-bold ${res.status === 'tampered' ? 'text-red-700' : 'text-emerald-700'} uppercase tracking-widest">Verification Verdict</span>
+                </div>
+                ${sigBadge}
+                <h4 class="text-2xl font-black ${res.status === 'tampered' ? 'text-red-900' : 'text-emerald-900'} mb-2">${res.status === 'tampered' ? 'TAMPERED / FAKE' : 'AUTHENTIC RECORD'}</h4>
+                <p class="text-[10px] font-black ${res.status === 'tampered' ? 'text-red-600' : 'text-emerald-600'} uppercase mb-4">Block Reference: #${blockId}</p>
+                
+                ${chainWarning}
+                ${geminiHtml}
+                ${specs}
+
+                ${reasons ? `<div class="bg-white/50 p-4 rounded-lg border border-red-100 my-6">
+                    <p class="text-[9px] font-black text-red-400 uppercase mb-2">Failure Reasons:</p>
+                    <ul class="space-y-1 text-xs">${reasons}</ul>
+                </div>` : ''}
+
+                <div class="mt-8 pt-6 border-t border-slate-200/50">
                     ${ocrDisplay}
                     ${forensicDiff}
                     ${signatureDiff}
-                </div>`;
-            }
+                </div>
+            </div>`;
+
         } catch (err) {
-            const r = document.getElementById('verify-result'); r.classList.remove('hidden');
-            r.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-xl p-6 fade-in"><p class="text-red-700 text-sm">Network error.</p></div>`;
+            console.error(err);
+            resultDiv.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-xl p-6 fade-in"><p class="text-red-700 text-sm">System Error: Failed to complete verification journey.</p></div>`;
         }
         btn.disabled = false;
         btn.innerHTML = '<span>Verify Authenticity</span><span class="material-symbols-outlined">shield_with_heart</span>';
@@ -976,8 +1082,11 @@ function loadChain(silent = false) {
                 <td class="px-6 py-5 text-sm font-semibold text-primary">
                     ${fname}
                     <div class="mt-1 flex flex-wrap gap-2">
+                        <a href="/api/chain/document/${d.block_index}/certified" target="_blank" class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-primary hover:text-primary-container transition-colors">
+                            <span class="material-symbols-outlined text-[12px]">verified</span> Certified PDF
+                        </a>
                         <a href="/api/verify/${d.block_index}/proof?api_key=${API_KEY}" target="_blank" class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-secondary hover:text-primary-container transition-colors">
-                            <span class="material-symbols-outlined text-[12px]">download</span> Download Proof
+                            <span class="material-symbols-outlined text-[12px]">download</span> JSON Proof
                         </a>
                         <button onclick="showVersionHistory(${d.block_index})" class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-blue-600 hover:text-blue-800 transition-colors">
                             <span class="material-symbols-outlined text-[12px]">history</span> View Versions
@@ -995,6 +1104,14 @@ function loadChain(silent = false) {
                         <span class="text-[8px] font-black text-slate-400 uppercase">Block Hash:</span>
                         <code class="text-[10px] font-mono bg-slate-100 px-2 py-0.5 rounded text-slate-600">${d.block_hash.slice(0,16)}...</code>
                     </div>
+                    ${d.ipfs_cid ? `
+                    <div class="flex items-center gap-2">
+                        <span class="text-[8px] font-black text-blue-400 uppercase">IPFS Node:</span>
+                        <a href="https://ipfs.io/ipfs/${d.ipfs_cid}" target="_blank" class="text-[10px] font-mono text-blue-600 hover:underline">
+                            ${d.ipfs_cid.slice(0,12)}...
+                        </a>
+                    </div>
+                    ` : ''}
                     ${d.merkle_root ? `
                     <div class="flex items-center gap-2">
                         <span class="text-[8px] font-black text-emerald-400 uppercase">Merkle Root:</span>
@@ -1244,20 +1361,24 @@ function renderBatch(app) {
                         </div>
                     </div>
                     <div class="space-y-2">
-                        <label class="block text-sm font-semibold text-primary px-1">Department ${currentUser?.department ? '<span class="text-[10px] text-emerald-600 font-black uppercase ml-2 border border-emerald-200 px-1.5 py-0.5 rounded-md">Locked</span>' : ''}</label>
+                        <label class="block text-sm font-semibold text-primary px-1">Document Category</label>
                         <div class="relative flex items-center">
-                            <span class="material-symbols-outlined absolute left-3 text-outline text-lg">corporate_fare</span>
-                            <select id="batch-dept" class="w-full bg-surface pl-10 pr-4 py-3 rounded-xl border border-outline-variant/30 focus:ring-2 focus:ring-secondary/20 text-on-surface text-sm appearance-none ${currentUser?.department ? 'opacity-70 cursor-not-allowed' : ''}" ${currentUser?.department ? 'disabled' : ''}>
-                                ${currentUser?.department ? `<option selected>${currentUser.department}</option>` : `
-                                    <option>Executive Office</option>
-                                    <option>Legal & Compliance</option>
-                                    <option>Operations & Logistics</option>
-                                    <option>Human Resources</option>
-                                    <option>Information Technology</option>
-                                    <option>Strategy & Planning</option>
-                                    <option>Finance & Audit</option>
-                                    <option>Public Relations</option>
-                                    <option>Research & Development</option>
+                            <span class="material-symbols-outlined absolute left-3 text-outline text-lg">category</span>
+                            <select id="batch-dept" class="w-full bg-surface pl-10 pr-4 py-3 rounded-xl border border-outline-variant/30 focus:ring-2 focus:ring-secondary/20 text-on-surface text-sm appearance-none">
+                                ${currentMode === 'b2c' ? `
+                                    <option>Personal Identity (Passport/ID)</option>
+                                    <option>Family Records (Birth/Marriage)</option>
+                                    <option>Financial Assets</option>
+                                    <option>Academic Certificates</option>
+                                    <option>Medical Reports</option>
+                                    <option>Office Records</option>
+                                ` : `
+                                    <option>Employee Contract</option>
+                                    <option>Personnel ID / KYC</option>
+                                    <option>Payroll & Tax</option>
+                                    <option>Experience Letters</option>
+                                    <option>Non-Disclosure Agreements</option>
+                                    <option>Termination Records</option>
                                 `}
                             </select>
                         </div>
