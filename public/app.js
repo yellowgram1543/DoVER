@@ -809,14 +809,62 @@ function renderVerify(app) {
                 const reasons = res.tamper_reasons ? res.tamper_reasons.map(r => `<li class="flex items-center gap-2 text-red-800/80"><span class="w-1.5 h-1.5 rounded-full bg-red-400"></span> ${r}</li>`).join('') : '';
                 const blockId = res.document_id || res.block_index || 'N/A';
 
-                r.innerHTML = `<div class="result-card bg-red-50/50 border border-red-200 rounded-xl p-6 relative overflow-hidden fade-in">
-                    <div class="flex items-center gap-3 mb-4"><span class="material-symbols-outlined text-red-600">error</span><span class="text-xs font-bold text-red-700 uppercase tracking-widest">Status: Tampered</span></div>
+                const chainWarning = res.chain_warning ? `
+                    <div class="bg-orange-50 border border-orange-100 p-4 rounded-lg my-4 flex gap-3">
+                        <span class="material-symbols-outlined text-orange-500">warning</span>
+                        <div>
+                            <p class="text-[10px] font-black text-orange-700 uppercase mb-1">Historical Integrity Warning</p>
+                            <p class="text-[10px] text-orange-800/80 leading-tight">${res.chain_warning}</p>
+                        </div>
+                    </div>
+                ` : '';
+
+                // Technical Integrity Specs
+                const specs = `
+                    <div class="mt-4 grid grid-cols-2 gap-3">
+                        <div class="bg-white/40 border border-red-100 p-3 rounded-lg">
+                            <p class="text-[8px] font-black text-slate-400 uppercase mb-1">File Hash Match</p>
+                            <p class="text-xs font-bold ${res.tamper_reasons.includes('File hash mismatch') ? 'text-red-500' : 'text-emerald-600'}">
+                                ${res.tamper_reasons.includes('File hash mismatch') ? 'FAILED' : 'SUCCESS (MATCH)'}
+                            </p>
+                        </div>
+                        <div class="bg-white/40 border border-red-100 p-3 rounded-lg">
+                            <p class="text-[8px] font-black text-slate-400 uppercase mb-1">OCR Similarity</p>
+                            <p class="text-xs font-bold ${res.ocr_tampered ? 'text-red-500' : 'text-emerald-600'}">
+                                ${res.ocr_similarity_score !== null ? res.ocr_similarity_score.toFixed(2) + '%' : 'SKIPPED'}
+                            </p>
+                        </div>
+                        <div class="bg-white/40 border border-red-100 p-3 rounded-lg">
+                            <p class="text-[8px] font-black text-slate-400 uppercase mb-1">Forensic Status</p>
+                            <p class="text-xs font-bold ${res.tamper_reasons.includes('Forensic analysis detected modifications') ? 'text-red-500' : 'text-emerald-600'}">
+                                ${res.tamper_reasons.includes('Forensic analysis detected modifications') ? 'SUSPICIOUS' : 'CLEAN'}
+                            </p>
+                        </div>
+                        <div class="bg-white/40 border border-red-100 p-3 rounded-lg">
+                            <p class="text-[8px] font-black text-slate-400 uppercase mb-1">Signature Valid</p>
+                            <p class="text-xs font-bold ${res.signature_status === 'VERIFIED' ? 'text-emerald-600' : 'text-red-500'}">
+                                ${res.signature_status === 'VERIFIED' ? 'YES' : 'NO/INVALID'}
+                            </p>
+                        </div>
+                    </div>
+                `;
+
+                r.innerHTML = `<div class="result-card ${res.status === 'tampered' ? 'bg-red-50/50 border border-red-200' : 'bg-emerald-50/50 border border-emerald-200'} rounded-xl p-6 relative overflow-hidden fade-in">
+                    <div class="flex items-center gap-3 mb-4">
+                        <span class="material-symbols-outlined ${res.status === 'tampered' ? 'text-red-600' : 'text-emerald-600'}">${res.status === 'tampered' ? 'error' : 'verified'}</span>
+                        <span class="text-xs font-bold ${res.status === 'tampered' ? 'text-red-700' : 'text-emerald-700'} uppercase tracking-widest">Status: ${res.status}</span>
+                    </div>
                     ${sigBadge}
-                    <h4 class="text-lg font-bold text-red-900 mb-2">Deep Verification Failed</h4>
-                    <p class="text-[10px] font-black text-red-600 uppercase mb-2">Reference: Block #${blockId}</p>
-                    <p class="text-sm text-red-800/70 leading-relaxed mb-4">System has detected unauthorized modifications via multi-layered analysis.</p>
+                    <h4 class="text-lg font-bold ${res.status === 'tampered' ? 'text-red-900' : 'text-emerald-900'} mb-2">${res.status === 'tampered' ? 'Deep Verification Failed' : 'Document Verified'}</h4>
+                    <p class="text-[10px] font-black ${res.status === 'tampered' ? 'text-red-600' : 'text-emerald-600'} uppercase mb-2">Reference: Block #${blockId}</p>
+                    <p class="text-sm ${res.status === 'tampered' ? 'text-red-800/70' : 'text-emerald-800/70'} leading-relaxed mb-4">
+                        ${res.status === 'tampered' ? 'System has detected unauthorized modifications via multi-layered analysis.' : 'Multi-layered analysis confirms the integrity of this document version.'}
+                    </p>
                     
-                    ${reasons ? `<div class="bg-white/50 p-4 rounded-lg border border-red-100 mb-4">
+                    ${chainWarning}
+                    ${specs}
+
+                    ${reasons ? `<div class="bg-white/50 p-4 rounded-lg border border-red-100 my-4">
                         <p class="text-[9px] font-black text-red-400 uppercase mb-2">Tamper Reasons Identified:</p>
                         <ul class="space-y-1 text-xs">${reasons}</ul>
                     </div>` : ''}

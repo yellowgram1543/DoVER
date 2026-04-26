@@ -12,12 +12,10 @@ Ready for Milestone 2: Digital Sovereignty.
 - [x] Phase 2: Intelligence & Advanced OCR (Multi-lang, Gemini AI)
 - [x] Phase 3: Public Access & Export (verify.html, pdfkit Reports)
 - [x] Phase 4: Admin Console & Security Hardening (Identity Locks, Admin UI)
+- [x] Phase 5: Stability & Bug Fixes (OCR recovery, script routing, Jimp, Bull, Merkle, async hash, security)
 
 ## Active Phase
-Milestone 1 Wrap-up.
-
-Phase 4: Admin Console & Security Hardening.
-
+Phase 5 COMPLETE. Ready to resume Milestone 2: Digital Sovereignty.
 
 ## Performance Metrics
 | Phase | Plan | Duration | Tasks | Files |

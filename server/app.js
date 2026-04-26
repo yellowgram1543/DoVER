@@ -14,12 +14,12 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(cors());
+app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:3000', credentials: true }));
 app.use(express.json());
 
 // Session Configuration
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'dover_vault_secret',
+    secret: process.env.SESSION_SECRET || (() => { console.warn('[SECURITY] SESSION_SECRET not set! Using random ephemeral key.'); return require('crypto').randomBytes(32).toString('hex'); })(),
     resave: false,
     saveUninitialized: false,
     store: (MongoStore.create || MongoStore.default.create)({
@@ -105,20 +105,30 @@ setInterval(async () => {
                     writeStream.on('error', reject);
                 });
 
-                const verification = hasher.verifyDocument(doc.block_index, db, tmpPath);
+                const verification = await hasher.verifyDocumentAsync(doc.block_index, db, tmpPath);
                 if (!verification.valid) {
                     db.prepare('UPDATE documents SET is_tampered = 1 WHERE block_index = ?').run(doc.block_index);
                     db.prepare(`INSERT INTO audit_log (document_id, action, actor, details) VALUES (?, ?, ?, ?)`)
                       .run(doc.block_index, 'TAMPER_DETECTED', 'BG_WATCHER', `Automated sweep detected file modification.`);
                 }
                 
-                if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+                if (fs.existsSync(tmpPath)) {
+                    try {
+                        fs.unlinkSync(tmpPath);
+                    } catch (e) {
+                        // On Windows, files are often locked briefly. Silent fallback.
+                    }
+                }
             } catch (err) {
                 // If file is missing in GridFS, it's a real tamper/deletion
                 if (err.code !== 'ENOENT') {
                     console.error(`[BG_WATCHER] Error verifying block #${doc.block_index}:`, err.message);
                 }
-                if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+                if (fs.existsSync(tmpPath)) {
+                    try {
+                        fs.unlinkSync(tmpPath);
+                    } catch (e) {}
+                }
             }
         }
     } catch (e) {

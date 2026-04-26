@@ -11,7 +11,8 @@ class WorkerPool {
         this.workers = {
             eng: null,
             hin: null,
-            indic: null
+            indic: null,
+            ara: null
         };
         this.initialized = false;
         this.initializing = false;
@@ -23,16 +24,25 @@ class WorkerPool {
     async init() {
         if (this.initialized || this.initializing) return;
         this.initializing = true;
-        console.log('[OCR] Initializing worker pool (eng, hin, kan+tam)...');
+        console.log('[OCR] Initializing worker pool (eng, hin, kan+tam, ara)...');
         try {
+            const commonParams = { user_defined_dpi: '300' };
+
             // engWorker
             this.workers.eng = await Tesseract.createWorker('eng');
+            await this.workers.eng.setParameters(commonParams);
             
             // hinWorker
             this.workers.hin = await Tesseract.createWorker('hin');
+            await this.workers.hin.setParameters(commonParams);
             
             // indicWorker (Kannada + Tamil)
             this.workers.indic = await Tesseract.createWorker('kan+tam');
+            await this.workers.indic.setParameters(commonParams);
+
+            // araWorker (Arabic)
+            this.workers.ara = await Tesseract.createWorker('ara');
+            await this.workers.ara.setParameters(commonParams);
             
             this.initialized = true;
             console.log('[OCR] Worker pool ready.');
@@ -45,32 +55,78 @@ class WorkerPool {
 
     /**
      * Returns the appropriate worker for the given language tag.
-     * @param {string} lang - 'eng', 'hin', or 'indic'.
+     * @param {string} lang - 'eng', 'hin', 'indic', or 'ara'.
      */
     async getWorker(lang) {
-        if (!this.initialized) await this.init();
+        if (!this.initialized) {
+            if (this.initializing) {
+                // Wait for initialization to finish
+                while (this.initializing) {
+                    await new Promise(r => setTimeout(r, 200));
+                }
+            } else {
+                await this.init();
+            }
+        }
         return this.workers[lang] || this.workers.eng;
+    }
+
+    /**
+     * Terminates and recreates a specific worker if it hangs or errors.
+     */
+    async recycleWorker(lang) {
+        console.log(`[OCR] Recycling ${lang}Worker due to timeout or failure...`);
+        const workerKey = this.workers[lang] ? lang : 'eng';
+        try {
+            if (this.workers[workerKey]) {
+                await this.workers[workerKey].terminate();
+            }
+        } catch (e) {
+            console.error(`[OCR] Error terminating ${workerKey}Worker:`, e.message);
+        }
+
+        try {
+            const langMap = { eng: 'eng', hin: 'hin', indic: 'kan+tam', ara: 'ara' };
+            this.workers[workerKey] = await Tesseract.createWorker(langMap[workerKey]);
+            await this.workers[workerKey].setParameters({ user_defined_dpi: '300' });
+            console.log(`[OCR] ${workerKey}Worker recycled successfully.`);
+        } catch (error) {
+            console.error(`[OCR] ${workerKey}Worker recycling failed:`, error.message);
+            this.workers[workerKey] = null; // Mark for retry next time
+        }
     }
 }
 
 const pool = new WorkerPool();
 
 /**
+ * Helper to run a promise with a timeout.
+ */
+async function withTimeout(promise, ms, label = 'Operation') {
+    let timeoutId;
+    const timeout = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
+}
+
+/**
  * Performs Orientation and Script Detection (OSD) to identify the primary script.
  * @param {string} filePath - Path to image file.
  * @returns {Promise<string>} - Detected script (e.g., 'Latin', 'Devanagari', 'Kannada', 'Tamil').
  */
-async function detectScript(filePath) {
+async function detectScript(imageSource) {
     let osdWorker = null;
     try {
-        // OSD requires legacyCore and legacyLang in Tesseract.js v5+ for .detect()
-        // OEM 0 is Legacy, which is required for OSD.
         osdWorker = await Tesseract.createWorker('osd', 0, {
             legacyCore: true,
             legacyLang: true,
             logger: m => {}
         });
-        const { data } = await osdWorker.detect(filePath);
+        // Fix for 0 DPI warning in OSD
+        await osdWorker.setParameters({ user_defined_dpi: '300' });
+        
+        const { data } = await withTimeout(osdWorker.detect(imageSource), 15000, 'OSD detection');
         await osdWorker.terminate();
         return data.script || 'Latin';
     } catch (error) {
@@ -85,62 +141,123 @@ async function detectScript(filePath) {
 /**
  * Extracts text from an image with script detection and worker routing.
  * @param {string} filePath - Absolute path to the file.
- * @returns {Promise<string>} - Extracted text.
+ * @returns {Promise<Object>} - OCR results { text, confidence, lowConfidence }.
  */
 async function extractText(filePath) {
-    let tempPath = '';
+    const OCR_TIMEOUT = 45000;
+
     try {
-        if (!fs.existsSync(filePath)) return '';
+        if (!fs.existsSync(filePath)) return { text: '', confidence: 0, lowConfidence: true };
 
         // 1. Pre-process for better OCR
         const image = await Jimp.read(filePath);
+        
+        // Handle tiny images
+        if (image.width < 100 || image.height < 100) {
+            console.log(`[OCR] Tiny image detected (${image.width}x${image.height}), padding to 100x100`);
+            image.background = 0xFFFFFFFF;
+            image.contain({
+                w: Math.max(100, image.width),
+                h: Math.max(100, image.height)
+            });
+        }
+
         image.greyscale();
         image.contrast(0.8);
         image.brightness(0.1);
         image.normalize();
-        image.scale(2);
-        
-        tempPath = path.join(path.dirname(filePath), 'temp_poly_' + Date.now() + '_' + path.basename(filePath));
-        await image.write(tempPath);
 
-        // 2. Detect Script
-        const script = await detectScript(tempPath);
+        // 2. Intelligent Scaling: Only scale if image is not already large
+        // Huge images (like 3024x4032) don't need scaling and can crash Leptonica if scaled 2x.
+        if (image.width < 1500 && image.height < 1500) {
+            image.scale(2);
+        }
+        
+        // 3. Convert to Buffer to avoid Jimp v1 file-write and metadata quirks
+        const imageBuffer = await image.getBuffer('image/png');
+
+        // 4. Detect Script
+        const script = await detectScript(imageBuffer);
         console.log(`[OCR] Detected script: ${script} for ${path.basename(filePath)}`);
 
-        // 3. Route to specialized worker
-        let workerKey = 'eng';
-        if (script === 'Devanagari') workerKey = 'hin';
-        else if (script === 'Kannada' || script === 'Tamil') workerKey = 'indic';
+        // 5. Route to specialized worker
+        const SUPPORTED_SCRIPTS = {
+            'Latin': 'eng',
+            'Devanagari': 'hin',
+            'Kannada': 'indic',
+            'Tamil': 'indic',
+            'Arabic': 'ara'
+        };
+        let workerKey = SUPPORTED_SCRIPTS[script] || 'eng';
+        if (!SUPPORTED_SCRIPTS[script]) {
+            console.warn(`[OCR] Unsupported script "${script}" detected — falling back to engWorker.`);
+        }
         
         console.log(`[OCR] Routing to ${workerKey}Worker`);
         const worker = await pool.getWorker(workerKey);
         
-        const { data: { text, confidence } } = await worker.recognize(tempPath);
+        // Ensure DPI is set right before recognition
+        await worker.setParameters({ user_defined_dpi: '300' });
+        
+        let recognitionResult;
+        try {
+            recognitionResult = await withTimeout(worker.recognize(imageBuffer), OCR_TIMEOUT, `${workerKey} recognition`);
+        } catch (recognizeError) {
+            console.error(`[OCR] ${workerKey}Worker failed:`, recognizeError.message);
+            if (recognizeError.message.includes('timed out')) {
+                pool.recycleWorker(workerKey).catch(() => {});
+            }
+            throw recognizeError;
+        }
 
-        // 4. Cleanup
-        if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+        const { data: { text, confidence } } = recognitionResult;
+        const isLowConfidence = confidence < 20 || (text.trim().length < 5 && confidence < 50);
 
-        // 5. Fallback if specialized worker had low confidence
+        // 6. Fallback if specialized worker had low confidence
         if (confidence < 30 && workerKey !== 'eng') {
             console.log(`[OCR] Low confidence (${confidence}), falling back to engWorker`);
             const engWorker = await pool.getWorker('eng');
-            const { data: { text: engText } } = await engWorker.recognize(filePath);
-            return engText || text || '';
+            
+            let engResult;
+            try {
+                await engWorker.setParameters({ user_defined_dpi: '300' });
+                engResult = await withTimeout(engWorker.recognize(imageBuffer), OCR_TIMEOUT, 'eng fallback recognition');
+            } catch (engError) {
+                console.error('[OCR] engWorker fallback failed:', engError.message);
+                if (engError.message.includes('timed out')) {
+                    pool.recycleWorker('eng').catch(() => {});
+                }
+                throw engError;
+            }
+
+            const { data: { text: engText, confidence: engConf } } = engResult;
+            return {
+                text: engText || text || '',
+                confidence: Math.max(confidence, engConf),
+                lowConfidence: (Math.max(confidence, engConf) < 20)
+            };
         }
         
-        return text || '';
+        return {
+            text: text || '',
+            confidence: confidence,
+            lowConfidence: isLowConfidence
+        };
     } catch (error) {
         console.error('[OCR_ERROR] Polyglot extraction failed:', error.message);
-        if (tempPath && fs.existsSync(tempPath)) {
-            try { fs.unlinkSync(tempPath); } catch (e) {}
-        }
         // Last-ditch attempt on original file with eng
         try {
             const engWorker = await pool.getWorker('eng');
-            const { data } = await engWorker.recognize(filePath);
-            return data.text || '';
+            await engWorker.setParameters({ user_defined_dpi: '300' });
+            const { data } = await withTimeout(engWorker.recognize(filePath), OCR_TIMEOUT, 'last-ditch eng recognition');
+            return {
+                text: data.text || '',
+                confidence: data.confidence,
+                lowConfidence: (data.confidence < 20)
+            };
         } catch (e) {
-            return '';
+            console.error('[OCR_ERROR] Last-ditch attempt also failed:', e.message);
+            return { text: '', confidence: 0, lowConfidence: true };
         }
     }
 }

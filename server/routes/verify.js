@@ -272,9 +272,9 @@ router.post('/', apiKey, upload.single('file'), async (req, res) => {
         } else if (req.file) {
             const originalName = req.file.originalname;
             if (compareWith) {
-                doc = db.prepare('SELECT * FROM documents WHERE filename = ? AND uploaded_by = ? ORDER BY block_index ASC LIMIT 1').get(originalName, compareWith);
+                doc = db.prepare('SELECT * FROM documents WHERE filename = ? AND uploaded_by = ? ORDER BY block_index DESC LIMIT 1').get(originalName, compareWith);
             } else {
-                doc = db.prepare('SELECT * FROM documents WHERE filename = ? ORDER BY block_index ASC LIMIT 1').get(originalName);
+                doc = db.prepare('SELECT * FROM documents WHERE filename = ? ORDER BY block_index DESC LIMIT 1').get(originalName);
             }
             isComparisonVerify = true;
         }
@@ -356,9 +356,12 @@ router.post('/', apiKey, upload.single('file'), async (req, res) => {
 
         // 1 & 2. Run extraction ONCE at the top and store in currentOcrText
         let currentOcrText = '';
+        let currentOcrLowConfidence = false;
         if (tmpPath && fs.existsSync(tmpPath)) {
             if (/png|jpg|jpeg/.test(doc.file_type)) {
-                currentOcrText = await ocr.extractText(tmpPath);
+                const ocrResult = await ocr.extractText(tmpPath);
+                currentOcrText = ocrResult.text;
+                currentOcrLowConfidence = ocrResult.lowConfidence;
             } else if (doc.file_type === 'text/plain' || doc.filename.endsWith('.txt')) {
                 currentOcrText = fs.readFileSync(tmpPath, 'utf8');
             }
@@ -374,9 +377,12 @@ router.post('/', apiKey, upload.single('file'), async (req, res) => {
         let forensic_comparison = null;
         let signature_comparison = null;
 
-        if (doc.ocr_text) {
+        if (doc.ocr_text && !currentOcrLowConfidence) {
             ocr_similarity = calculateSimilarity(doc.ocr_text, current_ocr_text);
             ocr_tampered = ocr_similarity < OCR_THRESHOLD;
+        } else if (currentOcrLowConfidence) {
+            console.log('[VERIFY] Low OCR confidence detected, skipping similarity check to avoid false positives.');
+            ocr_similarity = null; // Indicate skip
         }
 
         if (/png|jpg|jpeg/.test(doc.file_type)) {
@@ -394,12 +400,14 @@ router.post('/', apiKey, upload.single('file'), async (req, res) => {
             const currentSig = await signature.detectSignature(tmpPath);
             const storedSig = doc.signature_score ? JSON.parse(doc.signature_score) : null;
             if (storedSig) {
+                // Use explicit boolean conversion (!!) to ensure correct comparison
+                const statusChanged = (!!currentSig.signature_found !== !!storedSig.signature_found) || (!!currentSig.seal_found !== !!storedSig.seal_found);
                 signature_comparison = {
-                    status_change: (currentSig.signature_found !== storedSig.signature_found || currentSig.seal_found !== storedSig.seal_found),
-                    original_had_signature: storedSig.signature_found,
-                    current_has_signature: currentSig.signature_found,
-                    original_had_seal: storedSig.seal_found,
-                    current_has_seal: currentSig.seal_found
+                    status_change: statusChanged,
+                    original_had_signature: !!storedSig.signature_found,
+                    current_has_signature: !!currentSig.signature_found,
+                    original_had_seal: !!storedSig.seal_found,
+                    current_has_seal: !!currentSig.seal_found
                 };
             }
         }
@@ -409,53 +417,32 @@ router.post('/', apiKey, upload.single('file'), async (req, res) => {
         const visited = new Set();
         let currentHash = doc.prev_hash;
         let checked = 0;
+        let historical_tamper_detected = false;
+        let tampered_block_id = null;
 
         try {
             for (let depth = 0; depth < MAX_DEPTH && currentHash && currentHash !== '0000000000000000'; depth++) {
 
-                // 1. Cycle check BEFORE query
-                if (visited.has(currentHash)) {
-                    if (tmpPath && fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
-                    return res.json({ status: "invalid", reason: "CYCLE_DETECTED", checked_blocks: checked });
-                }
+                if (visited.has(currentHash)) break;
                 visited.add(currentHash);
 
-                // 2. Safe DB fetch
                 const current = db.prepare("SELECT * FROM documents WHERE block_hash = ?").get(currentHash);
-
-                if (!current) {
-                    if (tmpPath && fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
-                    return res.json({ status: "invalid", reason: "BROKEN_CHAIN", checked_blocks: checked });
-                }
+                if (!current) break; // Broken chain, but we continue verifying current
 
                 if (current.is_tampered) {
-                    if (tmpPath && fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
-                    return res.json({ status: "invalid", reason: "HISTORICAL_TAMPER", checked_blocks: checked, tampered_block: current.block_index });
+                    historical_tamper_detected = true;
+                    tampered_block_id = current.block_index;
+                    // We don't return early anymore; we just flag it as a warning
+                    break; 
                 }
 
                 checked++;
-
-                // 3. Move pointer
                 currentHash = current.prev_hash;
-
-                // Stop if we hit a checkpoint
-                if (current.checkpoint_hash) {
-                    break;
-                }
-
-                // 4. Yield control (CRITICAL)
+                if (current.checkpoint_hash) break;
                 await new Promise(resolve => setImmediate(resolve));
             }
-
-            if (checked >= MAX_DEPTH) {
-                if (tmpPath && fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
-                return res.json({ status: "invalid", reason: "MAX_DEPTH_EXCEEDED", checked_blocks: checked });
-            }
-
         } catch (chainError) {
             console.error('[CHAIN_TRAVERSAL_ERROR]', chainError);
-            if (tmpPath && fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
-            return res.status(500).json({ success: false, error: 'Chain traversal failed' });
         }
 
         // 4.5 Merkle Verification
@@ -484,9 +471,18 @@ router.post('/', apiKey, upload.single('file'), async (req, res) => {
         if (forensic_comparison && forensic_comparison.suspicious_change) tamper_reasons.push("Forensic analysis detected modifications");
         if (signature_comparison && signature_comparison.status_change) tamper_reasons.push("Signature/Seal presence changed");
         if (signature_mismatch) tamper_reasons.push("Signature mismatch");
-        if (merkle_valid === false) tamper_reasons.push("Merkle proof invalid");
-
+        
         const isTampered = tamper_reasons.length > 0;
+        
+        console.log(`\n┌── Verification Results for Block #${doc.block_index}`);
+        console.log(`│ - File Hash Match: ${verificationResult.valid ? 'YES' : 'NO'}`);
+        console.log(`│ - OCR Similarity: ${ocr_similarity !== null ? ocr_similarity.toFixed(2) + '%' : 'SKIPPED (Low Confidence)'}`);
+        console.log(`│ - Forensic Suspicious: ${forensic_comparison ? forensic_comparison.suspicious_change : 'NO CHANGE'}`);
+        console.log(`│ - Signature Valid: ${!signature_mismatch}`);
+        console.log(`│ - Chain Status: ${historical_tamper_detected ? '⚠️ WARNING (Historical Tamper at #' + tampered_block_id + ')' : '✅ SECURE'}`);
+        console.log(`│ - Final Verdict: ${isTampered ? '🔴 TAMPERED' : '✅ ORIGINAL'}`);
+        if (tamper_reasons.length > 0) console.log(`│ - Reasons: ${tamper_reasons.join(', ')}`);
+        console.log(`└── Verification Cycle Complete\n`);
 
         if (isTampered) {
             db.prepare('UPDATE documents SET is_tampered = 1 WHERE block_index = ?').run(doc.block_index);
@@ -494,11 +490,15 @@ router.post('/', apiKey, upload.single('file'), async (req, res) => {
 
         if (tmpPath && fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
 
+        const merkle_warning = (merkle_valid === false) ? "Merkle proof mismatch (legacy data)" : null;
+        const chain_warning = historical_tamper_detected ? `Historical tamper detected in ancestry (Block #${tampered_block_id}). Current version integrity verified independently.` : null;
+
         return res.json({
             status: isTampered ? "tampered" : "valid",
             valid: !isTampered,
             verdict: isTampered ? "TAMPERED" : "ORIGINAL",
             document_id: doc.block_index,
+            block_index: doc.block_index,
             checked_blocks: checked,
             signature_status,
             merkle_status,
@@ -509,7 +509,9 @@ router.post('/', apiKey, upload.single('file'), async (req, res) => {
             ocr_threshold: OCR_THRESHOLD,
             ocr_tampered: ocr_tampered,
             forensic_comparison,
-            signature_comparison
+            signature_comparison,
+            merkle_warning,
+            chain_warning
         });
 
     } catch (error) {

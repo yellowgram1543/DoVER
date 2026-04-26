@@ -3,9 +3,9 @@ const Queue = require('bull');
 
 const documentQueue = new Queue('document-processing', process.env.REDIS_URL, {
     settings: {
-        lockDuration: 60000, // 60 seconds (up from 30s)
-        lockRenewTime: 15000, // 15 seconds (renew more frequently)
-        stalledInterval: 60000, // Check for stalled jobs every 60s
+        lockDuration: 180000, // 180 seconds (was 60s — OCR+forensics+Gemini can exceed 60s)
+        lockRenewTime: 45000, // 45 seconds (renew more frequently)
+        stalledInterval: 120000, // Check for stalled jobs every 120s
     }
 });
 

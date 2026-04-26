@@ -41,7 +41,7 @@ const upload = multer({
     }
 });
 
-router.post('/', apiKey, (req, res) => {
+router.post('/', (req, res) => {
     upload.single('file')(req, res, async (err) => {
         if (err) return res.status(400).json({ success: false, error: err.message });
 

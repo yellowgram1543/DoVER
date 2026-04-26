@@ -50,10 +50,37 @@ function verifyDocument(documentId, db, manualFilePath) {
     };
 }
 
+/**
+ * Async version of verifyDocument — uses streaming hash to avoid blocking the event loop.
+ * Preferred for background operations like the integrity watcher.
+ */
+async function verifyDocumentAsync(documentId, db, manualFilePath) {
+    if (!manualFilePath) throw new Error("manualFilePath required - system uses GridFS");
+    
+    const doc = db.prepare('SELECT * FROM documents WHERE block_index = ?').get(documentId);
+    if (!doc) return { valid: false, details: 'Document not found' };
+
+    const currentFileHash = await generateFileHashAsync(manualFilePath);
+    const recomputedBlockHash = generateBlockHash(currentFileHash, doc.prev_hash, doc.upload_timestamp);
+
+    const isValid = (currentFileHash.trim() === doc.file_hash.trim()) && (recomputedBlockHash.trim() === doc.block_hash.trim());
+
+    return {
+        valid: isValid,
+        details: {
+            storedFileHash: doc.file_hash,
+            computedFileHash: currentFileHash,
+            storedBlockHash: doc.block_hash,
+            computedBlockHash: recomputedBlockHash
+        }
+    };
+}
+
 module.exports = {
     generateFileHash,
     generateFileHashAsync,
     generateBlockHash,
     getLastBlockHash,
-    verifyDocument
+    verifyDocument,
+    verifyDocumentAsync
 };

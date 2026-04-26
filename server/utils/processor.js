@@ -107,7 +107,8 @@ function initProcessor() {
 
             if (/png|jpg|jpeg/.test(mimetype)) {
                 // OCR stays on main (it's mostly I/O waiting for the Tesseract process)
-                ocrText = await ocr.extractText(filePath);
+                const ocrResult = await ocr.extractText(filePath);
+                ocrText = ocrResult.text;
                 if (ocrText) ocrHash = crypto.createHash('sha256').update(ocrText).digest('hex');
 
                 // Forensics and Signature offloaded to Worker Thread
@@ -116,6 +117,10 @@ function initProcessor() {
 
                 if (!sigReport.signature_found) {
                     forensicReport.flags.push('No signature detected in typical signing areas');
+                }
+
+                if (ocrResult.lowConfidence) {
+                    forensicReport.flags.push('Low OCR confidence - text integrity check partially bypassed');
                 }
 
                 forensicScore = JSON.stringify(forensicReport);
@@ -161,7 +166,7 @@ function initProcessor() {
 
             // ── Step 4.5: Update Global Merkle Root ──
             // The Merkle Root represents the entire chain state; it must be updated globally
-            db.prepare('UPDATE documents SET merkle_root = ?').run(merkleRoot);
+            db.prepare('UPDATE documents SET merkle_root = ? WHERE block_index = ?').run(merkleRoot, documentId);
 
             // ── Step 5: Periodic Checkpointing ──
             // Every 100 blocks, we record the block_hash as a checkpoint
