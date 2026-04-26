@@ -1071,7 +1071,7 @@ function loadChain(silent = false) {
                 : '';
             
             const anchorIcon = d.polygon_txid 
-                ? `<span class="material-symbols-outlined text-[14px] text-emerald-500" title="Anchored to Polygon">link</span>`
+                ? `<a href="https://amoy.polygonscan.com/tx/${d.polygon_txid}" target="_blank" class="material-symbols-outlined text-[14px] text-emerald-500 hover:text-emerald-700 transition-colors" title="View Public Proof on PolygonScan">link</a>`
                 : '';
 
             return `<tr class="${i%2===0?'':'bg-surface-container-lowest'} hover:bg-slate-50/50 transition-colors">
@@ -1668,8 +1668,9 @@ async function renderIntegrityModal(id) {
                                 <div class="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center text-[10px] font-black text-emerald-600 flex-shrink-0 border border-emerald-100 dark:border-emerald-800/30">
                                     ${i + 1}
                                 </div>
-                                <div class="flex-1 bg-slate-50 dark:bg-slate-900/30 px-4 py-2.5 rounded-xl border border-slate-100 dark:border-slate-800/50 group-hover:border-emerald-200 transition-colors">
-                                    <code class="text-[10px] font-mono text-slate-600 dark:text-slate-400 break-all">${p}</code>
+                                <div class="flex-1 bg-slate-50 dark:bg-slate-900/30 px-4 py-2.5 rounded-xl border border-slate-100 dark:border-slate-800/50 group-hover:border-emerald-200 transition-colors flex items-center justify-between">
+                                    <code class="text-[10px] font-mono text-slate-600 dark:text-slate-400 break-all">${p.hash || p}</code>
+                                    ${p.position ? `<span class="text-[8px] font-black uppercase text-slate-400 ml-2">${p.position}</span>` : ''}
                                 </div>
                             </div>
                         `).join('')}

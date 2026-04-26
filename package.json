@@ -13,6 +13,7 @@
     "@signpdf/signer-p12": "^3.3.0",
     "@signpdf/signpdf": "^3.3.0",
     "@tensorflow/tfjs": "^4.22.0",
+    "axios": "^1.15.2",
     "better-sqlite3": "^11.8.1",
     "bull": "^4.16.5",
     "connect-mongo": "^6.0.0",

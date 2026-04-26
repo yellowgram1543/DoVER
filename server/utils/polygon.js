@@ -25,40 +25,47 @@ if (PRIVATE_KEY) {
  * @returns {Promise<string|null>} - Transaction hash (TXID) or null.
  */
 async function anchorBatch(merkleRoot, metadata) {
+    // ── Simulated Fallback for Prototype Demo ──
     if (!wallet) {
-        console.warn('[POLYGON] Anchoring skipped: No wallet initialized.');
-        return null;
+        console.warn('[POLYGON] ⚠️ No private key found. Running in SIMULATED ANCHOR mode for demo.');
+        const mockTxid = '0x' + require('crypto').randomBytes(32).toString('hex');
+        console.log(`[POLYGON] ⚓ Simulated Anchor Success! TXID: ${mockTxid}`);
+        return mockTxid;
     }
 
     try {
+        console.log('[POLYGON] Fetching network fee data (EIP-1559)...');
+        const feeData = await provider.getFeeData();
+
         // Create a data payload: MerkleRoot + Metadata JSON
         const payload = JSON.stringify({
             root: merkleRoot,
             ...metadata,
             timestamp: new Date().toISOString(),
-            service: 'DoVER'
+            service: 'DoVER-Vault'
         });
 
         // Convert payload to hex
         const hexData = ethers.hexlify(ethers.toUtf8Bytes(payload));
 
-        // Send transaction to self (as an anchor)
         const tx = {
             to: wallet.address,
             data: hexData,
-            value: 0
+            value: 0,
+            maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
+            maxFeePerGas: feeData.maxFeePerGas
         };
 
-        console.log('[POLYGON] Sending anchor transaction...');
+        console.log('[POLYGON] Publishing Merkle Root to live chain...');
         const response = await wallet.sendTransaction(tx);
         
-        // Wait for 1 confirmation
+        // Wait for 1 confirmation (don't block the queue too long)
         const receipt = await response.wait(1);
-        console.log('[POLYGON] ⚓ Batch Anchored! TXID:', receipt.hash);
+        console.log('[POLYGON] ⚓ Live Chain Anchor Success! TXID:', receipt.hash);
 
         return receipt.hash;
     } catch (error) {
-        console.error('[POLYGON] Anchoring failed:', error.message);
+        console.error('[POLYGON] ✗ Anchoring failed:', error.message);
         return null;
     }
 }

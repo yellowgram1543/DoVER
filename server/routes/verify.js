@@ -4,6 +4,7 @@ const multer = require('multer');
 const db = require('../db/db');
 const hasher = require('../utils/hasher');
 const ocr = require('../utils/ocr');
+const gemini = require('../utils/gemini');
 const forensics = require('../utils/forensics');
 const signature = require('../utils/signature');
 const crypto = require('crypto');
@@ -495,7 +496,7 @@ router.post('/', apiKey, upload.single('file'), async (req, res) => {
         let ai_report = null;
         if (!currentOcrLowConfidence && current_ocr_text !== 'extraction_failed') {
             console.log('[VERIFY] Generating AI Integrity Report via Gemini...');
-            ai_report = await ocr.generateDocumentSummary(current_ocr_text, verificationResult.forensics || {});
+            ai_report = await gemini.generateDocumentSummary(current_ocr_text, verificationResult.forensics || {});
         }
 
         const merkle_warning = (merkle_valid === false) ? "Merkle proof mismatch (legacy data)" : null;
