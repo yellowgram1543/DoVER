@@ -1,6 +1,7 @@
 const Tesseract = require('tesseract.js');
 const fs = require('fs');
 const path = require('path');
+const gemini = require('./gemini');
 
 /**
  * WorkerPool manages persistent Tesseract workers for different language groups.
@@ -119,6 +120,17 @@ async function extractText(filePath) {
 
     try {
         if (!fs.existsSync(filePath)) return { text: '', confidence: 0, lowConfidence: true };
+
+        console.log(`[OCR] Attempting extraction with Gemini Vision...`);
+        try {
+            const text = await gemini.extractTextFromImage(filePath);
+            if (text) {
+                console.log(`[OCR] Gemini Vision extraction successful.`);
+                return { text: text, confidence: 95, lowConfidence: false };
+            }
+        } catch (geminiError) {
+            console.error('[OCR] Gemini Vision failed, falling back to Tesseract:', geminiError.message);
+        }
 
         // Read raw file buffer — pass directly to Tesseract (no Jimp preprocessing)
         const imageBuffer = fs.readFileSync(filePath);
