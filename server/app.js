@@ -104,6 +104,9 @@ const { requireAuth } = require('./middleware/auth');
 
 app.use('/auth', authRoutes);
 // Apply hmac + requireAuth + apiKey to sensitive routes
+// Status polling is exempt from HMAC — it's a read-only, unauthenticated progress check
+app.use('/api/upload/status', requireAuth, uploadRoutes);
+// All other upload routes require HMAC + auth + apiKey
 app.use('/api/upload', hmacMiddleware, requireAuth, apiKey, uploadRoutes);
 app.use('/api/verify', (req, res, next) => {
     // Apply hmac, requireAuth, and apiKey only to POST /api/verify or GET /api/verify/:id/proof

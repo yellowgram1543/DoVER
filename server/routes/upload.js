@@ -11,9 +11,8 @@ const forensics = require('../utils/forensics');
 const gemini = require('../utils/gemini');
 const signature = require('../utils/signature');
 const crypto = require('crypto');
-const { Jimp } = require('jimp');
-const { rgbaToInt } = require('@jimp/utils');
 const { getBucket } = require('../db/mongodb');
+
 const documentQueue = require('../utils/queue');
 const { processDocument } = require('../utils/processor');
 const apiKey = require('../middleware/apiKey');
