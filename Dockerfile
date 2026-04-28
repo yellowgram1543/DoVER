@@ -5,6 +5,10 @@ FROM node:18-slim
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     tesseract-ocr-eng \
+    tesseract-ocr-hin \
+    tesseract-ocr-ara \
+    tesseract-ocr-kan \
+    tesseract-ocr-tam \
     libtesseract-dev \
     && rm -rf /var/lib/apt/lists/*
 
