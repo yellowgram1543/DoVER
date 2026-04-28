@@ -9,9 +9,24 @@ client_secret_*.json
 
 # Database
 db.sqlite
+documents.db
 
 # OCR trained data (large binary files)
 *.traineddata
 
 # Graphify cache
 graphify-out/
+
+# PKI and Temporary Files (CRITICAL)
+certs/
+tmp/
+scratch/
+.planning/
+.gemini/
+.vscode/
+.DS_Store
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
