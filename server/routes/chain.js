@@ -326,9 +326,9 @@ router.get('/document/:id/certified', async (req, res) => {
             return res.status(404).json({ success: false, error: 'Document not found' });
         }
 
-        // RBAC: Authority only
-        if (!req.user || req.user.role !== 'authority') {
-            return res.status(403).json({ success: false, error: 'Authority privileges required' });
+        // RBAC: Authority OR Document Owner
+        if (!canAccessDocument(req.user, doc)) {
+            return res.status(403).json({ success: false, error: 'Permission denied' });
         }
 
         // 2. Fetch original file from GridFS

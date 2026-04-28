@@ -14,6 +14,7 @@ const nonceMiddleware = require('./middleware/nonce');
 const blocklist = require('./middleware/blocklist');
 const hmacMiddleware = require('./middleware/hmac');
 const db = require('./db/db');
+const PKIUtils = require('./utils/pki');
 
 const app = express();
 
@@ -99,6 +100,22 @@ app.use('/api/chain', hmacMiddleware, requireAuth, chainRoutes);
 app.use('/api/stats', hmacMiddleware, requireAuth, statsRoutes);
 app.use('/api/admin', hmacMiddleware, requireAuth, adminRoutes);
 
+// ── Public CRL Endpoint ──
+app.get('/api/public/crl', (req, res) => {
+    try {
+        const revoked = db.prepare("SELECT serial_number, revoked_at FROM key_registry WHERE status = 'revoked' AND serial_number IS NOT NULL").all();
+        const certInfos = revoked.map(r => ({
+            serialNumber: r.serial_number,
+            revocationDate: r.revoked_at
+        }));
+        const crl = PKIUtils.generateCRL(certInfos);
+        res.json(crl);
+    } catch (error) {
+        console.error('[PUBLIC_CRL_ERROR]', error);
+        res.status(500).json({ error: 'Failed to generate CRL' });
+    }
+});
+
 // SPA fallback: serve index.html for any non-API route
 app.get('*', (req, res) => {
     if (!req.path.startsWith('/api')) {
@@ -181,6 +198,9 @@ initProcessor();
 // ── Polyglot OCR Workers ──
 const ocr = require('./utils/ocr');
 ocr.initWorkers();
+
+// ── PKI Bootstrap ──
+PKIUtils.bootstrapCAs().catch(err => console.error('[PKI_BOOTSTRAP_ERROR]', err));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

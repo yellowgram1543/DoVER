@@ -80,7 +80,7 @@ router.post('/', uploadLimiter, (req, res) => {
                 return res.status(403).json({ success: false, error: 'Verified identity required' });
             }
 
-            // DEPARTMENT LOCKING: Check if user has a department set
+            // DEPARTMENT LOCKING: Check if user has a department set (for Hijacking checks)
             let userDept = null;
             const userInDb = db.prepare('SELECT department FROM users WHERE email = ?').get(uploaderEmail);
             
@@ -92,6 +92,9 @@ router.post('/', uploadLimiter, (req, res) => {
                 db.prepare('UPDATE users SET department = ? WHERE email = ?').run(userDept, uploaderEmail);
                 console.log(`[AUTH] Department locked to "${userDept}" for user ${uploaderEmail}`);
             }
+
+            // The document should use the category selected by the user, regardless of what they are locked to
+            const documentCategory = req.body.department || 'General';
             
             // Calculate hash for duplicate pre-check
             const fileHash = await hasher.generateFileHashAsync(tmpFilePath);
@@ -149,7 +152,7 @@ router.post('/', uploadLimiter, (req, res) => {
                 mimetype: req.file.mimetype,
                 uploadedBy: uploadedBy,
                 uploaderEmail: uploaderEmail,
-                department: userDept,
+                department: documentCategory,
                 version_number,
                 parent_document_id,
                 version_note,
@@ -206,6 +209,8 @@ router.post('/batch-upload', uploadLimiter, apiKey, (req, res) => {
                 console.log(`[AUTH] Batch-upload: Department locked to "${userDept}" for user ${uploaderEmail}`);
             }
 
+            const documentCategory = req.body.department || 'General';
+
             const batchId = Date.now();
             const jobIds = [];
 
@@ -217,7 +222,7 @@ router.post('/batch-upload', uploadLimiter, apiKey, (req, res) => {
                     mimetype: file.mimetype,
                     uploadedBy,
                     uploaderEmail: uploaderEmail,
-                    department: userDept,
+                    department: documentCategory,
                     batch_id: batchId
                 });
                 jobIds.push(job.id);

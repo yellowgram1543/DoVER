@@ -27,9 +27,11 @@ async function generateDocumentSummary(ocrText, forensicReport) {
             {
               "classification": "string",
               "summary": "string",
+              "confidence_score": 0.95,
               "entities": { "parties": [], "dates": [], "amounts": [] },
               "risk_assessment": { "rating": "LOW|MEDIUM|HIGH", "reasoning": "string", "flags": [] }
             }
+            Note: confidence_score must be a float between 0.0 and 1.0 based on data quality and forensic health.
         `;
 
         const result = await model.generateContent(prompt);

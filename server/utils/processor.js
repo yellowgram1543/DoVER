@@ -8,6 +8,7 @@ const signature = require('./signature');
 const { buildMerkleTree, getMerkleProof } = require('./merkle');
 const qr = require('./qr');
 const crypto = require('crypto');
+const forge = require('node-forge');
 const fs = require('fs');
 const path = require('path');
 const { getBucket } = require('../db/mongodb');
@@ -88,14 +89,50 @@ function initProcessor() {
 
             // ── Step 2.5: Digital Signature ──
             let documentSignature = null;
-            if (process.env.PRIVATE_KEY_B64) {
+            let signerFingerprint = null;
+
+            // Check for business-specific key in registry
+            const user = db.prepare('SELECT id FROM users WHERE email = ?').get(uploaderEmail);
+            const activeKey = user ? db.prepare('SELECT * FROM key_registry WHERE issuer_id = ? AND status = "active"').get(user.id) : null;
+
+            if (activeKey) {
+                try {
+                    console.log(`[PROCESSOR] Using business-specific key for ${uploadedBy} (Fingerprint: ${activeKey.fingerprint})`);
+                    const certsDir = path.resolve(__dirname, '..', '..', 'certs');
+                    const p12Path = path.join(certsDir, `${activeKey.fingerprint}.p12`);
+                    const pwdPath = path.join(certsDir, `${activeKey.fingerprint}.pwd`);
+
+                    if (fs.existsSync(p12Path) && fs.existsSync(pwdPath)) {
+                        const p12Buffer = fs.readFileSync(p12Path);
+                        const password = fs.readFileSync(pwdPath, 'utf8');
+
+                        const asn1 = forge.asn1.fromDer(p12Buffer.toString('binary'));
+                        const p12 = forge.pkcs12.pkcs12FromAsn1(asn1, password);
+                        const bags = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag });
+                        const privateKey = bags[forge.pki.oids.pkcs8ShroudedKeyBag][0].key;
+
+                        const sign = crypto.createSign('SHA256');
+                        sign.update(blockHash);
+                        const privateKeyPem = forge.pki.privateKeyToPem(privateKey);
+                        documentSignature = sign.sign(privateKeyPem, 'hex');
+                        signerFingerprint = activeKey.fingerprint;
+                    } else {
+                        throw new Error('Key files missing in certs/ directory');
+                    }
+                } catch (sigError) {
+                    console.error('[PROCESSOR] Business signature failed, falling back to authority key:', sigError.message);
+                }
+            }
+
+            // Fallback to Authority Key
+            if (!documentSignature && process.env.PRIVATE_KEY_B64) {
                 try {
                     const privateKey = Buffer.from(process.env.PRIVATE_KEY_B64, 'base64').toString('utf8');
                     const sign = crypto.createSign('SHA256');
                     sign.update(blockHash);
                     documentSignature = sign.sign(privateKey, 'hex');
                 } catch (sigError) {
-                    console.error('[PROCESSOR] Signature generation failed:', sigError.message);
+                    console.error('[PROCESSOR] Authority signature generation failed:', sigError.message);
                 }
             }
 
@@ -159,10 +196,10 @@ function initProcessor() {
             }
 
             const insertDoc = db.prepare(`
-                INSERT INTO documents (filename, file_type, uploaded_by, uploader_email, department, upload_timestamp, file_hash, prev_hash, block_hash, ocr_text, ocr_hash, forensic_score, signature_score, storage_id, signature, merkle_root, merkle_proof, parent_document_id, version_number, version_note, ai_summary, ipfs_cid)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO documents (filename, file_type, uploaded_by, uploader_email, department, upload_timestamp, file_hash, prev_hash, block_hash, ocr_text, ocr_hash, forensic_score, signature_score, storage_id, signature, signer_fingerprint, merkle_root, merkle_proof, parent_document_id, version_number, version_note, ai_summary, ipfs_cid)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `);
-            const result = insertDoc.run(originalname, mimetype, uploadedBy, uploaderEmail, department, timestamp, fileHash, prevHash, blockHash, ocrText, ocrHash, forensicScore, signatureScore, gridfsId, documentSignature, merkleRoot, JSON.stringify(merkleProof), parent_document_id, version_number || 1, version_note, aiSummary, null);
+            const result = insertDoc.run(originalname, mimetype, uploadedBy, uploaderEmail, department, timestamp, fileHash, prevHash, blockHash, ocrText, ocrHash, forensicScore, signatureScore, gridfsId, documentSignature, signerFingerprint, merkleRoot, JSON.stringify(merkleProof), parent_document_id, version_number || 1, version_note, aiSummary, null);
             const documentId = result.lastInsertRowid;
 
             // ── Step 4.2: Decentralized Storage (IPFS) ──

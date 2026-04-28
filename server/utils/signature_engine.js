@@ -4,6 +4,7 @@ const signpdf = require('@signpdf/signpdf').default;
 const { pdflibAddPlaceholder } = require('@signpdf/placeholder-pdf-lib');
 const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
 const fs = require('fs');
+const path = require('path');
 const dotenv = require('dotenv');
 
 dotenv.config();
@@ -57,7 +58,19 @@ class SignatureEngine {
             }
 
             // 3. Initialize the Signer for @signpdf
-            this.signer = new P12Signer(this.p12Buffer, { passphrase: this.password });
+            // Load CA chain for embedding
+            const certsDir = path.resolve(__dirname, '..', '..', 'certs');
+            const rootPath = path.join(certsDir, 'dover_root.pem');
+            const interPath = path.join(certsDir, 'dover_intermediate.pem');
+
+            const caChain = [];
+            if (fs.existsSync(interPath)) caChain.push(fs.readFileSync(interPath, 'utf8'));
+            if (fs.existsSync(rootPath)) caChain.push(fs.readFileSync(rootPath, 'utf8'));
+
+            this.signer = new P12Signer(this.p12Buffer, { 
+                passphrase: this.password,
+                ca: caChain
+            });
             
             return true;
         } catch (error) {

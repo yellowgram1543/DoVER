@@ -6,17 +6,17 @@ const API = {
     async getStats() { return (await fetch('/api/stats')).json(); },
     async getChain() { return (await fetch('/api/chain')).json(); },
     async upload(formData) {
-        return (await fetch('/api/upload', { 
-            method: 'POST', 
+        return (await fetch('/api/upload', {
+            method: 'POST',
             headers: { 'x-api-key': API_KEY },
-            body: formData 
+            body: formData
         })).json();
     },
     async verify(formData) {
-        return (await fetch('/api/verify', { 
-            method: 'POST', 
+        return (await fetch('/api/verify', {
+            method: 'POST',
             headers: { 'x-api-key': API_KEY },
-            body: formData 
+            body: formData
         })).json();
     },
     async getAudit() { return (await fetch('/api/chain/audit')).json(); },
@@ -27,10 +27,10 @@ const API = {
     },
     async getDocumentHistory(id) { return (await fetch(`/api/chain/document/${id}/history`)).json(); },
     async batchUpload(formData) {
-        return (await fetch('/api/upload/batch-upload', { 
-            method: 'POST', 
+        return (await fetch('/api/upload/batch-upload', {
+            method: 'POST',
             headers: { 'x-api-key': API_KEY },
-            body: formData 
+            body: formData
         })).json();
     },
     async getBatchStatus(batchId) {
@@ -40,7 +40,7 @@ const API = {
         return (await fetch(`/api/chain/document/${id}`)).json();
     },
     async analyzeDocument(id) {
-        return (await fetch(`/api/chain/document/${id}/analyze`, { 
+        return (await fetch(`/api/chain/document/${id}/analyze`, {
             method: 'POST'
         })).json();
     },
@@ -50,7 +50,7 @@ const API = {
     async promoteUser(userId, newRole) {
         return (await fetch('/api/admin/promote', {
             method: 'POST',
-            headers: { 
+            headers: {
                 'x-api-key': API_KEY,
                 'Content-Type': 'application/json'
             },
@@ -64,15 +64,17 @@ let currentUser = null;
 
 // ── Role State ──
 let currentMode = localStorage.getItem('dover_mode') || 'b2c'; // Default to Citizen
+let activeCategory = 'all'; // Default to all documents
 
 function switchMode(mode) {
     currentMode = mode;
     localStorage.setItem('dover_mode', mode);
-    
+    activeCategory = 'all'; // Reset category filter on mode switch
+
     // Update Buttons
     const btnB2c = document.getElementById('btn-b2c');
     const btnB2b = document.getElementById('btn-b2b');
-    
+
     if (mode === 'b2c') {
         btnB2c.className = 'flex-1 py-1.5 px-2 rounded-lg text-[10px] font-black uppercase bg-primary text-white shadow-md transition-all';
         btnB2b.className = 'flex-1 py-1.5 px-2 rounded-lg text-[10px] font-black uppercase text-slate-400 hover:text-slate-600 transition-all';
@@ -95,11 +97,14 @@ document.addEventListener('click', e => {
     const navLink = e.target.closest('.nav-link');
 
     if (btn) {
-        sidebar.classList.toggle('mobile-open');
+        const isOpen = sidebar.classList.toggle('mobile-open');
+        btn.setAttribute('aria-expanded', isOpen);
     } else if (navLink) {
         sidebar.classList.remove('mobile-open');
+        document.getElementById('mobile-menu-btn')?.setAttribute('aria-expanded', 'false');
     } else if (sidebar?.classList.contains('mobile-open') && !e.target.closest('#sidebar')) {
         sidebar.classList.remove('mobile-open');
+        document.getElementById('mobile-menu-btn')?.setAttribute('aria-expanded', 'false');
     }
 });
 
@@ -208,7 +213,7 @@ function renderLogin(container) {
 function updateHeaderUI(header, user) {
     const isDark = document.documentElement.classList.contains('dark');
     const badge = user.role === 'authority' ? `<span class="px-2 py-0.5 rounded bg-[#E9C176]/20 text-[#E9C176] text-[9px] font-black uppercase border border-[#E9C176]/30">Authority</span>` : '';
-    
+
     header.innerHTML = `
         <div class="flex items-center gap-4">
             <span class="md:hidden material-symbols-outlined text-blue-900 dark:text-[#E9C176] cursor-pointer" id="menu-toggle">menu</span>
@@ -242,7 +247,7 @@ function updateHeaderUI(header, user) {
 function navigate() {
     if (!currentUser) return checkAuth();
     const page = (location.hash.slice(1) || 'dashboard');
-    
+
     // Updated selector to match dynamic links
     document.querySelectorAll('.nav-link').forEach(l => {
         const isPageMatch = l.dataset.page === page || l.getAttribute('href') === `#${page}`;
@@ -255,13 +260,13 @@ function navigate() {
     const app = document.getElementById('app');
     app.innerHTML = '';
     switch (page) {
-        case 'upload':   renderUpload(app); break;
-        case 'verify':   renderVerify(app); break;
-        case 'chain':    renderChain(app); break;
-        case 'audit':    renderAudit(app); break;
+        case 'upload': renderUpload(app); break;
+        case 'verify': renderVerify(app); break;
+        case 'chain': renderChain(app); break;
+        case 'audit': renderAudit(app); break;
         case 'settings': renderSettings(app); break;
-        case 'help':     renderHelp(app); break;
-        case 'batch':    renderBatch(app); break;
+        case 'help': renderHelp(app); break;
+        case 'batch': renderBatch(app); break;
         case 'admin':
             if (currentUser.role === 'authority') {
                 renderAdmin(app);
@@ -269,7 +274,7 @@ function navigate() {
                 location.hash = '#dashboard';
             }
             break;
-        default:         renderDashboard(app); break;
+        default: renderDashboard(app); break;
     }
 }
 window.addEventListener('hashchange', navigate);
@@ -277,6 +282,110 @@ window.addEventListener('DOMContentLoaded', checkAuth);
 document.getElementById('menu-toggle')?.addEventListener('click', () => {
     document.getElementById('sidebar').classList.toggle('mobile-open');
 });
+
+// ── Category Mapping for B2B/B2C ──
+const CATEGORY_MAP = {
+    b2c: {
+        'Personal': ['Personal', 'Personal Identity (Passport/ID)', 'Academic Certificates', 'Medical Reports'],
+        'Family': ['Family', 'Family Records (Birth/Marriage)', 'Financial Assets'],
+        'Office': ['Office', 'Office Records']
+    },
+    b2b: {
+        'Employee Records': ['Employee Records', 'Employee Contract', 'Personnel ID / KYC', 'Payroll & Tax', 'Experience Letters', 'Non-Disclosure Agreements', 'Termination Records']
+    }
+};
+
+function renderTable(container, documents) {
+    if (!documents.length) {
+        container.innerHTML = `<div class="py-20 text-center space-y-4">
+            <span class="material-symbols-outlined text-6xl text-slate-200">folder_open</span>
+            <p class="text-slate-400 font-medium italic">No documents found in this category.</p>
+        </div>`;
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="border-b border-slate-100 dark:border-slate-800">
+                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Document</th>
+                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Fingerprint</th>
+                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Date</th>
+                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50 dark:divide-slate-800/50">
+                    ${documents.map(d => {
+                        // Find the "Parent" category for display
+                        let parentCat = d.department;
+                        for (const [parent, subs] of Object.entries(CATEGORY_MAP[currentMode])) {
+                            if (subs.includes(d.department)) {
+                                parentCat = parent;
+                                break;
+                            }
+                        }
+                        
+                        return `
+                        <tr class="hover:bg-slate-50/50 dark:hover:bg-white/5 transition-colors group">
+                            <td class="px-6 py-5">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600">
+                                        <span class="material-symbols-outlined">description</span>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm font-bold text-primary dark:text-[#D6E3FF]">${d.filename.split(/[/\\]/).pop()}</p>
+                                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-tighter">${parentCat}</p>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-5">
+                                <code class="text-[10px] font-mono text-slate-400 bg-slate-100 dark:bg-black/20 px-2 py-1 rounded">${d.block_hash.slice(0, 12)}...</code>
+                            </td>
+                            <td class="px-6 py-5 text-xs text-slate-500 font-medium">${new Date(d.upload_timestamp).toLocaleDateString()}</td>
+                            <td class="px-6 py-5 text-right">
+                                <div class="flex items-center justify-end gap-2">
+                                    <button onclick="renderIntegrityModal(${d.block_index})" class="p-2 rounded-lg hover:bg-emerald-50 text-emerald-600 transition-colors" title="Verify Integrity" aria-label="Verify integrity of block ${d.block_index}">
+                                        <span class="material-symbols-outlined text-xl">verified</span>
+                                    </button>
+                                    <a href="/api/chain/document/${d.block_index}/certified" target="_blank" class="p-2 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors" title="Download Certified PDF" aria-label="Download official certified PDF for block ${d.block_index}">
+                                        <span class="material-symbols-outlined text-xl">picture_as_pdf</span>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    `}).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+async function loadVaultDocuments(container) {
+    container.innerHTML = '<div class="flex justify-center py-20"><div class="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div></div>';
+
+    try {
+        const chain = await API.getChain();
+        let filtered = chain;
+
+        // 1. Filter by Mode (B2B vs B2C)
+        // Note: For now we assume all docs are visible, but we filter them into categories
+        // In a real app, B2B might only see docs with specific metadata
+
+        if (activeCategory !== 'all') {
+            const validDepts = CATEGORY_MAP[currentMode][activeCategory] || [];
+            filtered = chain.filter(d => validDepts.includes(d.department));
+        } else {
+            // "All" filter for current mode
+            const allValidDepts = Object.values(CATEGORY_MAP[currentMode]).flat();
+            filtered = chain.filter(d => allValidDepts.includes(d.department));
+        }
+
+        renderTable(container, filtered.reverse());
+    } catch (e) {
+        container.innerHTML = '<p class="text-center text-red-500 py-20">Failed to load documents.</p>';
+    }
+}
 
 // ── Stats Bar (shared) ──
 function renderStatsBar(container) {
@@ -319,7 +428,7 @@ function renderStatsBar(container) {
         document.getElementById('stat-total').textContent = d.total_documents?.toLocaleString() ?? '0';
         document.getElementById('stat-verified').textContent = d.verified_today?.toLocaleString() ?? '0';
         document.getElementById('stat-tampered').textContent = String(d.tampered_detected ?? 0).padStart(2, '0');
-    }).catch(() => {});
+    }).catch(() => { });
 }
 
 // ── Dashboard Page ──
@@ -327,6 +436,9 @@ function renderDashboard(app) {
     const isB2b = currentMode === 'b2b';
     const titleText = isB2b ? 'Institutional Portal' : 'My Personal Vault';
     const subTitle = isB2b ? 'Corporate Governance & Employee Records' : 'Self-Sovereign Identity & Life Records';
+
+    // 1. Clear container to prevent UI stacking glitch
+    app.innerHTML = '';
 
     document.getElementById('page-title').textContent = titleText;
     const wrap = document.createElement('div');
@@ -336,41 +448,51 @@ function renderDashboard(app) {
     header.innerHTML = `<div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div><span class="text-secondary font-bold tracking-widest uppercase text-xs">${subTitle}</span>
         <h1 class="text-3xl font-extrabold text-primary tracking-tight mt-1">${isB2b ? 'Admin Overview' : 'Secure Document Storage'}</h1></div>
-        <a href="#upload" class="bg-gradient-to-r from-primary to-primary-container text-on-primary px-6 py-3 rounded-xl font-semibold flex items-center gap-2 shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all">
+        <a href="#upload" class="bg-primary text-on-primary px-6 py-3 rounded-xl font-semibold flex items-center gap-2 shadow-lg shadow-primary/20 hover:bg-opacity-90 active:scale-95 transition-all">
             <span class="material-symbols-outlined text-lg">add</span> ${isB2b ? 'Issue New Certificate' : 'Protect New Document'}</a>
     </div>`;
     wrap.appendChild(header);
     renderStatsBar(wrap);
 
-    // Chain preview
-    const chainSection = document.createElement('div');
-    chainSection.className = 'bg-surface-container p-8 rounded-2xl relative overflow-hidden';
-    chainSection.innerHTML = `<div class="absolute top-0 right-0 p-4 opacity-5"><span class="material-symbols-outlined text-[120px]">account_tree</span></div>
-        <div class="relative z-10 grid md:grid-cols-4 gap-8">
-            <div class="md:col-span-1"><h3 class="text-xl font-bold text-primary mb-2">Live Node Feed</h3>
-            <p class="text-xs text-slate-500 leading-relaxed">Real-time verification logs from the distributed ledger.</p></div>
-            <div id="live-feed" class="md:col-span-3 flex flex-wrap gap-4">
-                <div class="bg-surface-container-lowest px-4 py-3 rounded-lg border border-primary/5 flex items-center gap-3">
-                    <div class="w-2 h-2 rounded-full bg-emerald-500 pulse-dot"></div>
-                    <span class="text-[10px] font-mono text-slate-600">Loading chain data...</span>
-                </div>
+    // Vault Explorer with Tabs
+    const explorer = document.createElement('div');
+    explorer.className = 'bg-surface-container-lowest rounded-[2rem] shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden';
+
+    // Ensure "all" is always lowercased for state consistency, but others match CATEGORY_MAP keys
+    const categories = ['all', ...Object.keys(CATEGORY_MAP[currentMode])];
+
+    explorer.innerHTML = `
+        <div class="px-8 py-6 border-b border-slate-50 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div class="flex items-center gap-2 overflow-x-auto no-scrollbar">
+                ${categories.map(cat => `
+                    <button onclick="setCategory('${cat}')" class="px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeCategory === cat ? 'bg-primary text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}">
+                        ${cat}
+                    </button>
+                `).join('')}
             </div>
-        </div>`;
-    wrap.appendChild(chainSection);
+            <div class="relative">
+                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
+                <input type="text" placeholder="Search vault..." class="pl-10 pr-4 py-2 bg-slate-50 dark:bg-black/20 border-none rounded-xl text-xs focus:ring-2 focus:ring-primary/10 w-full md:w-64"/>
+            </div>
+        </div>
+        <div id="vault-list" class="min-h-[400px]"></div>
+    `;
+    wrap.appendChild(explorer);
+
     app.appendChild(wrap);
 
-    // Populate live feed from chain
-    API.getChain().then(chain => {
-        const feed = document.getElementById('live-feed');
-        if (!feed) return;
-        const recent = chain.slice(-3).reverse();
-        feed.innerHTML = recent.map(d => `
-            <div class="bg-surface-container-lowest px-4 py-3 rounded-lg border border-primary/5 flex items-center gap-3">
-                <div class="w-2 h-2 rounded-full ${d.is_tampered ? 'bg-red-500' : 'bg-emerald-500'} pulse-dot"></div>
-                <span class="text-[10px] font-mono text-slate-600">Block #${d.block_index} • ${d.block_hash?.slice(0,12)}...</span>
-            </div>`).join('') || '<p class="text-sm text-slate-400">No blocks yet. Upload a document to begin.</p>';
-    }).catch(() => {});
+    // Load documents into the explorer
+    const listContainer = document.getElementById('vault-list');
+    loadVaultDocuments(listContainer);
 }
+
+// Global helper to switch categories
+window.setCategory = (cat) => {
+    activeCategory = cat;
+    // Partial re-render (just the explorer if we were fancy, but simple for now)
+    const app = document.getElementById('app');
+    renderDashboard(app);
+};
 
 // ── Upload Page ──
 function renderUpload(app) {
@@ -393,7 +515,7 @@ function renderUpload(app) {
                         <h3 class="text-xl font-semibold text-primary mb-2" id="drop-label">Drag and drop file</h3>
                         <p class="text-on-surface-variant mb-6 text-sm">Limit 10MB per file • PDF, DOCX, PNG, JPG, TXT</p>
                         <input type="file" id="file-input" class="hidden" accept=".pdf,.docx,.png,.jpg,.jpeg,.txt"/>
-                        <button type="button" id="browse-btn" class="bg-gradient-to-r from-primary to-primary-container text-white px-8 py-3 rounded-xl font-semibold shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all">Browse Files</button>
+                        <button type="button" id="browse-btn" class="bg-primary text-white px-8 py-3 rounded-xl font-semibold shadow-lg shadow-primary/20 hover:bg-opacity-90 active:scale-95 transition-all">Browse Files</button>
                     </div>
                     <div class="bg-surface-container-lowest rounded-xl p-8 space-y-6 shadow-sm">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -410,19 +532,11 @@ function renderUpload(app) {
                                     <span class="material-symbols-outlined absolute left-3 text-outline text-lg">category</span>
                                     <select id="upload-dept" class="w-full bg-surface pl-10 pr-4 py-3 rounded-xl border-none focus:ring-2 focus:ring-secondary/20 text-on-surface text-sm appearance-none">
                                         ${currentMode === 'b2c' ? `
-                                            <option>Personal Identity (Passport/ID)</option>
-                                            <option>Family Records (Birth/Marriage)</option>
-                                            <option>Financial Assets</option>
-                                            <option>Academic Certificates</option>
-                                            <option>Medical Reports</option>
-                                            <option>Office Records</option>
+                                            <option>Personal</option>
+                                            <option>Family</option>
+                                            <option>Office</option>
                                         ` : `
-                                            <option>Employee Contract</option>
-                                            <option>Personnel ID / KYC</option>
-                                            <option>Payroll & Tax</option>
-                                            <option>Experience Letters</option>
-                                            <option>Non-Disclosure Agreements</option>
-                                            <option>Termination Records</option>
+                                            <option>Employee Records</option>
                                         `}
                                     </select>
                                 </div>
@@ -446,7 +560,7 @@ function renderUpload(app) {
                             </div>
                         </div>
 
-                        <button type="submit" id="submit-btn" class="w-full bg-gradient-to-r from-primary to-primary-container text-white px-10 py-4 rounded-xl font-bold shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all text-lg flex items-center justify-center gap-3 disabled:opacity-50" disabled>
+                        <button type="submit" id="upload-btn" aria-label="Submit record to vault" class="w-full bg-primary text-white px-10 py-4 rounded-xl font-bold shadow-lg shadow-primary/20 hover:bg-opacity-90 active:scale-95 transition-all text-lg flex items-center justify-center gap-3">
                             <span class="material-symbols-outlined">upload_file</span> Submit Record
                         </button>
                     </div>
@@ -483,8 +597,8 @@ function renderUpload(app) {
         e.stopPropagation();
         fileInput.click();
     });
-    dropZone.addEventListener('click', (e) => { 
-        if (e.target === dropZone || e.target.closest('.drop-zone')) fileInput.click(); 
+    dropZone.addEventListener('click', (e) => {
+        if (e.target === dropZone || e.target.closest('.drop-zone')) fileInput.click();
     });
     dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
     dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
@@ -510,7 +624,7 @@ function renderUpload(app) {
         fd.append('file', fileInput.files[0]);
         fd.append('user', document.getElementById('upload-user').value || 'anonymous');
         fd.append('department', document.getElementById('upload-dept').value);
-        
+
         const parentId = document.getElementById('upload-parent').value.trim();
         const note = document.getElementById('upload-note').value.trim();
         if (parentId) fd.append('parent_document_id', parentId);
@@ -526,7 +640,7 @@ function renderUpload(app) {
                         <div class="flex items-center gap-3 mb-2"><span class="material-symbols-outlined text-blue-600 animate-spin">sync</span><span class="text-xs font-bold text-blue-700 uppercase">Processing...</span></div>
                         <p class="text-sm text-blue-800/70">Document #${res.job_id} is being secured on the blockchain. Check the Chain Explorer in a few seconds.</p>
                     </div>`;
-                    
+
                     // Poll for specific job completion
                     let attempts = 0;
                     const checkJob = setInterval(async () => {
@@ -538,7 +652,7 @@ function renderUpload(app) {
 
                             if (status.state === 'completed' && status.result) {
                                 clearInterval(checkJob);
-                                
+
                                 if (status.result.success === false) {
                                     // Handle non-success results from processor (e.g. Duplicates)
                                     if (status.result.error === 'Duplicate') {
@@ -581,7 +695,7 @@ function renderUpload(app) {
                                     };
                                     renderSuccessUI(resultDiv, finalResult);
                                 }
-                                
+
                                 // Reset button
                                 submitBtn.disabled = false;
                                 submitBtn.innerHTML = '<span class="material-symbols-outlined">upload_file</span> Submit Record';
@@ -591,7 +705,7 @@ function renderUpload(app) {
                                     <div class="flex items-center gap-3 mb-2"><span class="material-symbols-outlined text-red-600">error</span><span class="text-xs font-bold text-red-700 uppercase">Processing Failed</span></div>
                                     <p class="text-sm text-red-800/70">${status.error || 'The background processor failed to secure this document.'}</p>
                                 </div>`;
-                                
+
                                 // Reset button
                                 submitBtn.disabled = false;
                                 submitBtn.innerHTML = '<span class="material-symbols-outlined">upload_file</span> Submit Record';
@@ -741,7 +855,7 @@ function renderVerify(app) {
                         </div>
                         <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 px-1">Compare with (Legal Name)</label>
                         <input id="verify-compare" class="w-full bg-surface-container-low border-none rounded-xl px-6 py-4 text-sm focus:ring-2 focus:ring-secondary/20 placeholder:text-slate-300" placeholder="Leave blank for first upload" type="text"/></div>
-                        <button type="submit" id="verify-btn" class="w-full h-14 bg-gradient-to-r from-primary to-primary-container text-white rounded-xl font-bold text-lg flex items-center justify-center gap-3 shadow-lg shadow-primary/20 hover:opacity-90 active:scale-[0.98] transition-all">                            <span>Verify Authenticity</span><span class="material-symbols-outlined">shield_with_heart</span>
+                        <button type="submit" id="verify-btn" aria-label="Verify document authenticity" class="w-full h-14 bg-primary text-white rounded-xl font-bold text-lg flex items-center justify-center gap-3 shadow-lg shadow-primary/20 hover:bg-opacity-90 active:scale-[0.98] transition-all">                            <span>Verify Authenticity</span><span class="material-symbols-outlined">shield_with_heart</span>
                         </button>
                     </form>
                 </div>
@@ -768,7 +882,7 @@ function renderVerify(app) {
         if (el) el.innerHTML = `
             <div class="flex justify-between items-end"><div><p class="text-secondary uppercase font-bold text-[10px] tracking-widest">Total Documents</p><p class="text-2xl font-bold text-primary">${d.total_documents}</p></div></div>
             <div class="flex justify-between items-end"><div><p class="text-secondary uppercase font-bold text-[10px] tracking-widest">Tampered</p><p class="text-2xl font-bold text-error">${d.tampered_detected}</p></div></div>`;
-    }).catch(() => {});
+    }).catch(() => { });
 
     // File drop
     const verifyDrop = document.getElementById('verify-drop');
@@ -783,17 +897,17 @@ function renderVerify(app) {
         e.preventDefault();
         const btn = document.getElementById('verify-btn');
         const resultDiv = document.getElementById('verify-result');
-        
+
         btn.disabled = true;
         resultDiv.classList.remove('hidden');
-        
+
         // ── Trust Journey Animation ──
         const steps = [
-            { id: 'hash', label: 'Generating Content Fingerprint', icon: 'fingerprint' },
-            { id: 'vision', label: 'AI Forensic Texture Analysis', icon: 'biotech' },
-            { id: 'ocr', label: 'Multi-Lingual OCR Transcription', icon: 'translate' },
-            { id: 'chain', label: 'Blockchain Ancestry Validation', icon: 'link' },
-            { id: 'gemini', label: 'Gemini Generative AI Audit', icon: 'psychology' }
+            { id: 'hash', label: 'Fingerprinting Document Content...', icon: 'fingerprint' },
+            { id: 'vision', label: 'Scanning Forensic Texture Anomalies...', icon: 'biotech' },
+            { id: 'ocr', label: 'Transcribing Multilingual Text Layers...', icon: 'translate' },
+            { id: 'chain', label: 'Validating Blockchain Ancestry...', icon: 'link' },
+            { id: 'gemini', label: 'Performing Gemini AI Integrity Audit...', icon: 'psychology' }
         ];
 
         resultDiv.innerHTML = `
@@ -821,7 +935,7 @@ function renderVerify(app) {
             el.classList.remove('opacity-30', 'grayscale');
             const iconWrap = el.querySelector('div');
             const icon = el.querySelector('span');
-            
+
             if (status === 'loading') {
                 iconWrap.className = 'w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center animate-pulse';
                 el.querySelector('span:last-child').className = 'text-xs font-bold text-blue-600';
@@ -843,11 +957,11 @@ function renderVerify(app) {
             // Start the sequence
             updateStep('hash', 'loading');
             const resPromise = API.verify(fd);
-            
+
             await new Promise(r => setTimeout(r, 800));
             updateStep('hash', 'done');
             updateStep('vision', 'loading');
-            
+
             await new Promise(r => setTimeout(r, 1200));
             updateStep('vision', 'done');
             updateStep('ocr', 'loading');
@@ -857,7 +971,7 @@ function renderVerify(app) {
             updateStep('chain', 'loading');
 
             const res = await resPromise;
-            
+
             updateStep('chain', 'done');
             updateStep('gemini', 'loading');
             await new Promise(r => setTimeout(r, 600));
@@ -865,7 +979,7 @@ function renderVerify(app) {
 
             // ── Render Final Result ──
             const r = document.getElementById('verify-result');
-            
+
             let sigBadge = '';
             if (res.signature_status === 'VERIFIED') {
                 sigBadge = `<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-extrabold uppercase mb-4 shadow-sm border border-emerald-200">
@@ -885,18 +999,37 @@ function renderVerify(app) {
             let geminiHtml = '';
             if (res.ai_report && res.ai_report.status !== 'error') {
                 const ai = res.ai_report;
-                const riskColors = { 'LOW': 'text-emerald-500', 'MEDIUM': 'text-orange-500', 'HIGH': 'text-red-500' };
+                const riskColors = { 'LOW': 'text-emerald-400', 'MEDIUM': 'text-orange-400', 'HIGH': 'text-red-400' };
+                const riskBarColors = { 'LOW': 'bg-emerald-500', 'MEDIUM': 'bg-orange-500', 'HIGH': 'bg-red-500' };
+                const confidence = Math.round((ai.confidence_score || 0.85) * 100);
+                
                 geminiHtml = `
                     <div class="mt-6 bg-slate-900 rounded-2xl p-6 border border-white/10 shadow-2xl relative overflow-hidden group">
                         <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                             <span class="material-symbols-outlined text-6xl text-white">psychology</span>
                         </div>
-                        <div class="relative z-10 space-y-4">
+                        <div class="relative z-10 space-y-5">
                             <div class="flex items-center justify-between">
                                 <h5 class="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">Gemini AI Integrity Audit</h5>
-                                <span class="text-[9px] font-black uppercase ${riskColors[ai.risk_assessment?.rating] || 'text-slate-400'}">${ai.risk_assessment?.rating || 'N/A'} Risk Profile</span>
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2 h-2 rounded-full ${riskBarColors[ai.risk_assessment?.rating] || 'bg-slate-400'} animate-pulse"></span>
+                                    <span class="text-[9px] font-black uppercase ${riskColors[ai.risk_assessment?.rating] || 'text-slate-400'}">${ai.risk_assessment?.rating || 'N/A'} Risk Profile</span>
+                                </div>
                             </div>
-                            <p class="text-white text-sm leading-relaxed font-medium">"${ai.summary}"</p>
+
+                            <!-- Confidence Gauge -->
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-end">
+                                    <p class="text-[8px] font-black text-slate-500 uppercase">AI Verification Confidence</p>
+                                    <p class="text-lg font-black text-white leading-none">${confidence}%</p>
+                                </div>
+                                <div class="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
+                                    <div class="h-full bg-gradient-to-r from-blue-600 to-blue-400 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(37,99,235,0.5)]" style="width: ${confidence}%"></div>
+                                </div>
+                            </div>
+
+                            <p class="text-white text-sm leading-relaxed font-medium bg-white/5 p-4 rounded-xl border border-white/5">"${ai.summary}"</p>
+                            
                             <div class="grid grid-cols-2 gap-4 pt-2">
                                 <div class="space-y-1">
                                     <p class="text-[8px] font-black text-slate-500 uppercase">Classification</p>
@@ -972,12 +1105,6 @@ function renderVerify(app) {
                     <p class="text-[9px] font-black text-red-400 uppercase mb-2">Failure Reasons:</p>
                     <ul class="space-y-1 text-xs">${reasons}</ul>
                 </div>` : ''}
-
-                <div class="mt-8 pt-6 border-t border-slate-200/50">
-                    ${ocrDisplay}
-                    ${forensicDiff}
-                    ${signatureDiff}
-                </div>
             </div>`;
 
         } catch (err) {
@@ -1063,18 +1190,18 @@ function loadChain(silent = false) {
             const status = d.is_tampered
                 ? '<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-100 text-red-700 text-[10px] font-extrabold uppercase"><span class="w-1.5 h-1.5 rounded-full bg-red-500 pulse-dot"></span>Tampered</span>'
                 : '<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-700 text-[10px] font-extrabold uppercase"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>Verified</span>';
-            
-            const merkleBadge = d.merkle_proof 
+
+            const merkleBadge = d.merkle_proof
                 ? `<div class="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-600 text-[8px] font-black border border-emerald-100 uppercase">
                     <span class="material-symbols-outlined text-[10px]">account_tree</span> Merkle Verified
                    </div>`
                 : '';
-            
-            const anchorIcon = d.polygon_txid 
+
+            const anchorIcon = d.polygon_txid
                 ? `<a href="https://amoy.polygonscan.com/tx/${d.polygon_txid}" target="_blank" class="material-symbols-outlined text-[14px] text-emerald-500 hover:text-emerald-700 transition-colors" title="View Public Proof on PolygonScan">link</a>`
                 : '';
 
-            return `<tr class="${i%2===0?'':'bg-surface-container-lowest'} hover:bg-slate-50/50 transition-colors">
+            return `<tr class="${i % 2 === 0 ? '' : 'bg-surface-container-lowest'} hover:bg-slate-50/50 transition-colors">
                 <td class="px-6 py-5 text-sm font-bold text-secondary flex flex-col items-start gap-1">
                     <div class="flex items-center gap-1.5">#${d.block_index} ${anchorIcon}</div>
                     <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-[8px] font-black uppercase">V${d.version_number || 1}</span>
@@ -1082,19 +1209,19 @@ function loadChain(silent = false) {
                 <td class="px-6 py-5 text-sm font-semibold text-primary">
                     ${fname}
                     <div class="mt-1 flex flex-wrap gap-2">
-                        <a href="/api/chain/document/${d.block_index}/certified" target="_blank" class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-primary hover:text-primary-container transition-colors">
+                        <a href="/api/chain/document/${d.block_index}/certified" target="_blank" aria-label="Download certified PDF" class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-primary hover:text-primary-container transition-colors">
                             <span class="material-symbols-outlined text-[12px]">verified</span> Certified PDF
                         </a>
-                        <a href="/api/verify/${d.block_index}/proof?api_key=${API_KEY}" target="_blank" class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-secondary hover:text-primary-container transition-colors">
+                        <a href="/api/verify/${d.block_index}/proof?api_key=${API_KEY}" target="_blank" aria-label="Download JSON proof" class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-secondary hover:text-primary-container transition-colors">
                             <span class="material-symbols-outlined text-[12px]">download</span> JSON Proof
                         </a>
-                        <button onclick="showVersionHistory(${d.block_index})" class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-blue-600 hover:text-blue-800 transition-colors">
+                        <button onclick="showVersionHistory(${d.block_index})" aria-label="View version history" class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-blue-600 hover:text-blue-800 transition-colors">
                             <span class="material-symbols-outlined text-[12px]">history</span> View Versions
                         </button>
-                        <button onclick="renderIntegrityModal(${d.block_index})" class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-emerald-600 hover:text-emerald-800 transition-colors">
+                        <button onclick="renderIntegrityModal(${d.block_index})" aria-label="Verify integrity" class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-emerald-600 hover:text-emerald-800 transition-colors">
                             <span class="material-symbols-outlined text-[12px]">analytics</span> Verify Integrity
                         </button>
-                        <button onclick="renderDocumentIntelligence(${d.block_index})" class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-blue-600 hover:text-blue-800 transition-colors">
+                        <button onclick="renderDocumentIntelligence(${d.block_index})" aria-label="View AI intelligence" class="inline-flex items-center gap-1 text-[9px] font-black uppercase text-blue-600 hover:text-blue-800 transition-colors">
                             <span class="material-symbols-outlined text-[12px]">psychology</span> Intelligence
                         </button>
                     </div>
@@ -1102,20 +1229,20 @@ function loadChain(silent = false) {
                 <td class="px-6 py-5 flex flex-col gap-1">
                     <div class="flex items-center gap-2">
                         <span class="text-[8px] font-black text-slate-400 uppercase">Block Hash:</span>
-                        <code class="text-[10px] font-mono bg-slate-100 px-2 py-0.5 rounded text-slate-600">${d.block_hash.slice(0,16)}...</code>
+                        <code class="text-[10px] font-mono bg-slate-100 px-2 py-0.5 rounded text-slate-600">${d.block_hash.slice(0, 16)}...</code>
                     </div>
                     ${d.ipfs_cid ? `
                     <div class="flex items-center gap-2">
                         <span class="text-[8px] font-black text-blue-400 uppercase">IPFS Node:</span>
                         <a href="https://ipfs.io/ipfs/${d.ipfs_cid}" target="_blank" class="text-[10px] font-mono text-blue-600 hover:underline">
-                            ${d.ipfs_cid.slice(0,12)}...
+                            ${d.ipfs_cid.slice(0, 12)}...
                         </a>
                     </div>
                     ` : ''}
                     ${d.merkle_root ? `
                     <div class="flex items-center gap-2">
                         <span class="text-[8px] font-black text-emerald-400 uppercase">Merkle Root:</span>
-                        <code class="text-[10px] font-mono bg-emerald-50 px-2 py-0.5 rounded text-emerald-600">${d.merkle_root.slice(0,16)}...</code>
+                        <code class="text-[10px] font-mono bg-emerald-50 px-2 py-0.5 rounded text-emerald-600">${d.merkle_root.slice(0, 16)}...</code>
                     </div>
                     ` : ''}
                     ${merkleBadge}
@@ -1145,7 +1272,7 @@ function renderAudit(app) {
                 </button>
             </div>
         </div>`;
-    
+
     const tableWrap = document.createElement('div');
     tableWrap.className = 'bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm';
     tableWrap.innerHTML = `
@@ -1191,9 +1318,9 @@ function loadAudit(silent = false, documentId = null) {
     }
 
     if (!silent) body.innerHTML = '<tr><td colspan="6" class="px-6 py-8 text-center text-slate-400">Loading audit logs...</td></tr>';
-    
+
     const fetchCall = documentId ? API.getDocumentHistory(documentId) : API.getAudit();
-    
+
     fetchCall.then(logs => {
         if (!logs.length) {
             body.innerHTML = '<tr><td colspan="6" class="px-6 py-8 text-center text-slate-400">No audit events recorded.</td></tr>';
@@ -1203,10 +1330,10 @@ function loadAudit(silent = false, documentId = null) {
             const fname = log.filename.split(/[/\\]/).pop();
             const isTamper = log.action.includes('TAMPER');
             const rowClass = isTamper ? 'bg-red-50 text-red-900' : 'hover:bg-slate-50/50';
-            const actionBadge = isTamper 
+            const actionBadge = isTamper
                 ? `<span class="px-2 py-0.5 rounded-full bg-red-600 text-white text-[9px] font-black uppercase">TAMPER DETECTED</span>`
                 : `<span class="px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 text-[9px] font-bold uppercase">${log.action}</span>`;
-            
+
             return `<tr class="${rowClass} transition-colors">
                 <td class="px-6 py-5 text-xs font-medium">${new Date(log.timestamp).toLocaleString()}</td>
                 <td class="px-6 py-5 text-xs font-bold">${fname} <span class="text-[10px] text-slate-400 font-normal ml-1">#${log.document_id}</span></td>
@@ -1214,7 +1341,7 @@ function loadAudit(silent = false, documentId = null) {
                 <td class="px-6 py-5 text-xs font-semibold">${log.actor}</td>
                 <td class="px-6 py-5 text-xs text-on-surface-variant leading-relaxed">${log.details}</td>
                 <td class="px-6 py-5 text-xs">
-                    ${!documentId ? `<button onclick="loadAudit(false, ${log.document_id})" class="text-secondary font-bold hover:underline">View History</button>` : ''}
+                    ${!documentId ? `<button onclick="loadAudit(false, ${log.document_id})" aria-label="View history for block ${log.document_id}" class="text-secondary font-bold hover:underline">View History</button>` : ''}
                 </td>
             </tr>`;
         }).join('');
@@ -1230,7 +1357,7 @@ function renderSettings(app) {
     const wrap = document.createElement('div');
     wrap.className = 'max-w-2xl mx-auto space-y-8 fade-in';
     const isDark = document.documentElement.classList.contains('dark');
-    
+
     wrap.innerHTML = `
         <div class="space-y-2"><h1 class="text-4xl font-extrabold tracking-tight text-primary">Preferences</h1>
         <p class="text-on-surface-variant">Configure your local workspace and visual identity.</p></div>
@@ -1266,62 +1393,182 @@ function renderSettings(app) {
 function renderHelp(app) {
     document.getElementById('page-title').textContent = 'System Protocol Guide';
     const wrap = document.createElement('div');
-    wrap.className = 'max-w-6xl mx-auto space-y-12 fade-in';
+    wrap.className = 'max-w-7xl mx-auto space-y-16 fade-in';
 
     wrap.innerHTML = `
         <div class="text-center space-y-4">
-            <div class="inline-flex items-center gap-2 px-3 py-1 bg-primary text-white rounded-full text-[10px] font-black tracking-widest uppercase mb-2">Protocol v3.0 Active</div>
-            <h1 class="text-5xl font-black text-primary tracking-tight">The <span class="text-secondary">DoVER</span> Standard</h1>
-            <p class="text-on-surface-variant text-lg max-w-2xl mx-auto">Establishing the global benchmark for decentralized document integrity and verified legal evidence.</p>
+            <div class="inline-flex items-center gap-2 px-3 py-1 bg-primary text-white rounded-full text-[10px] font-black tracking-widest uppercase mb-2">Protocol v3.2 - Implementation & Design Blueprint</div>
+            <h1 class="text-6xl font-black text-primary tracking-tight">System <span class="text-secondary">Intelligence</span> Guide</h1>
+            <p class="text-on-surface-variant text-lg max-w-2xl mx-auto font-medium">Strategic documentation for the DoVER decentralized document integrity ecosystem.</p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm hover:shadow-md transition-shadow space-y-4 group">
-                <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">public</span></div>
-                <h3 class="text-xl font-bold text-primary">1. Public Trust Layer</h3>
-                <p class="text-sm text-slate-500 leading-relaxed">Our <strong>Public Portal</strong> allows citizens to verify any document instantly via QR code without logging in. It displays blockchain confirmation and forensic health without exposing sensitive data.</p>
+        <!-- Implementation Disclaimer Block -->
+        <div class="bg-blue-50 border border-blue-100 rounded-[2rem] p-10 flex flex-col md:flex-row gap-8 items-center shadow-sm">
+            <div class="w-16 h-16 bg-blue-600 text-white rounded-2xl flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-3xl">info</span>
             </div>
-
-            <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm hover:shadow-md transition-shadow space-y-4 group">
-                <div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">picture_as_pdf</span></div>
-                <h3 class="text-xl font-bold text-primary">2. Court-Ready Export</h3>
-                <p class="text-sm text-slate-500 leading-relaxed">Authorities can export <strong>RSA-Signed PDF Reports</strong>. These include full chain of custody, Merkle proofs, and Bates numbering, designed to be admissible as digital evidence in court.</p>
-            </div>
-
-            <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm hover:shadow-md transition-shadow space-y-4 group">
-                <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">link</span></div>
-                <h3 class="text-xl font-bold text-primary">3. Polygon Anchoring</h3>
-                <p class="text-sm text-slate-500 leading-relaxed">Every document block is anchored to the <strong>Polygon Blockchain</strong>. This provides immutable proof-of-existence that is independent of our servers and verifiable globally.</p>
-            </div>
-
-            <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm hover:shadow-md transition-shadow space-y-4 group">
-                <div class="w-12 h-12 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">smart_toy</span></div>
-                <h3 class="text-xl font-bold text-primary">4. Gemini AI Insights</h3>
-                <p class="text-sm text-slate-500 leading-relaxed">Leveraging <strong>Gemini 1.5 Pro</strong>, the system generates natural language summaries, extracts key entities, and provides automated risk assessments for every registered record.</p>
-            </div>
-
-            <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm hover:shadow-md transition-shadow space-y-4 group">
-                <div class="w-12 h-12 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">shield_person</span></div>
-                <h3 class="text-xl font-bold text-primary">5. Identity Isolation</h3>
-                <p class="text-sm text-slate-500 leading-relaxed">Strict **Google OAuth** identity enforcement ensures that users only see their own records, while providing <strong>Authority Clearance</strong> for system-wide auditing.</p>
-            </div>
-
-            <div class="bg-surface-container-lowest p-8 rounded-3xl border border-surface-container shadow-sm hover:shadow-md transition-shadow space-y-4 group">
-                <div class="w-12 h-12 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform"><span class="material-symbols-outlined text-3xl">memory</span></div>
-                <h3 class="text-xl font-bold text-primary">6. Parallel Forensics</h3>
-                <p class="text-sm text-slate-500 leading-relaxed">Computational analysis is offloaded to <strong>Worker Threads</strong>. Our AI crunches pixel data for font consistency and baseline jitter without ever slowing down the user experience.</p>
+            <div class="space-y-2">
+                <h2 class="text-xl font-black text-primary uppercase tracking-tight">Project Implementation Status</h2>
+                <p class="text-sm text-slate-600 leading-relaxed font-medium">
+                    DoVER is a functional prototype demonstrating a decentralized document integrity pipeline. 
+                    The current implementation focuses on **Core Cryptographic Logic** (Hashing, Chaining, Signature Verification). 
+                    Advanced network-level features, including **Global PKI Onboarding**, **Merkle Batching**, and **Polygon Network Persistence**, 
+                    are presented here as part of the system’s **Architectural Design Blueprint** for production-grade scaling.
+                </p>
             </div>
         </div>
+
+        <!-- 1. The Core Operational Engine -->
+        <section class="space-y-8">
+            <div class="flex items-center gap-4">
+                <div class="h-px flex-1 bg-slate-200"></div>
+                <h2 class="text-xs font-black uppercase tracking-[0.3em] text-slate-400">01. Core Operational Engine</h2>
+                <div class="h-px flex-1 bg-slate-200"></div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 space-y-4">
+                    <div class="text-primary font-black text-4xl opacity-10">01</div>
+                    <h4 class="font-bold text-lg text-primary">Cryptographic Hashing</h4>
+                    <p class="text-xs text-slate-500 leading-relaxed">Files are fingerprinted using SHA-256 before ingestion. This ensures any modification—down to a single pixel—is immediately detected.</p>
+                </div>
+                <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 space-y-4">
+                    <div class="text-primary font-black text-4xl opacity-10">02</div>
+                    <h4 class="font-bold text-lg text-primary">Distributed Chaining</h4>
+                    <p class="text-xs text-slate-500 leading-relaxed">Document records are linked in a blockchain-style ledger. Each block contains the hash of its predecessor, creating an immutable history.</p>
+                </div>
+                <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 space-y-4">
+                    <div class="text-primary font-black text-4xl opacity-10">03</div>
+                    <h4 class="font-bold text-lg text-primary">Forensic Analysis</h4>
+                    <p class="text-xs text-slate-500 leading-relaxed">Integrated worker threads perform multi-layer scans for font consistency and baseline jitter to identify potential physical tampering.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. The Verification Journey (Live Demo) -->
+        <section class="bg-slate-900 p-12 rounded-[4rem] text-white space-y-10 relative overflow-hidden">
+            <div class="absolute top-0 right-0 p-8 opacity-5"><span class="material-symbols-outlined text-[20rem]">verified</span></div>
+            <div class="relative z-10 grid md:grid-cols-2 gap-12 items-center">
+                <div class="space-y-6">
+                    <h2 class="text-4xl font-black tracking-tight">Active Trust Journey <br/><span class="text-blue-400">Integrated Verification</span></h2>
+                    <p class="text-slate-400 text-sm leading-relaxed">Verification is a comprehensive journey. Our live scanner provides real-time visual checklists of the cryptographic and AI checks being performed on the record.</p>
+                    <div class="space-y-4">
+                        <div class="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/10">
+                            <span class="material-symbols-outlined text-blue-400">psychology</span>
+                            <div>
+                                <p class="text-xs font-black uppercase">Gemini AI Audit</p>
+                                <p class="text-[10px] text-slate-500">Live natural language summaries generated for every verification.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/10">
+                            <span class="material-symbols-outlined text-emerald-400">history</span>
+                            <div>
+                                <p class="text-xs font-black uppercase">Ancestry Validation</p>
+                                <p class="text-[10px] text-slate-500">Real-time traversal of the document's version history and audit log.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white/5 rounded-3xl p-8 border border-white/10 space-y-6 text-center">
+                    <div class="space-y-2">
+                        <span class="material-symbols-outlined text-5xl text-blue-400">auto_awesome</span>
+                        <h3 class="text-xl font-bold">AI Confidence Gauge</h3>
+                    </div>
+                    <div class="space-y-4">
+                        <div class="h-2 w-full bg-white/10 rounded-full overflow-hidden">
+                            <div class="h-full bg-blue-500 w-[95%]"></div>
+                        </div>
+                        <p class="text-[11px] text-slate-400 leading-relaxed italic">"The confidence gauge utilizes Gemini AI to interpret forensic health flags, providing a human-readable risk score for each record."</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. Architectural Design Blueprint -->
+        <section class="space-y-8">
+            <div class="flex items-center gap-4">
+                <div class="h-px flex-1 bg-slate-200"></div>
+                <h2 class="text-xs font-black uppercase tracking-[0.3em] text-slate-400">03. Architectural Design Blueprint</h2>
+                <div class="h-px flex-1 bg-slate-200"></div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="bg-surface-container-low p-10 rounded-[3rem] border border-surface-container space-y-6">
+                    <div class="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center"><span class="material-symbols-outlined text-3xl">hub</span></div>
+                    <h3 class="text-2xl font-black text-primary">Scalable PKI Architecture</h3>
+                    <p class="text-slate-500 leading-relaxed text-sm italic">Designed for enterprise scaling.</p>
+                    <p class="text-slate-500 leading-relaxed text-sm">Our blueprint includes a centralized Key Registry for institutional onboarding. This architecture supports RSA-2048 identity verification and administrative approval workflows for corporate entities.</p>
+                </div>
+                <div class="bg-surface-container-low p-10 rounded-[3rem] border border-surface-container space-y-6">
+                    <div class="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center"><span class="material-symbols-outlined text-3xl">link</span></div>
+                    <h3 class="text-2xl font-black text-primary">Public Network Anchoring</h3>
+                    <p class="text-slate-500 leading-relaxed text-sm italic">Designed for global immutability.</p>
+                    <p class="text-slate-500 leading-relaxed text-sm">The architecture supports anchoring Merkle Root hashes to the Polygon blockchain. This provides a secondary, tamper-proof layer of proof-of-existence that survives even if the DoVER server is offline.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. Adversarial Security Standards -->
+        <section class="space-y-8">
+            <div class="flex items-center gap-4">
+                <div class="h-px flex-1 bg-slate-200"></div>
+                <h2 class="text-xs font-black uppercase tracking-[0.3em] text-slate-400">04. Adversarial Security Standards</h2>
+                <div class="h-px flex-1 bg-slate-200"></div>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div class="p-6 bg-surface-container-lowest border border-slate-100 rounded-3xl space-y-3">
+                    <span class="material-symbols-outlined text-secondary">history</span>
+                    <h4 class="font-bold text-sm text-primary">Anti-Replay</h4>
+                    <p class="text-[10px] text-slate-500">X-Nonce enforcement logic designed to prevent duplicate request execution.</p>
+                </div>
+                <div class="p-6 bg-surface-container-lowest border border-slate-100 rounded-3xl space-y-3">
+                    <span class="material-symbols-outlined text-secondary">signature</span>
+                    <h4 class="font-bold text-sm text-primary">HMAC Signing</h4>
+                    <p class="text-[10px] text-slate-500">Protocol designed for cryptographically signed request validation via API Secrets.</p>
+                </div>
+                <div class="p-6 bg-surface-container-lowest border border-slate-100 rounded-3xl space-y-3">
+                    <span class="material-symbols-outlined text-secondary">timer</span>
+                    <h4 class="font-bold text-sm text-primary">Clock Skew</h4>
+                    <p class="text-[10px] text-slate-500">Time-windowed authentication to minimize interception windows.</p>
+                </div>
+                <div class="p-6 bg-surface-container-lowest border border-slate-100 rounded-3xl space-y-3">
+                    <span class="material-symbols-outlined text-secondary">security</span>
+                    <h4 class="font-bold text-sm text-primary">Abuse Tracking</h4>
+                    <p class="text-[10px] text-slate-500">Integrated scoring system to flag and block malicious traffic patterns.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. Future Compliance: Export & Evidence -->
+        <section class="bg-blue-50 p-12 rounded-[4rem] flex flex-col md:flex-row items-center gap-12 border border-blue-100 shadow-sm">
+            <div class="flex-1 space-y-6">
+                <h2 class="text-4xl font-black text-primary tracking-tight">Certified Export <br/><span class="text-secondary">Blueprint</span></h2>
+                <p class="text-slate-600 text-sm leading-relaxed font-medium">The system’s designed lifecycle includes **Official Certified PDF Exports**. These documents are architected to include an embedded <strong>dover_proof.json</strong> file, aligning with digital evidence standards for court admissibility.</p>
+                <div class="flex gap-4">
+                    <div class="flex items-center gap-2 text-xs font-black text-primary uppercase"><span class="material-symbols-outlined text-lg">draw</span> P12 Signature</div>
+                    <div class="flex items-center gap-2 text-xs font-black text-primary uppercase"><span class="material-symbols-outlined text-lg">attachment</span> Audit Trail</div>
+                </div>
+            </div>
+            <div class="w-full md:w-72 aspect-[3/4] bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 space-y-4 opacity-80">
+                <div class="h-4 w-3/4 bg-slate-100 rounded"></div>
+                <div class="h-4 w-full bg-slate-100 rounded"></div>
+                <div class="h-4 w-5/6 bg-slate-100 rounded"></div>
+                <div class="flex-1"></div>
+                <div class="border-2 border-blue-100 bg-blue-50/50 p-4 rounded-xl">
+                    <p class="text-[8px] font-black text-blue-400 uppercase tracking-widest">Architectural Spec</p>
+                    <p class="text-[10px] font-bold text-primary uppercase mt-1">Certified PDF Export</p>
+                    <p class="text-[8px] text-slate-400">Designed for Evidence</p>
+                </div>
+            </div>
+        </section>
 
         <div class="bg-primary p-12 rounded-[3rem] text-white text-center space-y-6 shadow-2xl shadow-primary/30 relative overflow-hidden mt-8">
             <div class="relative z-10">
-                <h2 class="text-3xl font-black uppercase tracking-tight">Enterprise Compliance Standards</h2>
-                <p class="opacity-70 max-w-lg mx-auto text-sm leading-relaxed">DoVER adheres to strict ISO-standard immutable ledger protocols, ensuring every document registration is legally traceable and cryptographically secure.</p>
+                <h2 class="text-3xl font-black uppercase tracking-tight">Technical Implementation & Research</h2>
+                <p class="opacity-70 max-w-lg mx-auto text-sm leading-relaxed">For a deep dive into the cryptographic logic and adversarial threat models currently being prototyped, refer to the project's internal technical specifications.</p>
                 <div class="flex justify-center gap-4 mt-6">
-                    <a href="#upload" class="inline-flex bg-white text-primary px-10 py-4 rounded-2xl font-black hover:scale-105 active:scale-95 transition-transform shadow-xl">Start Secure Upload</a>
+                    <a href="#dashboard" class="inline-flex bg-white text-primary px-10 py-4 rounded-2xl font-black hover:scale-105 active:scale-95 transition-transform shadow-xl">Return to Vault</a>
                 </div>
             </div>
-            <span class="material-symbols-outlined absolute -right-6 -bottom-6 text-[15rem] opacity-5 pointer-events-none">gavel</span>
+            <span class="material-symbols-outlined absolute -right-6 -bottom-6 text-[15rem] opacity-5 pointer-events-none">help_center</span>
         </div>
     `;
     app.appendChild(wrap);
@@ -1349,7 +1596,7 @@ function renderBatch(app) {
                     <h3 class="text-xl font-semibold text-primary mb-2" id="batch-drop-label">Drag & drop files here</h3>
                     <p class="text-on-surface-variant text-sm mb-6">Up to 20 files • PDF, DOCX, PNG, JPG, TXT</p>
                     <input type="file" id="batch-file-input" class="hidden" multiple accept=".pdf,.docx,.png,.jpg,.jpeg,.txt"/>
-                    <button type="button" id="batch-browse-btn" class="bg-gradient-to-r from-primary to-primary-container text-white px-8 py-3 rounded-xl font-semibold shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all">Browse Files</button>
+                    <button type="button" id="batch-browse-btn" class="bg-primary text-white px-8 py-3 rounded-xl font-semibold shadow-lg shadow-primary/20 hover:bg-opacity-90 active:scale-95 transition-all">Browse Files</button>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1366,26 +1613,18 @@ function renderBatch(app) {
                             <span class="material-symbols-outlined absolute left-3 text-outline text-lg">category</span>
                             <select id="batch-dept" class="w-full bg-surface pl-10 pr-4 py-3 rounded-xl border border-outline-variant/30 focus:ring-2 focus:ring-secondary/20 text-on-surface text-sm appearance-none">
                                 ${currentMode === 'b2c' ? `
-                                    <option>Personal Identity (Passport/ID)</option>
-                                    <option>Family Records (Birth/Marriage)</option>
-                                    <option>Financial Assets</option>
-                                    <option>Academic Certificates</option>
-                                    <option>Medical Reports</option>
-                                    <option>Office Records</option>
+                                    <option>Personal</option>
+                                    <option>Family</option>
+                                    <option>Office</option>
                                 ` : `
-                                    <option>Employee Contract</option>
-                                    <option>Personnel ID / KYC</option>
-                                    <option>Payroll & Tax</option>
-                                    <option>Experience Letters</option>
-                                    <option>Non-Disclosure Agreements</option>
-                                    <option>Termination Records</option>
+                                    <option>Employee Records</option>
                                 `}
                             </select>
                         </div>
                     </div>
                 </div>
 
-                <button type="submit" id="batch-submit-btn" class="w-full mt-6 bg-gradient-to-r from-primary to-primary-container text-white px-10 py-4 rounded-xl font-bold shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all text-lg flex items-center justify-center gap-3 disabled:opacity-40" disabled>
+                <button type="submit" id="batch-submit-btn" class="w-full mt-6 bg-primary text-white px-10 py-4 rounded-xl font-bold shadow-lg shadow-primary/20 hover:bg-opacity-90 active:scale-95 transition-all text-lg flex items-center justify-center gap-3 disabled:opacity-40" disabled>
                     <span class="material-symbols-outlined">upload_file</span> Upload Batch
                 </button>
             </form>
@@ -1507,24 +1746,24 @@ function renderBatch(app) {
 
     function jobRowHTML(job) {
         const statusColors = {
-            queued:     'bg-slate-100 text-slate-600',
+            queued: 'bg-slate-100 text-slate-600',
             processing: 'bg-yellow-100 text-yellow-700',
-            completed:  'bg-green-100 text-green-700',
-            failed:     'bg-red-100 text-red-700'
+            completed: 'bg-green-100 text-green-700',
+            failed: 'bg-red-100 text-red-700'
         };
         const barColors = {
-            queued:     'bg-slate-300',
+            queued: 'bg-slate-300',
             processing: 'bg-yellow-400',
-            completed:  'bg-emerald-500',
-            failed:     'bg-red-500'
+            completed: 'bg-emerald-500',
+            failed: 'bg-red-500'
         };
         const icon = job.status === 'completed'
             ? '<span class="material-symbols-outlined text-emerald-500 text-xl" style="font-variation-settings:\"FILL\" 1">check_circle</span>'
             : job.status === 'failed'
-            ? '<span class="material-symbols-outlined text-red-500 text-xl" style="font-variation-settings:\"FILL\" 1">cancel</span>'
-            : job.status === 'processing'
-            ? '<span class="material-symbols-outlined text-yellow-500 text-xl animate-spin">progress_activity</span>'
-            : '<span class="material-symbols-outlined text-slate-400 text-xl">schedule</span>';
+                ? '<span class="material-symbols-outlined text-red-500 text-xl" style="font-variation-settings:\"FILL\" 1">cancel</span>'
+                : job.status === 'processing'
+                    ? '<span class="material-symbols-outlined text-yellow-500 text-xl animate-spin">progress_activity</span>'
+                    : '<span class="material-symbols-outlined text-slate-400 text-xl">schedule</span>';
 
         const docLink = job.document_id
             ? `<span class="text-[10px] text-secondary font-bold">Block #${job.document_id}</span>`
@@ -1581,7 +1820,7 @@ async function showVersionHistory(id) {
     try {
         const versions = await fetch(`/api/chain/document/${id}/versions`).then(r => r.json());
         const content = document.getElementById('version-timeline-content');
-        
+
         if (!versions.length) {
             content.innerHTML = '<p class="text-center text-slate-400 font-medium py-12">No version history found.</p>';
             return;
@@ -1652,10 +1891,10 @@ async function renderIntegrityModal(id) {
     try {
         const doc = await API.getDocument(id);
         const content = document.getElementById('integrity-modal-content');
-        
+
         const isAnchored = !!doc.polygon_txid;
         const txUrl = `https://amoy.polygonscan.com/tx/${doc.polygon_txid}`;
-        
+
         // Parse Merkle Proof if it exists
         let proofHtml = '<p class="text-xs text-slate-400 italic">No Merkle proof available for this block.</p>';
         if (doc.merkle_proof) {
@@ -1826,7 +2065,7 @@ async function renderIntelligenceContent(id, isRefresh = false) {
     try {
         const doc = await API.getDocument(id);
         const ai = doc.ai_summary ? (typeof doc.ai_summary === 'string' ? JSON.parse(doc.ai_summary) : doc.ai_summary) : null;
-        
+
         if (!ai || ai.status === 'unavailable' || ai.status === 'skipped' || ai.status === 'error') {
             container.innerHTML = `
                 <div class="text-center py-20 space-y-6">
@@ -2005,14 +2244,14 @@ async function downloadReport(id) {
     const originalContent = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<span class="material-symbols-outlined text-sm animate-spin">progress_activity</span> Exporting...';
-    
+
     try {
         const response = await fetch(`/api/chain/document/${id}/report`);
         if (!response.ok) {
             const err = await response.json();
             throw new Error(err.error || "Failed to generate report");
         }
-        
+
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -2091,9 +2330,9 @@ async function renderAdmin(app) {
     const searchInput = document.getElementById('user-search');
     searchInput.addEventListener('input', (e) => {
         const query = e.target.value.toLowerCase();
-        const filtered = users.filter(u => 
-            u.name.toLowerCase().includes(query) || 
-            u.email.toLowerCase().includes(query) || 
+        const filtered = users.filter(u =>
+            u.name.toLowerCase().includes(query) ||
+            u.email.toLowerCase().includes(query) ||
             (u.department && u.department.toLowerCase().includes(query))
         );
         renderUserTable(filtered);
@@ -2104,7 +2343,7 @@ function renderUserTable(users) {
     const body = document.getElementById('user-table-body');
     const authCountEl = document.getElementById('auth-count');
     const userCountEl = document.getElementById('user-count');
-    
+
     if (!body) return;
 
     if (!users.length) {
@@ -2118,7 +2357,7 @@ function renderUserTable(users) {
 
     body.innerHTML = users.map(user => {
         const isSelf = user.email === currentUser.email;
-        const roleBadge = user.role === 'authority' 
+        const roleBadge = user.role === 'authority'
             ? '<span class="px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 text-[9px] font-black uppercase tracking-tighter border border-blue-200 dark:border-blue-800">Authority</span>'
             : '<span class="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 text-[9px] font-black uppercase tracking-tighter border border-slate-200 dark:border-slate-700">Standard User</span>';
 
@@ -2150,6 +2389,7 @@ function renderUserTable(users) {
                     ` : `
                         <button 
                             onclick="toggleAuthority(${user.id}, '${user.role === 'authority' ? 'user' : 'authority'}', this)"
+                            aria-label="${user.role === 'authority' ? 'Revoke authority' : 'Promote to authority'} for ${user.name}"
                             class="inline-flex items-center gap-2 px-4 py-2 ${user.role === 'authority' ? 'bg-red-50 text-red-600 hover:bg-red-100 border-red-100' : 'bg-blue-50 text-blue-600 hover:bg-blue-100 border-blue-100'} rounded-xl font-bold text-[10px] uppercase tracking-wider transition-all border active:scale-95"
                         >
                             <span class="material-symbols-outlined text-sm">${user.role === 'authority' ? 'person_remove' : 'verified'}</span>

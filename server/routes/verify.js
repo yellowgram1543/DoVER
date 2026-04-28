@@ -33,21 +33,61 @@ router.get('/public/verify/:hash', verifyLimiter, async (req, res) => {
 
         // Logic for signature status (consistent with existing verification)
         let signature_status = "VERIFIED";
+        let issuer_name = "DoVER Authority";
+
         if (!doc.signature) {
             signature_status = "NOT_SIGNED";
         } else {
-            const verify = crypto.createVerify('SHA256');
-            verify.update(doc.block_hash);
-            let publicKey = '';
-            if (process.env.PUBLIC_KEY_B64) {
-                publicKey = Buffer.from(process.env.PUBLIC_KEY_B64, 'base64').toString('utf8');
-            } else if (process.env.PUBLIC_KEY) {
-                publicKey = process.env.PUBLIC_KEY.replace(/\\n/g, '\n');
+            let publicKey = null;
+
+            // 1. Check if it has a specific signer in the registry
+            if (doc.signer_fingerprint) {
+                const keyRecord = db.prepare('SELECT * FROM key_registry WHERE fingerprint = ?').get(doc.signer_fingerprint);
+                if (keyRecord) {
+                    if (keyRecord.status === 'active') {
+                        publicKey = keyRecord.public_key_pem;
+                        // Fetch issuer name for display
+                        const issuer = db.prepare('SELECT name FROM users WHERE id = ?').get(keyRecord.issuer_id);
+                        if (issuer) issuer_name = issuer.name;
+                    } else {
+                        signature_status = "REVOKED_KEY";
+                    }
+                } else {
+                    signature_status = "UNKNOWN_KEY";
+                }
+            } else {
+                // Fallback to default authority key
+                if (process.env.PUBLIC_KEY_B64) {
+                    publicKey = Buffer.from(process.env.PUBLIC_KEY_B64, 'base64').toString('utf8');
+                } else if (process.env.PUBLIC_KEY) {
+                    publicKey = process.env.PUBLIC_KEY.replace(/\\n/g, '\n');
+                }
             }
 
-            if (publicKey) {
-                const isValid = verify.verify(publicKey, doc.signature, 'hex');
-                signature_status = isValid ? "VERIFIED" : "INVALID";
+            if (publicKey && signature_status !== "REVOKED_KEY") {
+                try {
+                    // Check CRL
+                    if (doc.signer_fingerprint) {
+                        const keyRecord = db.prepare('SELECT serial_number FROM key_registry WHERE fingerprint = ?').get(doc.signer_fingerprint);
+                        if (keyRecord && keyRecord.serial_number) {
+                            // In a real app, we'd fetch the CRL from /api/public/crl and parse it.
+                            // For this prototype, we'll check the registry status directly (which the CRL is derived from).
+                            const isRevoked = db.prepare('SELECT 1 FROM key_registry WHERE serial_number = ? AND status = "revoked"').get(keyRecord.serial_number);
+                            if (isRevoked) {
+                                signature_status = "REVOKED_BY_CRL";
+                            }
+                        }
+                    }
+
+                    if (signature_status !== "REVOKED_BY_CRL") {
+                        const verify = crypto.createVerify('SHA256');
+                        verify.update(doc.block_hash);
+                        const isValid = verify.verify(publicKey, doc.signature, 'hex');
+                        signature_status = isValid ? "VERIFIED" : "INVALID";
+                    }
+                } catch (e) {
+                    signature_status = "ERROR";
+                }
             }
         }
 
@@ -56,13 +96,15 @@ router.get('/public/verify/:hash', verifyLimiter, async (req, res) => {
             document_id: doc.block_index,
             filename: doc.filename,
             uploaded_by: doc.uploaded_by,
+            issuer_name: issuer_name,
             upload_timestamp: doc.upload_timestamp,
             block_index: doc.block_index,
             block_hash: doc.block_hash,
-            ipfs_cid: doc.ipfs_cid, // Added IPFS CID
+            ipfs_cid: doc.ipfs_cid,
             is_tampered: doc.is_tampered,
             signature_status: signature_status,
-            ocr_similarity_score: doc.ocr_hash ? 100 : null, // Default to 100 for verified blocks
+            signer_fingerprint: doc.signer_fingerprint,
+            ocr_similarity_score: doc.ocr_hash ? 100 : null,
             verdict: doc.is_tampered ? "TAMPERED" : "ORIGINAL",
             polygon_txid: doc.polygon_txid,
             forensic_summary: doc.is_tampered 

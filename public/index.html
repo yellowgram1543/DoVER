@@ -52,17 +52,17 @@
 
         <!-- Role Switcher -->
         <div class="px-4 mb-6">
-            <div class="bg-white/50 dark:bg-black/20 p-1 rounded-xl flex items-center border border-slate-200 dark:border-slate-700">
-                <button id="btn-b2c" onclick="switchMode('b2c')" class="flex-1 py-1.5 px-2 rounded-lg text-[10px] font-black uppercase transition-all">Citizen</button>
-                <button id="btn-b2b" onclick="switchMode('b2b')" class="flex-1 py-1.5 px-2 rounded-lg text-[10px] font-black uppercase transition-all">Institution</button>
+            <div class="bg-white/50 dark:bg-black/20 p-1 rounded-xl flex items-center border border-slate-200 dark:border-slate-700" role="group" aria-label="Vault Mode Switcher">
+                <button id="btn-b2c" onclick="switchMode('b2c')" aria-label="Switch to Citizen Vault" class="flex-1 py-1.5 px-2 rounded-lg text-[10px] font-black uppercase transition-all">Citizen</button>
+                <button id="btn-b2b" onclick="switchMode('b2b')" aria-label="Switch to Institutional Portal" class="flex-1 py-1.5 px-2 rounded-lg text-[10px] font-black uppercase transition-all">Institution</button>
             </div>
         </div>
 
-        <nav id="nav-links" class="flex-1 px-4 space-y-1">
+        <nav id="nav-links" class="flex-1 px-4 space-y-1" aria-label="Main Navigation">
             <!-- Navigation links will be injected here by app.js based on mode -->
         </nav>
         <div class="px-4 pt-4 border-t border-slate-200 dark:border-slate-700 space-y-1">
-            <a href="#help" data-page="help" class="nav-link flex items-center px-4 py-2 mx-2 rounded-lg transition-all group">
+            <a href="#help" data-page="help" aria-label="View Help Guide" class="nav-link flex items-center px-4 py-2 mx-2 rounded-lg transition-all group">
                 <span class="material-symbols-outlined mr-3 text-xl">help</span><span class="font-medium text-sm">Help Guide</span>
             </a>
         </div>
@@ -71,7 +71,7 @@
     <!-- Top Header -->
     <header class="fixed top-0 w-full z-40 bg-white/80 dark:bg-[#0A192F]/80 backdrop-blur-xl flex justify-between items-center px-6 py-3 shadow-sm md:pl-72 transition-colors">
         <div class="flex items-center gap-4">
-            <button id="mobile-menu-btn" class="md:hidden w-10 h-10 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+            <button id="mobile-menu-btn" aria-label="Open Mobile Menu" aria-expanded="false" class="md:hidden w-10 h-10 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                 <span class="material-symbols-outlined text-blue-900 dark:text-[#E9C176]">menu</span>
             </button>
             <h2 id="page-title" class="font-sans tracking-tight text-slate-500 dark:text-[#D6E3FF] font-medium text-sm">Dashboard</h2>
