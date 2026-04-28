@@ -1,4 +1,6 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const fs = require('fs');
+const mime = require('mime-types');
 const dotenv = require('dotenv');
 
 dotenv.config();
@@ -50,4 +52,30 @@ async function generateDocumentSummary(ocrText, forensicReport) {
     }
 }
 
-module.exports = { generateDocumentSummary };
+async function extractTextFromImage(filePath) {
+    try {
+        if (!fs.existsSync(filePath)) throw new Error("File not found");
+        
+        const mimeType = mime.lookup(filePath) || 'image/jpeg';
+        const imageBase64 = fs.readFileSync(filePath).toString('base64');
+        
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const prompt = "Extract all text from this image exactly as written. Do not add any extra commentary.";
+        
+        const imagePart = {
+            inlineData: {
+                data: imageBase64,
+                mimeType
+            }
+        };
+
+        const result = await model.generateContent([prompt, imagePart]);
+        const response = await result.response;
+        return response.text().trim();
+    } catch (error) {
+        console.error('[GEMINI_VISION] ✗ OCR Failed:', error.message);
+        throw error;
+    }
+}
+
+module.exports = { generateDocumentSummary, extractTextFromImage };

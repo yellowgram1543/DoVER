@@ -172,18 +172,11 @@ document.addEventListener('click', e => {
 });
 
 function handleLogout() {
-    localStorage.removeItem('dover_demo_user');
     window.location.href = '/auth/logout';
 }
 
 async function checkAuth() {
-    // Check for Demo Bypass user first
-    const demoUser = localStorage.getItem('dover_demo_user');
-    if (demoUser) {
-        currentUser = JSON.parse(demoUser);
-    } else {
-        currentUser = await API.getMe();
-    }
+    currentUser = await API.getMe();
     
     const app = document.getElementById('app');
     const sidebar = document.getElementById('sidebar');
@@ -255,19 +248,6 @@ function updateSidebarUI(user) {
     }
 }
 
-// ── Guest Mode bypass — must be top-level so onclick="bypassLogin()" can find it ──
-window.bypassLogin = () => {
-    localStorage.setItem('dover_demo_user', JSON.stringify({
-        id: 'demo-user',
-        name: 'Hackathon Judge',
-        email: 'judge@hackathon.io',
-        role: 'authority',
-        picture: 'https://ui-avatars.com/api/?name=Judge&background=001e40&color=fff',
-        api_secret: 'demo-secret-key-12345'
-    }));
-    window.location.reload();
-};
-
 function renderLogin(container) {
     container.innerHTML = `
         <div class="fixed inset-0 flex items-center justify-center bg-slate-50 dark:bg-[#0A192F] z-[100] fade-in">
@@ -291,18 +271,6 @@ function renderLogin(container) {
                     <img src="https://www.gstatic.com/images/branding/product/1x/gsa_512dp.png" class="w-6 h-6 group-hover:scale-110 transition-transform" alt="Google"/>
                     <span class="text-base">Sign in with Google</span>
                 </button>
-
-                <div class="relative flex items-center py-2">
-                    <div class="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
-                    <span class="flex-shrink mx-4 text-[10px] font-black uppercase text-slate-300 tracking-widest">OR</span>
-                    <div class="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
-                </div>
-
-                <button onclick="bypassLogin()" class="w-full flex items-center justify-center gap-2 text-slate-500 hover:text-primary dark:hover:text-[#E9C176] font-bold text-sm transition-all">
-                    <span class="material-symbols-outlined text-lg">no_accounts</span>
-                    <span>Continue as Guest (Demo Mode)</span>
-                </button>
-
 
                 <p class="text-[10px] text-slate-400 font-medium">By signing in, you agree to the secure audit protocols.</p>
             </div>
@@ -1071,6 +1039,14 @@ function renderVerify(app) {
             updateStep('chain', 'loading');
 
             const res = await resPromise;
+            
+            if (res.error) {
+                const r = document.getElementById('verify-result');
+                r.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-xl p-6 fade-in shadow-sm"><p class="text-red-700 font-bold mb-1 flex items-center gap-2"><span class="material-symbols-outlined">error</span> Verification Failed</p><p class="text-red-600 text-sm ml-8">${res.error}</p></div>`;
+                btn.disabled = false;
+                btn.innerHTML = '<span>Verify Authenticity</span><span class="material-symbols-outlined">shield_with_heart</span>';
+                return;
+            }
 
             updateStep('chain', 'done');
             updateStep('gemini', 'loading');
