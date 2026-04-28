@@ -95,6 +95,11 @@ router.post('/', uploadLimiter, (req, res) => {
                 uploadStream.on('error', reject);
             });
 
+            // Cleanup local temp file after GridFS upload
+            if (tmpFilePath && fs.existsSync(tmpFilePath)) {
+                fs.unlinkSync(tmpFilePath);
+            }
+
             // Processing via Queue with Sync Fallback
             const jobData = {
                 storageId: gridfsId.toString(),
