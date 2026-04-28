@@ -98,11 +98,17 @@ async function secureFetch(url, options = {}) {
         signature = CryptoJS.HmacSHA256(payload, currentUser.api_secret).toString();
     }
 
+    // Generate a random 16-character hex nonce
+    const nonce = Array.from(crypto.getRandomValues(new Uint8Array(8)))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+
     const headers = {
         ...(options.headers || {}),
         'X-Signature': signature,
         'X-Timestamp': timestamp,
         'X-File-Hash': fileHash,
+        'X-Nonce': nonce,
         'x-api-key': API_KEY,
         'X-User-ID': currentUser?.id || ''
     };
