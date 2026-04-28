@@ -20,8 +20,13 @@ const app = express();
 app.set('trust proxy', 1);
 
 // Redis Client for Rate Limiting
-const redisClient = createClient({ url: process.env.REDIS_URL || 'redis://127.0.0.1:6379' });
-redisClient.connect().catch(console.error);
+const redisClient = createClient({ 
+    url: process.env.REDIS_URL || 'redis://127.0.0.1:6379',
+    socket: { connectTimeout: 5000 } // 5 second timeout to prevent hangs
+});
+
+redisClient.on('error', (err) => console.warn('[REDIS_ERROR] Offline — falling back to memory:', err.message));
+redisClient.connect().catch(err => console.warn('[REDIS_CONNECT_FAIL] Moving on without Redis.'));
 
 // Global IP Blocklist
 app.use(blocklist);
@@ -33,9 +38,9 @@ const globalLimiter = rateLimit({
     standardHeaders: 'draft-7',
     legacyHeaders: false,
     validate: { keyGeneratorIpFallback: false },
-    store: new RedisStore({
+    store: redisClient.isOpen ? new RedisStore({
         sendCommand: (...args) => redisClient.sendCommand(args),
-    }),
+    }) : undefined, // Falls back to MemoryStore if Redis is closed
     handler: (req, res, next, options) => {
         db.prepare(`INSERT INTO audit_log (document_id, action, actor, details) VALUES (?, ?, ?, ?)`)
           .run(0, 'RATE_LIMIT_EXCEEDED', req.ip, `Global limit hit: ${req.method} ${req.url}`);
