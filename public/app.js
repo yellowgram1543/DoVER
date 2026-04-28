@@ -255,6 +255,19 @@ function updateSidebarUI(user) {
     }
 }
 
+// ── Guest Mode bypass — must be top-level so onclick="bypassLogin()" can find it ──
+window.bypassLogin = () => {
+    localStorage.setItem('dover_demo_user', JSON.stringify({
+        id: 'demo-user',
+        name: 'Hackathon Judge',
+        email: 'judge@hackathon.io',
+        role: 'authority',
+        picture: 'https://ui-avatars.com/api/?name=Judge&background=001e40&color=fff',
+        api_secret: 'demo-secret-key-12345'
+    }));
+    window.location.reload();
+};
+
 function renderLogin(container) {
     container.innerHTML = `
         <div class="fixed inset-0 flex items-center justify-center bg-slate-50 dark:bg-[#0A192F] z-[100] fade-in">
@@ -289,20 +302,7 @@ function renderLogin(container) {
                     <span class="material-symbols-outlined text-lg">no_accounts</span>
                     <span>Continue as Guest (Demo Mode)</span>
                 </button>
-                
-                <script>
-                    window.bypassLogin = () => {
-                        localStorage.setItem('dover_demo_user', JSON.stringify({
-                            id: 'demo-user',
-                            name: 'Hackathon Judge',
-                            email: 'judge@hackathon.io',
-                            role: 'authority',
-                            picture: 'https://ui-avatars.com/api/?name=Judge&background=001e40&color=fff',
-                            api_secret: 'demo-secret-key-12345'
-                        }));
-                        window.location.reload();
-                    };
-                </script>
+
 
                 <p class="text-[10px] text-slate-400 font-medium">By signing in, you agree to the secure audit protocols.</p>
             </div>
