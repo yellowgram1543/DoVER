@@ -649,7 +649,7 @@ function renderUpload(app) {
                             </div>
                         </div>
 
-                        <button type="submit" id="upload-btn" aria-label="Submit record to vault" class="w-full bg-primary text-white px-10 py-4 rounded-xl font-bold shadow-lg shadow-primary/20 hover:bg-opacity-90 active:scale-95 transition-all text-lg flex items-center justify-center gap-3">
+                        <button type="submit" id="submit-btn" aria-label="Submit record to vault" class="w-full bg-primary text-white px-10 py-4 rounded-xl font-bold shadow-lg shadow-primary/20 hover:bg-opacity-90 active:scale-95 transition-all text-lg flex items-center justify-center gap-3" disabled>
                             <span class="material-symbols-outlined">upload_file</span> Submit Record
                         </button>
                     </div>
