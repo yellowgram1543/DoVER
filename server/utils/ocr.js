@@ -1,5 +1,5 @@
 const Tesseract = require('tesseract.js');
-const { Jimp } = require('jimp');
+const Jimp = require('jimp');
 const fs = require('fs');
 const path = require('path');
 
