@@ -46,12 +46,14 @@ passport.use(new GoogleStrategy({
         const picture = profile.photos && profile.photos[0]?.value;
 
         if (!user) {
-            // Create new user
+            // Create new user with a generated API Secret for signing
             const userId = profile.id; 
+            const apiSecret = require('crypto').randomBytes(32).toString('hex');
+            
             db.prepare(`
-                INSERT INTO users (id, google_id, name, email, picture, last_login)
-                VALUES (?, ?, ?, ?, ?, datetime('now'))
-            `).run(userId, profile.id, profile.displayName, email, picture);
+                INSERT INTO users (id, google_id, name, email, picture, api_secret, last_login)
+                VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+            `).run(userId, profile.id, profile.displayName, email, picture, apiSecret);
             
             user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
         } else {

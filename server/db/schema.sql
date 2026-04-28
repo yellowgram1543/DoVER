@@ -19,3 +19,15 @@ CREATE TABLE IF NOT EXISTS audit_log (
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
     details TEXT
 );
+
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    google_id TEXT UNIQUE,
+    name TEXT,
+    email TEXT,
+    picture TEXT,
+    role TEXT DEFAULT 'citizen',
+    department TEXT DEFAULT 'General',
+    api_secret TEXT,
+    last_login DATETIME
+);
