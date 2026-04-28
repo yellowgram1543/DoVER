@@ -11,10 +11,11 @@ const crypto = require('crypto');
 const forge = require('node-forge');
 const fs = require('fs');
 const path = require('path');
-const { getBucket } = require('../db/mongodb');
+const { getBucket, mongoose } = require('../db/mongodb');
 const { Worker } = require('worker_threads');
 const { anchorBatch } = require('./polygon');
 const ipfs = require('./ipfs');
+const PKIUtils = require('./pki');
 
 /**
  * Helper to run heavy analysis in a separate thread.
@@ -42,33 +43,36 @@ function initProcessor() {
     isInitialized = true;
 
     documentQueue.process(1, async (job) => {
-        const { filePath, originalname, mimetype, uploadedBy, uploaderEmail, department, parent_document_id, version_number, version_note } = job.data;
+        const { storageId, originalname, mimetype, uploadedBy, uploaderEmail, department, parent_document_id, version_number, version_note } = job.data;
+        let filePath = job.data.filePath; // Legacy fallback
+        let gridfsId = storageId;
 
         try {
-            // Validate file exists
-            if (!fs.existsSync(filePath)) {
-                throw new Error(`File not found: ${filePath}`);
-            }
-
             const bucket = getBucket();
             if (!bucket) {
                 throw new Error('MongoDB connection not ready');
             }
 
-            // ── Step 1: Upload to GridFS (0→25%) ──
-            await job.progress(0);
+            // ── Step 1: Download from GridFS (0→25%) ──
+            await job.progress(10);
+            
+            if (gridfsId) {
+                const ext = path.extname(originalname);
+                filePath = path.resolve('tmp', `job_${job.id}_${Date.now()}${ext}`);
+                const writeStream = fs.createWriteStream(filePath);
+                
+                const downloadStream = bucket.openDownloadStream(new mongoose.Types.ObjectId(gridfsId));
+                downloadStream.pipe(writeStream);
 
-            const uploadStream = bucket.openUploadStream(originalname, {
-                contentType: mimetype
-            });
-            const gridfsId = uploadStream.id.toString();
+                await new Promise((resolve, reject) => {
+                    writeStream.on('finish', resolve);
+                    writeStream.on('error', reject);
+                });
+            }
 
-            await new Promise((resolve, reject) => {
-                fs.createReadStream(filePath)
-                    .pipe(uploadStream)
-                    .on('error', reject)
-                    .on('finish', resolve);
-            });
+            if (!filePath || !fs.existsSync(filePath)) {
+                throw new Error(`File not found for processing: ${filePath}`);
+            }
 
             await job.progress(25);
 
@@ -78,10 +82,10 @@ function initProcessor() {
             const timestamp = new Date().toISOString();
             const blockHash = hasher.generateBlockHash(fileHash, prevHash, timestamp);
 
-            // ── Step 2.7: Merkle Tree Integration ──
-            // Fetch all existing block_hashes to build the global Merkle Root
-            const existingHashes = db.prepare('SELECT block_hash FROM documents ORDER BY block_index ASC').all().map(d => d.block_hash);
-            const allHashes = [...existingHashes, blockHash];
+            // ── Step 2.7: Merkle Tree Integration (Optimized to O(1) batch) ──
+            // Fetch only the last 99 hashes to build a 100-block Merkle Root
+            const lastHashes = db.prepare('SELECT block_hash FROM documents ORDER BY block_index DESC LIMIT 99').all().map(d => d.block_hash).reverse();
+            const allHashes = [...lastHashes, blockHash];
             
             const merkleTree = buildMerkleTree(allHashes);
             const merkleRoot = merkleTree.root;
@@ -104,7 +108,10 @@ function initProcessor() {
 
                     if (fs.existsSync(p12Path) && fs.existsSync(pwdPath)) {
                         const p12Buffer = fs.readFileSync(p12Path);
-                        const password = fs.readFileSync(pwdPath, 'utf8');
+                        const encryptedPassword = fs.readFileSync(pwdPath, 'utf8');
+                        const password = PKIUtils.decryptData(encryptedPassword);
+
+                        if (!password) throw new Error('Failed to decrypt P12 password');
 
                         const asn1 = forge.asn1.fromDer(p12Buffer.toString('binary'));
                         const p12 = forge.pkcs12.pkcs12FromAsn1(asn1, password);
@@ -213,10 +220,6 @@ function initProcessor() {
                 console.warn('[PROCESSOR] IPFS backup skipped:', ipfsErr.message);
             }
 
-            // ── Step 4.5: Update Global Merkle Root ──
-            // The Merkle Root represents the entire chain state; it must be updated globally
-            db.prepare('UPDATE documents SET merkle_root = ? WHERE block_index = ?').run(merkleRoot, documentId);
-
             // ── Step 5: Periodic Checkpointing ──
             // Every 100 blocks, we record the block_hash as a checkpoint
             if (documentId % 100 === 0) {
@@ -268,7 +271,7 @@ function initProcessor() {
             console.log(`[PROCESSOR] ✓ Job #${job.id} completed → Block #${documentId} (${originalname})`);
 
             // Generate QR code for the public verification portal
-            const qrData = `http://localhost:3000/verify.html?id=${documentId}`;
+            const qrData = `http://localhost:3000/verify.html?hash=${blockHash}`;
             const qrImageBase64 = await qr.generateQR(qrData);
 
             return {

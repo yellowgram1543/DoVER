@@ -109,8 +109,10 @@ router.post('/keys/approve/:id', requireAuthority, async (req, res) => {
         const certsDir = path.resolve(__dirname, '..', '..', 'certs');
         if (!fs.existsSync(certsDir)) fs.mkdirSync(certsDir);
         fs.writeFileSync(path.join(certsDir, `${fingerprint}.p12`), p12Buffer);
-        // Also save the password (In production, this would be in a KMS)
-        fs.writeFileSync(path.join(certsDir, `${fingerprint}.pwd`), password);
+        
+        // Securely encrypt the password before saving to disk
+        const encryptedPassword = PKIUtils.encryptData(password);
+        fs.writeFileSync(path.join(certsDir, `${fingerprint}.pwd`), encryptedPassword);
 
         // Update Registry
         db.prepare(`

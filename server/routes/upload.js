@@ -96,8 +96,19 @@ router.post('/', uploadLimiter, (req, res) => {
             // The document should use the category selected by the user, regardless of what they are locked to
             const documentCategory = req.body.department || 'General';
             
-            // Calculate hash for duplicate pre-check
+            // Calculate hash for duplicate pre-check AND HMAC verification
             const fileHash = await hasher.generateFileHashAsync(tmpFilePath);
+
+            // HMAC CONTENT VERIFICATION: Ensure the file uploaded matches the hash in the signed header
+            const signedFileHash = req.header('X-File-Hash');
+            if (signedFileHash && signedFileHash !== fileHash) {
+                if (fs.existsSync(tmpFilePath)) fs.unlinkSync(tmpFilePath);
+                return res.status(403).json({ 
+                    success: false, 
+                    error: 'Integrity Failure', 
+                    message: 'The uploaded file content does not match the signed hash. HMAC verification failed.' 
+                });
+            }
 
             // Versioning logic
             let parent_document_id = (req.body.parent_document_id && req.body.parent_document_id !== 'undefined') ? parseInt(req.body.parent_document_id) : null;
@@ -145,9 +156,28 @@ router.post('/', uploadLimiter, (req, res) => {
                 }
             }
 
+            // ── GridFS Upload (Prior to Queue) ──
+            // We upload to GridFS immediately so that any background worker can access it.
+            const uploadStream = bucket.openUploadStream(req.file.originalname, {
+                contentType: req.file.mimetype,
+                metadata: {
+                    uploadedBy,
+                    uploaderEmail,
+                    fileHash
+                }
+            });
+
+            const gridfsId = uploadStream.id;
+            fs.createReadStream(tmpFilePath).pipe(uploadStream);
+
+            await new Promise((resolve, reject) => {
+                uploadStream.on('finish', resolve);
+                uploadStream.on('error', reject);
+            });
+
             // ── Async Processing via Queue ──
             const job = await documentQueue.add({
-                filePath: tmpFilePath,
+                storageId: gridfsId.toString(),
                 originalname: req.file.originalname,
                 mimetype: req.file.mimetype,
                 uploadedBy: uploadedBy,

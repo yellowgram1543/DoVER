@@ -112,19 +112,30 @@ router.get('/batch/:batch_id/status', async (req, res) => {
     try {
         const batchId = parseInt(req.params.batch_id);
 
-        // Fetch all jobs across every state in parallel
-        const [waiting, active, completed, failed, delayed] = await Promise.all([
-            documentQueue.getWaiting(),
-            documentQueue.getActive(),
-            documentQueue.getCompleted(),
-            documentQueue.getFailed(),
-            documentQueue.getDelayed()
+        // Fetch all jobs in parallel by checking the states selectively or getting a list of IDs.
+        // Bull doesn't have a "getJobsByData" method, but we can avoid pulling all contents.
+        // For this prototype, we'll use a more targeted approach if we had job IDs stored,
+        // but since we don't store batch->job mapping in DB yet, we'll keep the logic but 
+        // optimize it to not pull every job's full data if possible.
+        
+        // BETTER: Use Bull's built-in filtering if possible, or just pull the IDs first.
+        const [waitingIds, activeIds, completedIds, failedIds] = await Promise.all([
+            documentQueue.getWaitingIds(),
+            documentQueue.getActiveIds(),
+            documentQueue.getCompletedIds(),
+            documentQueue.getFailedIds()
         ]);
 
-        const allJobs = [...waiting, ...active, ...completed, ...failed, ...delayed];
+        const allJobIds = [...waitingIds, ...activeIds, ...completedIds, ...failedIds];
+        const batchJobs = [];
 
-        // Filter to jobs belonging to this batch
-        let batchJobs = allJobs.filter(j => j.data.batch_id === batchId);
+        // Only fetch job data for jobs that actually exist to save memory
+        for (const jobId of allJobIds) {
+            const job = await documentQueue.getJob(jobId);
+            if (job && job.data && job.data.batch_id === batchId) {
+                batchJobs.push(job);
+            }
+        }
 
         if (batchJobs.length === 0) {
             return res.status(404).json({ success: false, error: 'No jobs found for this batch_id' });
@@ -141,10 +152,11 @@ router.get('/batch/:batch_id/status', async (req, res) => {
         // Map each job to a clean status object
         const jobs = batchJobs.map(j => {
             let status;
-            if (waiting.find(x => x.id === j.id))   status = 'queued';
-            else if (active.find(x => x.id === j.id)) status = 'processing';
-            else if (failed.find(x => x.id === j.id)) status = 'failed';
-            else                                       status = 'completed';
+            if (waitingIds.includes(j.id))        status = 'queued';
+            else if (activeIds.includes(j.id))    status = 'processing';
+            else if (failedIds.includes(j.id))    status = 'failed';
+            else if (completedIds.includes(j.id)) status = 'completed';
+            else                                  status = 'unknown';
 
             return {
                 job_id: j.id,
@@ -200,7 +212,7 @@ router.get('/document/:id/versions', (req, res) => {
         let parentId = currentDoc.parent_document_id;
         let safety = 0;
         
-        while (parentId !== null && safety < 50) {
+        while (parentId !== null && safety < 5000) {
             const parent = db.prepare('SELECT block_index, parent_document_id, filename, uploader_email FROM documents WHERE block_index = ?').get(parentId);
             
             // STRICT LINEAGE: Stop if parent metadata mismatch

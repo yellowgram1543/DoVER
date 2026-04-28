@@ -37,12 +37,19 @@ module.exports = async (req, res, next) => {
     }
 
     // Recompute HMAC
-    // Payload: method + originalUrl + timestamp + body
+    // Payload: method + originalUrl + timestamp + fileHash + body
+    const fileHash = req.header('X-File-Hash') || '';
+    
     let bodyStr = '';
     if (req.method !== 'GET' && req.body && Object.keys(req.body).length > 0) {
-        bodyStr = JSON.stringify(req.body);
+        // Sort keys for stable stringification
+        const sortedBody = Object.keys(req.body).sort().reduce((acc, key) => {
+            acc[key] = req.body[key];
+            return acc;
+        }, {});
+        bodyStr = JSON.stringify(sortedBody);
     }
-    const payload = `${req.method}${req.originalUrl}${timestamp}${bodyStr}`;
+    const payload = `${req.method}${req.originalUrl}${timestamp}${fileHash}${bodyStr}`;
     
     const hmac = crypto.createHmac('sha256', user.api_secret);
     hmac.update(payload);

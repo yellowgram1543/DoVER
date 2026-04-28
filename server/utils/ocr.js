@@ -273,27 +273,38 @@ async function initWorkers() {
  * Calculates the Levenshtein distance between two strings using dynamic programming.
  */
 function levenshteinDistance(str1, str2) {
-    if (str1 === str2) return 0;
-    if (str1.length === 0) return str2.length;
-    if (str2.length === 0) return str1.length;
+    // Length cap to prevent OOM on massive documents
+    const MAX_LEN = 20000;
+    const s1 = str1.length > MAX_LEN ? str1.substring(0, MAX_LEN) : str1;
+    const s2 = str2.length > MAX_LEN ? str2.substring(0, MAX_LEN) : str2;
 
-    const track = Array(str2.length + 1).fill(null).map(() =>
-        Array(str1.length + 1).fill(null));
+    if (s1 === s2) return 0;
+    if (s1.length === 0) return s2.length;
+    if (s2.length === 0) return s1.length;
 
-    for (let i = 0; i <= str1.length; i += 1) track[0][i] = i;
-    for (let j = 0; j <= str2.length; j += 1) track[j][0] = j;
+    // Ensure s1 is the shorter string to minimize space
+    let a = s1, b = s2;
+    if (a.length > b.length) [a, b] = [b, a];
 
-    for (let j = 1; j <= str2.length; j += 1) {
-        for (let i = 1; i <= str1.length; i += 1) {
-            const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
-            track[j][i] = Math.min(
-                track[j][i - 1] + 1, // deletion
-                track[j - 1][i] + 1, // insertion
-                track[j - 1][i - 1] + indicator // substitution
+    const n = a.length, m = b.length;
+    let prevRow = new Int32Array(n + 1);
+    let currRow = new Int32Array(n + 1);
+
+    for (let i = 0; i <= n; i++) prevRow[i] = i;
+
+    for (let j = 1; j <= m; j++) {
+        currRow[0] = j;
+        for (let i = 1; i <= n; i++) {
+            const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+            currRow[i] = Math.min(
+                currRow[i - 1] + 1,
+                prevRow[i] + 1,
+                prevRow[i - 1] + cost
             );
         }
+        [prevRow, currRow] = [currRow, prevRow];
     }
-    return track[str2.length][str1.length];
+    return prevRow[n];
 }
 
 /**

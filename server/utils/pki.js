@@ -45,10 +45,12 @@ class PKIUtils {
             { name: 'basicConstraints', cA: true },
             { name: 'keyUsage', keyCertSign: true, cRLSign: true }
         ]);
+        const caPassphrase = process.env.CA_PASSPHRASE || 'default-secure-passphrase';
+
         rootCert.sign(rootKeys.privateKey, forge.md.sha256.create());
 
         fs.writeFileSync(rootPath, forge.pki.certificateToPem(rootCert));
-        fs.writeFileSync(rootKeyPath, forge.pki.privateKeyToPem(rootKeys.privateKey));
+        fs.writeFileSync(rootKeyPath, forge.pki.encryptRsaPrivateKey(rootKeys.privateKey, caPassphrase));
 
         // 2. Generate Intermediate CA
         const interKeys = forge.pki.rsa.generateKeyPair(2048);
@@ -72,7 +74,7 @@ class PKIUtils {
         interCert.sign(rootKeys.privateKey, forge.md.sha256.create());
 
         fs.writeFileSync(interPath, forge.pki.certificateToPem(interCert));
-        fs.writeFileSync(interKeyPath, forge.pki.privateKeyToPem(interKeys.privateKey));
+        fs.writeFileSync(interKeyPath, forge.pki.encryptRsaPrivateKey(interKeys.privateKey, caPassphrase));
 
         console.log('[PKI] ✓ PKI Hierarchy created successfully.');
     }
@@ -89,8 +91,9 @@ class PKIUtils {
             throw new Error('Intermediate CA not bootstrapped. Run bootstrapCAs first.');
         }
 
+        const caPassphrase = process.env.CA_PASSPHRASE || 'default-secure-passphrase';
         const interCert = forge.pki.certificateFromPem(fs.readFileSync(interPath, 'utf8'));
-        const interKey = forge.pki.privateKeyFromPem(fs.readFileSync(interKeyPath, 'utf8'));
+        const interKey = forge.pki.decryptRsaPrivateKey(fs.readFileSync(interKeyPath, 'utf8'), caPassphrase);
         const rootCert = forge.pki.certificateFromPem(fs.readFileSync(rootPath, 'utf8'));
 
         const keys = forge.pki.rsa.generateKeyPair(2048);
@@ -142,7 +145,9 @@ class PKIUtils {
         const interKeyPath = path.join(CERTS_DIR, 'dover_intermediate.key');
         if (!fs.existsSync(interKeyPath)) return null;
 
-        const interKey = fs.readFileSync(interKeyPath, 'utf8');
+        const caPassphrase = process.env.CA_PASSPHRASE || 'default-secure-passphrase';
+        const interKeyForge = forge.pki.decryptRsaPrivateKey(fs.readFileSync(interKeyPath, 'utf8'), caPassphrase);
+        const interKeyPem = forge.pki.privateKeyToPem(interKeyForge);
 
         const crlData = {
             issuer: 'DoVER Intermediate CA',
@@ -154,7 +159,7 @@ class PKIUtils {
         const dataStr = JSON.stringify(crlData);
         const sign = crypto.createSign('SHA256');
         sign.update(dataStr);
-        const signature = sign.sign(interKey, 'hex');
+        const signature = sign.sign(interKeyPem, 'hex');
 
         return {
             data: crlData,
@@ -175,6 +180,41 @@ class PKIUtils {
         }
         const publicKeyPem = forge.pki.publicKeyToPem(cert.publicKey);
         return crypto.createHash('sha256').update(publicKeyPem).digest('hex');
+    }
+
+    /**
+     * Encrypts arbitrary text using the CA_PASSPHRASE.
+     * Useful for storing secondary passwords securely.
+     */
+    static encryptData(text) {
+        const passphrase = process.env.CA_PASSPHRASE || 'default-secure-passphrase';
+        // Create a 32-byte key from the passphrase
+        const key = crypto.createHash('sha256').update(passphrase).digest();
+        const iv = crypto.randomBytes(16);
+        const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+        let encrypted = cipher.update(text, 'utf8', 'hex');
+        encrypted += cipher.final('hex');
+        return iv.toString('hex') + ':' + encrypted;
+    }
+
+    /**
+     * Decrypts text encrypted by encryptData.
+     */
+    static decryptData(encryptedText) {
+        try {
+            const passphrase = process.env.CA_PASSPHRASE || 'default-secure-passphrase';
+            const key = crypto.createHash('sha256').update(passphrase).digest();
+            const parts = encryptedText.split(':');
+            const iv = Buffer.from(parts.shift(), 'hex');
+            const encrypted = Buffer.from(parts.join(':'), 'hex');
+            const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+            let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+            decrypted += decipher.final('utf8');
+            return decrypted;
+        } catch (e) {
+            console.error('[PKI] Decryption failed:', e.message);
+            return null;
+        }
     }
 }
 

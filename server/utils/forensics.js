@@ -208,12 +208,21 @@ async function analyzeImage(filePath) {
         const std = tensor.sub(mean).square().mean().sqrt();
         const stdVal = (await std.data())[0];
         
-        if (stdVal < 5) {
+        // ── Step 5: Final Evaluation ──
+        // High alignment + Extremely low variance = likely a clean born-digital PDF
+        const isDigitalOrigin = report.alignment_score > 98 && stdVal < 2;
+
+        if (stdVal < 5 && !isDigitalOrigin) {
             report.font_consistency -= 15;
             report.flags.push('Low pixel variance detected (possible flat digital edit)');
         }
 
-        if (report.font_consistency < 80 || report.alignment_score < 80) {
+        if (isDigitalOrigin) {
+            report.recommendation = "CLEAN_DIGITAL";
+            report.suspicious = false; // Override any minor jitter flags
+            report.flags = report.flags.filter(f => !f.includes('Low pixel variance'));
+            report.flags.push('Verified Born-Digital Origin');
+        } else if (report.font_consistency < 80 || report.alignment_score < 80) {
             report.suspicious = true;
         }
 

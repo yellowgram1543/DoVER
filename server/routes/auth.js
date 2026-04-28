@@ -33,7 +33,8 @@ router.get('/me', (req, res) => {
             email: user.email,
             picture: user.picture,
             role: user.role || 'user',
-            department: user.department || null
+            department: user.department || null,
+            api_secret: user.api_secret || null
         });
     } else {
         res.status(401).json({ error: 'Not authenticated' });
