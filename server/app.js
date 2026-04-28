@@ -89,7 +89,8 @@ app.use(session({
     resave: false,
     saveUninitialized: false,
     store: (MongoStore.create || MongoStore.default.create)({
-        mongoUrl: process.env.MONGODB_URI || 'mongodb://localhost:27017/docvault'
+        clientPromise: require('./db/mongodb').getConn().asPromise().then(c => c.getClient()),
+        dbName: 'docvault'
     }),
     cookie: {
         secure: process.env.NODE_ENV === 'production',
