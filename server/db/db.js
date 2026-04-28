@@ -7,34 +7,45 @@ const db = new Database('db.sqlite');
 const schemaPath = path.join(__dirname, 'schema.sql');
 const schema = fs.readFileSync(schemaPath, 'utf8');
 
+// Always attempt to execute schema for new tables
 db.exec(schema);
 
-// Migration: Ensure checkpoint_hash column exists
-try {
-    db.prepare('ALTER TABLE documents ADD COLUMN checkpoint_hash TEXT').run();
-    console.log('[DB_MIGRATE] ✓ Added checkpoint_hash column');
-} catch (err) {
-    if (!err.message.includes('duplicate column name')) {
-        console.error('[DB_MIGRATE] ✗ Error adding checkpoint_hash column:', err.message);
+/**
+ * Migration helper to safely add columns if they don't exist
+ */
+function addColumn(table, column, type) {
+    try {
+        db.prepare(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`).run();
+        console.log(`[DB_MIGRATE] ✓ Added ${column} to ${table}`);
+    } catch (err) {
+        if (!err.message.includes('duplicate column name')) {
+            console.error(`[DB_MIGRATE] ✗ Error adding ${column} to ${table}:`, err.message);
+        }
     }
 }
 
-try {
-    db.prepare('ALTER TABLE documents ADD COLUMN signature TEXT').run();
-    console.log('[DB_MIGRATE] ✓ Added signature column');
-} catch (err) {
-    if (!err.message.includes('duplicate column name')) {
-        console.error('[DB_MIGRATE] ✗ Error adding signature column:', err.message);
-    }
-}
+// Ensure all production columns exist for documents table
+const docColumns = [
+    ['uploader_email', 'TEXT'],
+    ['department', 'TEXT DEFAULT "General"'],
+    ['ocr_text', 'TEXT'],
+    ['ocr_hash', 'TEXT'],
+    ['forensic_score', 'TEXT'],
+    ['signature_score', 'TEXT'],
+    ['ipfs_cid', 'TEXT'],
+    ['signature', 'TEXT'],
+    ['signer_fingerprint', 'TEXT'],
+    ['merkle_root', 'TEXT'],
+    ['merkle_proof', 'TEXT'],
+    ['parent_document_id', 'INTEGER'],
+    ['version_number', 'INTEGER DEFAULT 1'],
+    ['version_note', 'TEXT'],
+    ['checkpoint_hash', 'TEXT'],
+    ['ai_summary', 'TEXT'],
+    ['is_tampered', 'BOOLEAN DEFAULT 0'],
+    ['last_checked_at', 'DATETIME']
+];
 
-try {
-    db.prepare('ALTER TABLE documents ADD COLUMN ai_summary TEXT').run();
-    console.log('[DB_MIGRATE] ✓ Added ai_summary column');
-} catch (err) {
-    if (!err.message.includes('duplicate column name')) {
-        console.error('[DB_MIGRATE] ✗ Error adding ai_summary column:', err.message);
-    }
-}
+docColumns.forEach(([col, type]) => addColumn('documents', col, type));
 
 module.exports = db;
