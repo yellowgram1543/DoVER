@@ -19,9 +19,11 @@ RUN npm install --production
 # Copy local code to the container image.
 COPY . .
 
-# Ensure the uploads directory exists
-RUN mkdir -p uploads
+# Ensure the necessary directories exist and are owned by the node user
+RUN mkdir -p tmp uploads && chown -R node:node /usr/src/app
 
+ENV PORT 8080
+USER node
 # Expose the port the app runs on
 EXPOSE 8080
 
