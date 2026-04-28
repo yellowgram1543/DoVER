@@ -79,6 +79,11 @@ async function secureFetch(url, options = {}) {
     const timestamp = Math.floor(Date.now() / 1000).toString();
     const fileHash = options.fileHash || '';
     
+    // Generate a random 16-character hex nonce
+    const nonce = Array.from(crypto.getRandomValues(new Uint8Array(8)))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+
     let signature = '';
     if (currentUser && currentUser.api_secret) {
         const method = options.method || 'GET';
@@ -94,14 +99,9 @@ async function secureFetch(url, options = {}) {
             bodyStr = JSON.stringify(sortedBody);
         }
 
-        const payload = `${method}${url}${timestamp}${fileHash}${bodyStr}`;
+        const payload = `${method}${url}${timestamp}${fileHash}${nonce}${bodyStr}`;
         signature = CryptoJS.HmacSHA256(payload, currentUser.api_secret).toString();
     }
-
-    // Generate a random 16-character hex nonce
-    const nonce = Array.from(crypto.getRandomValues(new Uint8Array(8)))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
 
     const headers = {
         ...(options.headers || {}),

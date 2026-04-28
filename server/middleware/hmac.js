@@ -49,7 +49,8 @@ module.exports = async (req, res, next) => {
         }, {});
         bodyStr = JSON.stringify(sortedBody);
     }
-    const payload = `${req.method}${req.originalUrl}${timestamp}${fileHash}${bodyStr}`;
+    const nonce = req.header('X-Nonce') || '';
+    const payload = `${req.method}${req.originalUrl}${timestamp}${fileHash}${nonce}${bodyStr}`;
     
     const hmac = crypto.createHmac('sha256', user.api_secret);
     hmac.update(payload);
