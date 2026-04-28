@@ -1,63 +1,115 @@
 // ── API Configuration ──
-const API_KEY = 'dover_secret_key_2026';
+const API_KEY = '11824503150ade959ba564320a36fcbb24274766c0a7f62589498eef4738337a';
 
 // ── API helpers ──
 const API = {
     async getStats() { return (await fetch('/api/stats')).json(); },
     async getChain() { return (await fetch('/api/chain')).json(); },
-    async upload(formData) {
-        return (await fetch('/api/upload', {
+    async upload(formData, file) {
+        const fileHash = await computeFileHash(file);
+        return (await secureFetch('/api/upload', {
             method: 'POST',
-            headers: { 'x-api-key': API_KEY },
-            body: formData
+            body: formData,
+            fileHash
         })).json();
     },
-    async verify(formData) {
-        return (await fetch('/api/verify', {
+    async verify(formData, file) {
+        let fileHash = '';
+        if (file) fileHash = await computeFileHash(file);
+        return (await secureFetch('/api/verify', {
             method: 'POST',
-            headers: { 'x-api-key': API_KEY },
-            body: formData
+            body: formData,
+            fileHash
         })).json();
     },
-    async getAudit() { return (await fetch('/api/chain/audit')).json(); },
+    async getAudit() { return (await secureFetch('/api/chain/audit')).json(); },
     async getMe() {
         const r = await fetch('/auth/me');
         if (r.status === 401) return null;
         return r.json();
     },
-    async getDocumentHistory(id) { return (await fetch(`/api/chain/document/${id}/history`)).json(); },
-    async batchUpload(formData) {
-        return (await fetch('/api/upload/batch-upload', {
+    async getDocumentHistory(id) { return (await secureFetch(`/api/chain/document/${id}/history`)).json(); },
+    async batchUpload(formData, files) {
+        // For simplicity, we hash the first file or a composite for the batch signature
+        const fileHash = files.length ? await computeFileHash(files[0]) : '';
+        return (await secureFetch('/api/upload/batch-upload', {
             method: 'POST',
-            headers: { 'x-api-key': API_KEY },
-            body: formData
+            body: formData,
+            fileHash
         })).json();
     },
     async getBatchStatus(batchId) {
-        return (await fetch(`/api/chain/batch/${batchId}/status`)).json();
+        return (await secureFetch(`/api/chain/batch/${batchId}/status`)).json();
     },
     async getDocument(id) {
-        return (await fetch(`/api/chain/document/${id}`)).json();
+        return (await secureFetch(`/api/chain/document/${id}`)).json();
     },
     async analyzeDocument(id) {
-        return (await fetch(`/api/chain/document/${id}/analyze`, {
+        return (await secureFetch(`/api/chain/document/${id}/analyze`, {
             method: 'POST'
         })).json();
     },
     async getUsers() {
-        return (await fetch('/api/admin/users')).json();
+        return (await secureFetch('/api/admin/users')).json();
     },
     async promoteUser(userId, newRole) {
-        return (await fetch('/api/admin/promote', {
+        return (await secureFetch('/api/admin/promote', {
             method: 'POST',
-            headers: {
-                'x-api-key': API_KEY,
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId, newRole })
         })).json();
     }
 };
+
+// ── Security Helpers ──
+async function computeFileHash(file) {
+    if (!file) return '';
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const wordArray = CryptoJS.lib.WordArray.create(e.target.result);
+            const hash = CryptoJS.SHA256(wordArray).toString();
+            resolve(hash);
+        };
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+async function secureFetch(url, options = {}) {
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const fileHash = options.fileHash || '';
+    
+    let signature = '';
+    if (currentUser && currentUser.api_secret) {
+        const method = options.method || 'GET';
+        
+        let bodyStr = '';
+        if (options.body && !(options.body instanceof FormData)) {
+            // STABLE SIGNING: Sort keys alphabetically to match backend hmac.js
+            const bodyObj = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
+            const sortedBody = Object.keys(bodyObj).sort().reduce((acc, key) => {
+                acc[key] = bodyObj[key];
+                return acc;
+            }, {});
+            bodyStr = JSON.stringify(sortedBody);
+        }
+
+        const payload = `${method}${url}${timestamp}${fileHash}${bodyStr}`;
+        signature = CryptoJS.HmacSHA256(payload, currentUser.api_secret).toString();
+    }
+
+    const headers = {
+        ...(options.headers || {}),
+        'X-Signature': signature,
+        'X-Timestamp': timestamp,
+        'X-File-Hash': fileHash,
+        'x-api-key': API_KEY,
+        'X-User-ID': currentUser?.id || ''
+    };
+
+    return fetch(url, { ...options, headers });
+}
+
 
 // ── Auth State ──
 let currentUser = null;
@@ -630,7 +682,7 @@ function renderUpload(app) {
         if (parentId) fd.append('parent_document_id', parentId);
         if (note) fd.append('version_note', note);
         try {
-            const res = await API.upload(fd);
+            const res = await API.upload(fd, fileInput.files[0]);
             const resultDiv = document.getElementById('upload-result');
             resultDiv.classList.remove('hidden');
             if (res.success) {
@@ -956,7 +1008,7 @@ function renderVerify(app) {
         try {
             // Start the sequence
             updateStep('hash', 'loading');
-            const resPromise = API.verify(fd);
+            const resPromise = API.verify(fd, verifyFile.files[0]);
 
             await new Promise(r => setTimeout(r, 800));
             updateStep('hash', 'done');
@@ -1671,7 +1723,7 @@ function renderBatch(app) {
         fd.append('department', document.getElementById('batch-dept').value);
 
         try {
-            const res = await API.batchUpload(fd);
+            const res = await API.batchUpload(fd, Array.from(fileInput.files));
             if (!res.batch_id) throw new Error(res.error || 'Upload failed');
             startDashboard(res);
         } catch (err) {

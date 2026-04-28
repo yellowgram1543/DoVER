@@ -26,6 +26,7 @@
         }
     </script>
     <link rel="stylesheet" href="/styles.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <style>
         .verdict-banner { transition: all 0.3s ease; }
         .hash-mono { font-family: 'JetBrains Mono', 'Courier New', monospace; word-break: break-all; }
@@ -65,30 +66,17 @@
         <div class="bg-white dark:bg-[#1C2A41] rounded-2xl p-8 shadow-xl border border-slate-200 dark:border-slate-700 space-y-6 fade-in" style="animation-delay: 0.1s">
             <div class="space-y-4">
                 <div class="space-y-1.5">
-                    <label class="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Block Identity Hash</label>
+                    <label class="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Document Identity Hash</label>
                     <div class="relative">
                         <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">fingerprint</span>
                         <input type="text" id="input-hash" class="w-full pl-10 pr-4 py-3 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#0F1B33] text-sm font-mono focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#E9C176] transition-all" placeholder="Enter 64-char block hash...">
-                    </div>
-                </div>
-
-                <div class="relative flex items-center justify-center py-2">
-                    <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-100 dark:border-slate-800"></div></div>
-                    <span class="relative px-4 bg-white dark:bg-[#1C2A41] text-[10px] font-black text-slate-300 dark:text-slate-600 uppercase tracking-widest">OR</span>
-                </div>
-
-                <div class="space-y-1.5">
-                    <label class="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Document Index ID</label>
-                    <div class="relative">
-                        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">tag</span>
-                        <input type="number" id="input-id" class="w-full pl-10 pr-4 py-3 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#0F1B33] text-sm font-bold focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#E9C176] transition-all" placeholder="e.g. 35">
                     </div>
                 </div>
             </div>
 
             <button onclick="runVerification()" class="w-full bg-primary dark:bg-[#E9C176] text-white dark:text-[#0A192F] py-4 rounded-xl font-extrabold uppercase tracking-widest text-xs flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-blue-900/10 dark:shadow-none">
                 <span class="material-symbols-outlined text-xl">verified_user</span>
-                Verify Now
+                Verify Authenticity
             </button>
         </div>
 
@@ -110,15 +98,14 @@
 
         async function runVerification() {
             const hash = document.getElementById('input-hash').value.trim();
-            const id = document.getElementById('input-id').value.trim();
             const out = document.getElementById('verify-output');
 
-            if (!hash && !id) return alert('Enter a hash or an ID');
+            if (!hash) return alert('Enter a valid document hash');
 
             out.innerHTML = `<div class="py-12 flex justify-center"><div class="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div></div>`;
             out.classList.remove('hidden');
 
-            const url = id ? `/api/verify/public/verify/qr/${id}` : `/api/verify/public/verify/${hash}`;
+            const url = `/api/verify/public/verify/${hash}`;
 
             try {
                 const res = await fetch(url);
