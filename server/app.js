@@ -1,4 +1,13 @@
 require('dotenv').config();
+
+// ── Global Crash Guards ── Keep server alive through unexpected errors
+process.on('uncaughtException', (err) => {
+    console.error('[FATAL] Uncaught Exception — server staying alive:', err.message);
+});
+process.on('unhandledRejection', (reason) => {
+    console.error('[FATAL] Unhandled Promise Rejection — server staying alive:', reason?.message || reason);
+});
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -30,7 +39,7 @@ const app = express();
 app.set('trust proxy', 1);
 
 // Redis Client for Rate Limiting
-const redisClient = createClient({ 
+const redisClient = createClient({
     url: process.env.REDIS_URL || 'redis://127.0.0.1:6379',
     socket: { connectTimeout: 5000 } // 5 second timeout to prevent hangs
 });
@@ -53,7 +62,7 @@ const globalLimiter = rateLimit({
     }) : undefined, // Falls back to MemoryStore if Redis is closed
     handler: (req, res, next, options) => {
         db.prepare(`INSERT INTO audit_log (document_id, action, actor, details) VALUES (?, ?, ?, ?)`)
-          .run(0, 'RATE_LIMIT_EXCEEDED', req.ip, `Global limit hit: ${req.method} ${req.url}`);
+            .run(0, 'RATE_LIMIT_EXCEEDED', req.ip, `Global limit hit: ${req.method} ${req.url}`);
         res.status(options.statusCode).json({
             success: false,
             error: 'Too many requests',
@@ -67,8 +76,8 @@ app.use(globalLimiter);
 app.use(nonceMiddleware);
 
 app.use((req, res, next) => {
-  console.log("REQUEST_RECEIVED:", req.method, req.url);
-  next();
+    console.log("REQUEST_RECEIVED:", req.method, req.url);
+    next();
 });
 
 app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:3000', credentials: true }));
@@ -183,9 +192,9 @@ setInterval(async () => {
                 if (!verification.valid) {
                     db.prepare('UPDATE documents SET is_tampered = 1 WHERE block_index = ?').run(doc.block_index);
                     db.prepare(`INSERT INTO audit_log (document_id, action, actor, details) VALUES (?, ?, ?, ?)`)
-                      .run(doc.block_index, 'TAMPER_DETECTED', 'BG_WATCHER', `Automated sweep detected file modification.`);
+                        .run(doc.block_index, 'TAMPER_DETECTED', 'BG_WATCHER', `Automated sweep detected file modification.`);
                 }
-                
+
                 if (fs.existsSync(tmpPath)) {
                     try {
                         fs.unlinkSync(tmpPath);
@@ -201,7 +210,7 @@ setInterval(async () => {
                 if (fs.existsSync(tmpPath)) {
                     try {
                         fs.unlinkSync(tmpPath);
-                    } catch (e) {}
+                    } catch (e) { }
                 }
             }
         }
