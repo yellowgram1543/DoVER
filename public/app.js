@@ -913,8 +913,9 @@ function renderVerify(app) {
                         <div><h3 class="text-xl font-bold text-primary">Document Identity</h3><p class="text-sm text-on-surface-variant">Enter the document ID or upload the file.</p></div>
                     </div>
                     <form id="verify-form" class="space-y-6">
-                        <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 px-1">Document ID</label>
-                        <input id="verify-id" class="w-full bg-surface-container-low border-none rounded-xl px-6 py-4 text-lg focus:ring-2 focus:ring-secondary/20 placeholder:text-slate-300" placeholder="e.g. 1" type="text"/></div>
+                        <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 px-1">Original Document ID</label>
+                        <input id="verify-id" class="w-full bg-surface-container-low border-none rounded-xl px-6 py-4 text-lg focus:ring-2 focus:ring-secondary/20 placeholder:text-slate-300" placeholder="e.g. 1" type="text"/>
+                        <p class="text-[10px] text-slate-400 mt-2 px-1 font-medium">Required if you are verifying a file with a changed filename.</p></div>
                         <div class="text-center text-xs font-bold text-slate-400 uppercase tracking-widest">— OR —</div>
                         <div id="verify-drop" class="drop-zone relative py-12 border-2 border-dashed border-outline-variant/40 rounded-xl flex flex-col items-center justify-center bg-surface-container-low/30 hover:bg-surface-container-low transition-colors group cursor-pointer">
                             <span class="material-symbols-outlined text-4xl text-slate-400 group-hover:text-secondary mb-4 transition-colors">cloud_upload</span>
@@ -1001,16 +1002,17 @@ function renderVerify(app) {
             const el = document.getElementById(`step-${id}`);
             if (!el) return;
             el.classList.remove('opacity-30', 'grayscale');
-            const iconWrap = el.querySelector('div');
-            const icon = el.querySelector('span');
+            const iconWrap = el.children[0];
+            const icon = iconWrap.firstElementChild;
+            const label = el.children[1];
 
             if (status === 'loading') {
                 iconWrap.className = 'w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center animate-pulse';
-                el.querySelector('span:last-child').className = 'text-xs font-bold text-blue-600';
+                label.className = 'text-xs font-bold text-blue-600';
             } else {
                 iconWrap.className = 'w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-sm border border-emerald-100';
                 icon.textContent = 'check_circle';
-                el.querySelector('span:last-child').className = 'text-xs font-bold text-slate-700 dark:text-slate-300';
+                label.className = 'text-xs font-bold text-slate-700 dark:text-slate-300';
             }
         };
 
