@@ -47,7 +47,7 @@ function initProcessor() {
     });
 
     documentQueue.on('completed', (job, result) => {
-        console.log(`[QUEUE] Job #${job.id} completed:`, result.filename);
+        console.log(`[QUEUE] Job #${job.id} completed:`, result?.filename || job.data?.originalname || 'unknown');
     });
 
     documentQueue.on('failed', (job, err) => {
@@ -58,7 +58,7 @@ function initProcessor() {
 }
 
 async function processDocument(data, job = null) {
-    const { storageId, originalname, mimetype, uploadedBy, uploaderEmail, department, parent_document_id, version_number, version_note } = data;
+    const { storageId, originalname = 'unknown_file', mimetype = 'application/octet-stream', uploadedBy, uploaderEmail, department, parent_document_id, version_number, version_note } = data;
     let filePath = data.filePath; // Legacy fallback
     let gridfsId = storageId;
     
@@ -178,7 +178,7 @@ async function processDocument(data, job = null) {
                 const summary = await gemini.generateDocumentSummary(ocrText, forensicReport);
                 aiSummary = JSON.stringify(summary);
             }
-        } else if (/text\/plain/.test(mimetype) || originalname.endsWith('.txt')) {
+        } else if (/text\/plain/.test(mimetype) || originalname?.endsWith('.txt')) {
             ocrText = fs.readFileSync(filePath, 'utf8');
             if (ocrText) ocrHash = crypto.createHash('sha256').update(ocrText).digest('hex');
             forensicScore = JSON.stringify({ score: 100, flags: [], analysis: 'Text verified.' });

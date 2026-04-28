@@ -67,6 +67,11 @@ async function computeFileHash(file) {
     return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onload = (e) => {
+            if (typeof CryptoJS === 'undefined') {
+                console.error('[SECURITY] CryptoJS library failed to load. Check your network or script tags.');
+                alert('Security engine failed to initialize. Please refresh the page.');
+                return;
+            }
             const wordArray = CryptoJS.lib.WordArray.create(e.target.result);
             const hash = CryptoJS.SHA256(wordArray).toString();
             resolve(hash);
