@@ -16,6 +16,16 @@ const hmacMiddleware = require('./middleware/hmac');
 const db = require('./db/db');
 const PKIUtils = require('./utils/pki');
 
+// ── Startup Initialization ──
+const requiredDirs = ['tmp', 'uploads', 'certs'];
+requiredDirs.forEach(dir => {
+    const dirPath = path.join(__dirname, '..', dir);
+    if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath, { recursive: true });
+        console.log(`[INIT] Created directory: ${dir}`);
+    }
+});
+
 const app = express();
 app.set('trust proxy', 1);
 
@@ -34,7 +44,7 @@ app.use(blocklist);
 // Global Rate Limiter: 100 requests per 15 minutes
 const globalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    limit: 100,
+    limit: 500, // Increased for Demo Resilience
     standardHeaders: 'draft-7',
     legacyHeaders: false,
     validate: { keyGeneratorIpFallback: false },

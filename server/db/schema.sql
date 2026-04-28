@@ -7,8 +7,12 @@ CREATE TABLE IF NOT EXISTS documents (
     file_hash TEXT NOT NULL,
     prev_hash TEXT NOT NULL,
     block_hash TEXT NOT NULL,
+    storage_id TEXT,
+    checkpoint_hash TEXT,
+    ai_summary TEXT,
     signature TEXT,
-    is_tampered BOOLEAN DEFAULT 0
+    is_tampered BOOLEAN DEFAULT 0,
+    last_checked_at DATETIME
 );
 
 CREATE TABLE IF NOT EXISTS audit_log (
