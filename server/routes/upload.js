@@ -179,6 +179,14 @@ router.post('/batch-upload', uploadLimiter, (req, res) => {
                 }
             }
 
+            // Cleanup all batch files from temp storage
+            for (const file of req.files) {
+                const batchTmpPath = path.resolve(file.path);
+                if (fs.existsSync(batchTmpPath)) {
+                    fs.unlinkSync(batchTmpPath);
+                }
+            }
+
             res.json({
                 success: true,
                 batch_id: batchId,
