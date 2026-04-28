@@ -72,7 +72,7 @@ router.get('/public/verify/:hash', verifyLimiter, async (req, res) => {
                         if (keyRecord && keyRecord.serial_number) {
                             // In a real app, we'd fetch the CRL from /api/public/crl and parse it.
                             // For this prototype, we'll check the registry status directly (which the CRL is derived from).
-                            const isRevoked = db.prepare('SELECT 1 FROM key_registry WHERE serial_number = ? AND status = "revoked"').get(keyRecord.serial_number);
+                            const isRevoked = db.prepare("SELECT 1 FROM key_registry WHERE serial_number = ? AND status = 'revoked'").get(keyRecord.serial_number);
                             if (isRevoked) {
                                 signature_status = "REVOKED_BY_CRL";
                             }

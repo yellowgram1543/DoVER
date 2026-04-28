@@ -116,7 +116,7 @@ async function processDocument(data, job = null) {
         let signerFingerprint = null;
 
         const user = db.prepare('SELECT id FROM users WHERE email = ?').get(uploaderEmail);
-        const activeKey = user ? db.prepare('SELECT * FROM key_registry WHERE issuer_id = ? AND status = "active"').get(user.id) : null;
+        const activeKey = user ? db.prepare("SELECT * FROM key_registry WHERE issuer_id = ? AND status = 'active'").get(user.id) : null;
 
         if (activeKey) {
             try {
