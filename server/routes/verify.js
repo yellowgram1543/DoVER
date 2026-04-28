@@ -323,6 +323,7 @@ router.post('/', verifyLimiter, apiKey, upload.single('file'), async (req, res) 
         if (req.body.document_id) {
             console.log('[TRACE] Received document_id:', req.body.document_id, 'Type:', typeof req.body.document_id);
             doc = db.prepare('SELECT * FROM documents WHERE block_index = ?').get(req.body.document_id);
+            if (req.file) isComparisonVerify = true;
         } else if (req.file) {
             const originalName = req.file.originalname;
             if (compareWith) {

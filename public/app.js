@@ -910,13 +910,12 @@ function renderVerify(app) {
                 <div class="bg-surface-container-lowest rounded-xl p-8 shadow-sm shadow-blue-900/5">
                     <div class="flex items-center gap-4 mb-8">
                         <div class="w-12 h-12 rounded-xl bg-primary-fixed flex items-center justify-center text-on-primary-fixed"><span class="material-symbols-outlined">fingerprint</span></div>
-                        <div><h3 class="text-xl font-bold text-primary">Document Identity</h3><p class="text-sm text-on-surface-variant">Enter the document ID or upload the file.</p></div>
+                        <div><h3 class="text-xl font-bold text-primary">Document Identity</h3><p class="text-sm text-on-surface-variant">Upload a file to verify its authenticity against the vault.</p></div>
                     </div>
                     <form id="verify-form" class="space-y-6">
-                        <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 px-1">Original Document ID</label>
+                        <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 px-1">Original Document ID (Optional)</label>
                         <input id="verify-id" class="w-full bg-surface-container-low border-none rounded-xl px-6 py-4 text-lg focus:ring-2 focus:ring-secondary/20 placeholder:text-slate-300" placeholder="e.g. 1" type="text"/>
                         <p class="text-[10px] text-slate-400 mt-2 px-1 font-medium">Required if you are verifying a file with a changed filename.</p></div>
-                        <div class="text-center text-xs font-bold text-slate-400 uppercase tracking-widest">— OR —</div>
                         <div id="verify-drop" class="drop-zone relative py-12 border-2 border-dashed border-outline-variant/40 rounded-xl flex flex-col items-center justify-center bg-surface-container-low/30 hover:bg-surface-container-low transition-colors group cursor-pointer">
                             <span class="material-symbols-outlined text-4xl text-slate-400 group-hover:text-secondary mb-4 transition-colors">cloud_upload</span>
                             <p class="text-sm font-medium text-on-surface-variant" id="verify-drop-label">Drag and drop document, or <span class="text-secondary underline underline-offset-4">browse</span></p>
