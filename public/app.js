@@ -160,8 +160,20 @@ document.addEventListener('click', e => {
     }
 });
 
+function handleLogout() {
+    localStorage.removeItem('dover_demo_user');
+    window.location.href = '/auth/logout';
+}
+
 async function checkAuth() {
-    currentUser = await API.getMe();
+    // Check for Demo Bypass user first
+    const demoUser = localStorage.getItem('dover_demo_user');
+    if (demoUser) {
+        currentUser = JSON.parse(demoUser);
+    } else {
+        currentUser = await API.getMe();
+    }
+    
     const app = document.getElementById('app');
     const sidebar = document.getElementById('sidebar');
     const header = document.querySelector('header');
@@ -255,7 +267,32 @@ function renderLogin(container) {
                     <img src="https://www.gstatic.com/images/branding/product/1x/gsa_512dp.png" class="w-6 h-6 group-hover:scale-110 transition-transform" alt="Google"/>
                     <span class="text-base">Sign in with Google</span>
                 </button>
+
+                <div class="relative flex items-center py-2">
+                    <div class="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
+                    <span class="flex-shrink mx-4 text-[10px] font-black uppercase text-slate-300 tracking-widest">OR</span>
+                    <div class="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
+                </div>
+
+                <button onclick="bypassLogin()" class="w-full flex items-center justify-center gap-2 text-slate-500 hover:text-primary dark:hover:text-[#E9C176] font-bold text-sm transition-all">
+                    <span class="material-symbols-outlined text-lg">no_accounts</span>
+                    <span>Continue as Guest (Demo Mode)</span>
+                </button>
                 
+                <script>
+                    window.bypassLogin = () => {
+                        localStorage.setItem('dover_demo_user', JSON.stringify({
+                            id: 'demo-user',
+                            name: 'Hackathon Judge',
+                            email: 'judge@hackathon.io',
+                            role: 'authority',
+                            picture: 'https://ui-avatars.com/api/?name=Judge&background=001e40&color=fff',
+                            api_secret: 'demo-secret-key-12345'
+                        }));
+                        window.location.reload();
+                    };
+                </script>
+
                 <p class="text-[10px] text-slate-400 font-medium">By signing in, you agree to the secure audit protocols.</p>
             </div>
         </div>
@@ -282,10 +319,10 @@ function updateHeaderUI(header, user) {
                 </div>
                 <img src="${user.picture}" class="h-9 w-9 rounded-full border-2 border-primary/10 shadow-sm" alt="Profile"/>
             </div>
-            <a href="/auth/logout" class="flex items-center gap-2 text-slate-500 hover:text-error transition-colors text-xs font-bold uppercase tracking-wider">
+            <button onclick="handleLogout()" class="flex items-center gap-2 text-slate-500 hover:text-error transition-colors text-xs font-bold uppercase tracking-wider">
                 <span class="material-symbols-outlined text-lg">logout</span>
                 <span class="hidden sm:inline">Logout</span>
-            </a>
+            </button>
         </div>
     `;
 
