@@ -17,6 +17,7 @@ const db = require('./db/db');
 const PKIUtils = require('./utils/pki');
 
 const app = express();
+app.set('trust proxy', 1);
 
 // Redis Client for Rate Limiting
 const redisClient = createClient({ url: process.env.REDIS_URL || 'redis://127.0.0.1:6379' });
