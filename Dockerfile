@@ -4,6 +4,7 @@ FROM node:18-slim
 # Install Tesseract and other dependencies for image processing
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
+    tesseract-ocr-eng \
     libtesseract-dev \
     && rm -rf /var/lib/apt/lists/*
 
