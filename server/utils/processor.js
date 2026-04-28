@@ -176,6 +176,21 @@ function initProcessor() {
                     const summary = await gemini.generateDocumentSummary(ocrText, forensicReport);
                     aiSummary = JSON.stringify(summary);
                 }
+            } else if (/text\/plain/.test(mimetype) || originalname.endsWith('.txt')) {
+                // Handle plain text files
+                console.log(`[PROCESSOR] Processing plain text file for AI intelligence: ${originalname}`);
+                ocrText = fs.readFileSync(filePath, 'utf8');
+                if (ocrText) ocrHash = crypto.createHash('sha256').update(ocrText).digest('hex');
+                
+                // Initialize empty but valid forensic report for text files
+                const forensicReport = { score: 100, flags: ['Text-based document - forensic image analysis skipped'], analysis: 'Plain text integrity verified via hash.' };
+                forensicScore = JSON.stringify(forensicReport);
+
+                // Gemini Intelligence Analysis for Text
+                if (ocrText) {
+                    const summary = await gemini.generateDocumentSummary(ocrText, forensicReport);
+                    aiSummary = JSON.stringify(summary);
+                }
             }
 
             await job.progress(75);

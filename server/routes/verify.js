@@ -408,20 +408,25 @@ router.post('/', verifyLimiter, apiKey, upload.single('file'), async (req, res) 
             }
         }
 
-        // 1 & 2. Run extraction ONCE at the top and store in currentOcrText
-        let currentOcrText = '';
+        // 1 & 2. Run extraction ONCE at the top and store in current_ocr_text
+        let current_ocr_text = '';
         let currentOcrLowConfidence = false;
         if (tmpPath && fs.existsSync(tmpPath)) {
             if (/png|jpg|jpeg/.test(doc.file_type)) {
                 const ocrResult = await ocr.extractText(tmpPath);
-                currentOcrText = ocrResult.text;
+                current_ocr_text = ocrResult.text;
                 currentOcrLowConfidence = ocrResult.lowConfidence;
             } else if (doc.file_type === 'text/plain' || doc.filename.endsWith('.txt')) {
-                currentOcrText = fs.readFileSync(tmpPath, 'utf8');
+                current_ocr_text = fs.readFileSync(tmpPath, 'utf8');
+                currentOcrLowConfidence = false;
             }
         }
 
-        let current_ocr_text = (!currentOcrText || currentOcrText.trim().length === 0) ? 'extraction_failed' : currentOcrText.trim();
+        if (!current_ocr_text || current_ocr_text.trim().length === 0) {
+            current_ocr_text = 'extraction_failed';
+        } else {
+            current_ocr_text = current_ocr_text.trim();
+        }
 
         // 3. Deep Analysis
         const OCR_THRESHOLD = 95;
