@@ -22,11 +22,18 @@ function canAccessDocument(user, document) {
 router.get('/', (req, res) => {
     try {
         const isAuthority = req.user && req.user.role === 'authority';
+        const isLoggedIn = !!req.user;
+        
         let documents;
         if (isAuthority) {
-            documents = db.prepare('SELECT * FROM documents ORDER BY block_index ASC').all();
+            // Authorities see everything
+            documents = db.prepare('SELECT * FROM documents ORDER BY block_index DESC').all();
+        } else if (isLoggedIn) {
+            // Logged in users see their own documents
+            documents = db.prepare('SELECT * FROM documents WHERE uploader_email = ? ORDER BY block_index DESC').all(req.user.email);
         } else {
-            documents = db.prepare('SELECT * FROM documents WHERE uploader_email = ? ORDER BY block_index ASC').all(req.user.email);
+            // Guests see a public overview of the latest records
+            documents = db.prepare('SELECT * FROM documents ORDER BY block_index DESC LIMIT 20').all();
         }
         res.json(documents);
     } catch (error) {
@@ -38,6 +45,7 @@ router.get('/', (req, res) => {
 router.get('/audit', (req, res) => {
     try {
         const isAuthority = req.user && req.user.role === 'authority';
+        const isLoggedIn = !!req.user;
         let auditLogs;
         if (isAuthority) {
             auditLogs = db.prepare(`
@@ -46,7 +54,7 @@ router.get('/audit', (req, res) => {
                 LEFT JOIN documents d ON a.document_id = d.block_index
                 ORDER BY a.timestamp DESC
             `).all();
-        } else {
+        } else if (isLoggedIn) {
             auditLogs = db.prepare(`
                 SELECT a.document_id, d.filename, a.action, a.actor, a.timestamp, a.details
                 FROM audit_log a
@@ -54,6 +62,8 @@ router.get('/audit', (req, res) => {
                 WHERE d.uploader_email = ?
                 ORDER BY a.timestamp DESC
             `).all(req.user.email);
+        } else {
+            auditLogs = []; // Guests don't see private audit trails
         }
         res.json(auditLogs);
     } catch (error) {
