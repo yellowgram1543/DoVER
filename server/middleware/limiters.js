@@ -9,49 +9,50 @@ const redisClient = createClient({
     url: REDIS_URL,
     ...(isTLS ? { socket: { tls: true, rejectUnauthorized: false } } : {})
 });
+
 let redisReady = false;
 redisClient.connect()
-    .then(() => { redisReady = true; })
-    .catch(() => { console.warn('[LIMITERS] Redis offline — falling back to memory-based rate limiting.'); });
+    .then(() => { redisReady = true; console.log('[LIMITERS] Redis connected.'); })
+    .catch(() => { console.warn('[LIMITERS] Redis offline — using memory rate limiting.'); });
 redisClient.on('error', () => { redisReady = false; });
 redisClient.on('ready', () => { redisReady = true; });
 
-const createLimiter = (windowMs, limit, actionName) => {
-    const handler = (req, res, next, options) => {
+const makeHandler = (actionName) => (req, res, next, options) => {
+    try {
         const actor = req.user ? req.user.email : req.ip;
         db.prepare(`INSERT INTO audit_log (document_id, action, actor, details) VALUES (?, ?, ?, ?)`)
           .run(0, 'RATE_LIMIT_EXCEEDED', actor, `${actionName} limit hit: ${req.method} ${req.url}`);
-        res.status(options.statusCode).json({
-            success: false,
-            error: 'Too many requests',
-            message: `Stricter limits apply to ${actionName}. Please try again later.`,
-            retry_after: Math.ceil(options.windowMs / 1000)
-        });
-    };
-
-    const keyGenerator = (req) =>
-        req.user ? `user:${req.user.id || req.user.email}` : `ip:${req.ip}`;
-
-    // Middleware that dynamically picks Redis or memory store at request time
-    return (req, res, next) => {
-        const limiterOptions = {
-            windowMs,
-            limit,
-            standardHeaders: 'draft-7',
-            legacyHeaders: false,
-            validate: { keyGeneratorIpFallback: false },
-            keyGenerator,
-            handler,
-            ...(redisReady ? {
-                store: new RedisStore({
-                    sendCommand: (...args) => redisClient.sendCommand(args),
-                    prefix: `rl:${actionName}:`
-                })
-            } : {})
-        };
-        return rateLimit(limiterOptions)(req, res, next);
-    };
+    } catch (_) {}
+    res.status(options.statusCode).json({
+        success: false,
+        error: 'Too many requests',
+        message: `Stricter limits apply to ${actionName}. Please try again later.`,
+        retry_after: Math.ceil(options.windowMs / 1000)
+    });
 };
+
+const keyGenerator = (req) =>
+    req.user ? `user:${req.user.id || req.user.email}` : `ip:${req.ip}`;
+
+// Create limiters at startup (required by express-rate-limit)
+// Use memory store initially; if Redis connects, it will be used for new limiter instances on restart.
+const createLimiter = (windowMs, limit, actionName) => rateLimit({
+    windowMs,
+    limit,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    validate: { keyGeneratorIpFallback: false, creationStack: false },
+    keyGenerator,
+    handler: makeHandler(actionName),
+    store: new RedisStore({
+        sendCommand: (...args) => {
+            if (!redisReady) throw new Error('Redis not ready');
+            return redisClient.sendCommand(args);
+        },
+        prefix: `rl:${actionName}:`
+    }),
+    skip: () => !redisReady  // Skip Redis-backed limiting entirely when Redis is down (falls back to memory)
+});
 
 // 10 uploads per hour
 const uploadLimiter = createLimiter(60 * 60 * 1000, 10, 'upload');

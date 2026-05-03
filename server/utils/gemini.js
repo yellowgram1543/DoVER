@@ -17,8 +17,8 @@ async function generateDocumentSummary(ocrText, forensicReport) {
     if (!ocrText || ocrText.trim().length === 0) return { status: "skipped", reason: "No OCR text" };
 
     try {
-        // Use gemini-flash-latest for stable quota
-        const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+        // Use gemini-2.0-flash (current stable free-tier model)
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
         const prompt = `
             You are a forensic document analyst. Analyze this document.
@@ -59,7 +59,7 @@ async function extractTextFromImage(filePath) {
         const mimeType = mime.lookup(filePath) || 'image/jpeg';
         const imageBase64 = fs.readFileSync(filePath).toString('base64');
         
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
         const prompt = "Extract all text from this image exactly as written. Do not add any extra commentary.";
         
         const imagePart = {

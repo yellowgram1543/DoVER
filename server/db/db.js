@@ -48,4 +48,11 @@ const docColumns = [
 
 docColumns.forEach(([col, type]) => addColumn('documents', col, type));
 
+// Ensure user abuse tracking columns exist
+const userColumns = [
+    ['abuse_score', 'INTEGER DEFAULT 0'],
+    ['is_flagged', 'BOOLEAN DEFAULT 0']
+];
+userColumns.forEach(([col, type]) => addColumn('users', col, type));
+
 module.exports = db;
