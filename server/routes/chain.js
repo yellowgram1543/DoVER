@@ -29,11 +29,11 @@ router.get('/', (req, res) => {
             // Authorities see everything
             documents = db.prepare('SELECT * FROM documents ORDER BY block_index DESC').all();
         } else if (isLoggedIn) {
-            // Logged in users see their own documents
-            documents = db.prepare('SELECT * FROM documents WHERE uploader_email = ? ORDER BY block_index DESC').all(req.user.email);
+            // Logged in users see their own documents (case-insensitive)
+            documents = db.prepare('SELECT * FROM documents WHERE LOWER(uploader_email) = LOWER(?) ORDER BY block_index DESC').all(req.user.email);
         } else {
-            // Guests see a public overview of the latest records
-            documents = db.prepare('SELECT * FROM documents ORDER BY block_index DESC LIMIT 20').all();
+            // No guest mode: return empty array if not authenticated
+            documents = [];
         }
         res.json(documents);
     } catch (error) {
@@ -59,7 +59,7 @@ router.get('/audit', (req, res) => {
                 SELECT a.document_id, d.filename, a.action, a.actor, a.timestamp, a.details
                 FROM audit_log a
                 LEFT JOIN documents d ON a.document_id = d.block_index
-                WHERE d.uploader_email = ?
+                WHERE LOWER(d.uploader_email) = LOWER(?)
                 ORDER BY a.timestamp DESC
             `).all(req.user.email);
         } else {
