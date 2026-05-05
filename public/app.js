@@ -1732,7 +1732,7 @@ function renderBatch(app) {
     function onFilesSelected() {
         const count = fileInput.files.length;
         if (count > 0) {
-            dropLabel.textContent = `${count} file${count > 1 ? 's' : ''} selected`;
+            dropLabel.innerHTML = `<span class="text-secondary font-bold">${count} file${count > 1 ? 's' : ''}</span> selected`;
             submitBtn.disabled = false;
         }
     }
@@ -1761,23 +1761,32 @@ function renderBatch(app) {
     });
 
     function startDashboard(batch) {
-        // Hide form, show dashboard
-        document.getElementById('batch-form').classList.add('hidden');
+        // Disable form instead of hiding it to avoid layout jump
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="material-symbols-outlined">check_circle</span> Queued';
+        fileInput.value = ''; // Reset file input
+        
         const dash = document.getElementById('batch-dashboard');
         dash.classList.remove('hidden');
         dash.innerHTML = `
-            <div class="bg-surface-container-lowest rounded-2xl p-8 shadow-sm">
+            <div class="bg-surface-container-lowest rounded-2xl p-8 shadow-sm border border-slate-100 animate-slide-up">
                 <div class="flex items-center justify-between mb-6">
                     <div>
-                        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Batch ID: ${batch.batch_id}</p>
-                        <h2 class="text-2xl font-bold text-primary">Processing <span id="dash-completed">0</span> / ${batch.total_files} files</h2>
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Batch ID: ${batch.batch_id}</p>
+                        <h2 class="text-2xl font-black text-primary tracking-tight">Processing <span id="dash-completed" class="text-secondary">0</span> / ${batch.total_files} files</h2>
                     </div>
-                    <span id="dash-badge" class="px-3 py-1 rounded-full text-xs font-black uppercase bg-blue-100 text-blue-700">QUEUED</span>
+                    <span id="dash-badge" class="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-blue-100 text-blue-700 shadow-sm border border-blue-200">QUEUED</span>
                 </div>
-                <div class="w-full bg-slate-100 rounded-full h-3 mb-8 overflow-hidden">
-                    <div id="dash-overall-bar" class="h-3 rounded-full bg-gradient-to-r from-primary to-secondary transition-all duration-500" style="width:0%"></div>
+                <div class="w-full bg-slate-100 rounded-full h-3 mb-8 overflow-hidden shadow-inner">
+                    <div id="dash-overall-bar" class="h-3 rounded-full bg-gradient-to-r from-primary to-secondary transition-all duration-700 ease-out" style="width:0%"></div>
                 </div>
-                <div id="dash-jobs" class="space-y-4"></div>
+                <div id="dash-jobs" class="grid grid-cols-1 gap-4"></div>
+                
+                <div id="batch-actions" class="hidden mt-8 pt-8 border-t border-slate-100 flex justify-center">
+                    <button onclick="location.reload()" class="bg-primary text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-2">
+                        <span class="material-symbols-outlined">add</span> Start New Batch
+                    </button>
+                </div>
             </div>
         `;
 
@@ -1817,6 +1826,12 @@ function renderBatch(app) {
             if (allDone) {
                 clearInterval(pollInterval);
                 document.getElementById('dash-overall-bar').style.width = '100%';
+                document.getElementById('batch-actions').classList.remove('hidden');
+                
+                // Re-enable form for next batch
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<span class="material-symbols-outlined">upload_file</span> Upload Batch';
+                dropLabel.textContent = 'Drag & drop files here';
             }
         } catch (err) {
             // Silently retry on network error

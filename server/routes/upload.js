@@ -157,16 +157,41 @@ router.post('/batch-upload', uploadLimiter, (req, res) => {
             const jobIds = [];
             const results = [];
             const isQueueReady = documentQueue.client && documentQueue.client.status === 'ready';
+            const bucket = getBucket();
+
+            if (!bucket) {
+                return res.status(503).json({ success: false, error: 'Database connection not ready.' });
+            }
 
             for (const file of req.files) {
+                const tmpFilePath = path.resolve(file.path);
+                
+                // Calculate hash early for consistency
+                const fileHash = await hasher.generateFileHashAsync(tmpFilePath);
+
+                // Upload to GridFS
+                const uploadStream = bucket.openUploadStream(file.originalname, {
+                    contentType: file.mimetype,
+                    metadata: { uploadedBy, uploaderEmail, fileHash, batchId }
+                });
+
+                const gridfsId = uploadStream.id;
+                fs.createReadStream(tmpFilePath).pipe(uploadStream);
+
+                await new Promise((resolve, reject) => {
+                    uploadStream.on('finish', resolve);
+                    uploadStream.on('error', reject);
+                });
+
                 const jobData = {
-                    filePath: path.resolve(file.path),
+                    storageId: gridfsId.toString(),
                     originalname: file.originalname,
                     mimetype: file.mimetype,
                     uploadedBy,
                     uploaderEmail,
                     department: documentCategory,
-                    batch_id: batchId
+                    batch_id: batchId,
+                    fileHash
                 };
 
                 if (isQueueReady) {
@@ -176,13 +201,10 @@ router.post('/batch-upload', uploadLimiter, (req, res) => {
                     const result = await processDocument(jobData);
                     results.push(result);
                 }
-            }
 
-            // Cleanup all batch files from temp storage
-            for (const file of req.files) {
-                const batchTmpPath = path.resolve(file.path);
-                if (fs.existsSync(batchTmpPath)) {
-                    fs.unlinkSync(batchTmpPath);
+                // Cleanup local temp file
+                if (fs.existsSync(tmpFilePath)) {
+                    fs.unlinkSync(tmpFilePath);
                 }
             }
 
