@@ -21,6 +21,9 @@ Every document is cryptographically signed using a full Certificate Authority ch
 ### Decentralized Proof of Existence
 Document proofs are anchored to the **Polygon Blockchain**. This provides permanent, third-party verification that a document existed in its current state at a specific point in time, independent of the DoVER platform.
 
+### HMAC-SHA256 Security
+Every request and file upload is protected by signed cryptographic headers to prevent tampering and ensure end-to-end transport security.
+
 ---
 
 ## System Architecture
@@ -55,9 +58,9 @@ graph TD
 
 ---
 
-## Getting Started
+## Getting Started & Deployment
 
-### 1. Environment Configuration
+### 1. Local Environment Configuration
 Create a `.env` file with the following keys:
 ```env
 # Core Secrets
@@ -72,19 +75,27 @@ REDIS_URL=rediss://default:your_upstash_password@your_endpoint.upstash.io:6379
 POLYGON_PRIVATE_KEY=your_wallet_key
 ```
 
-### 2. Installation
+### 2. Local Installation
 ```bash
 npm install
 npm start
 ```
 
+### 3. Google Cloud Deployment (Cloud Run)
+DoVER is optimized for **Google Cloud Run**.
+1. Create a new Cloud Run service and connect your repository.
+2. Select **Dockerfile** as the build configuration.
+3. Inject the environment variables listed above into the Cloud Run configuration.
+
 ---
 
-## Forensic Integrity Process
-1. **Hash Registration**: Binary fingerprinting using SHA-256.
-2. **Identity Verification**: X.509 certificate signing of the document container.
-3. **AI Semantic Audit**: Gemini-powered extraction and cross-referencing.
-4. **Blockchain Anchoring**: Proof-of-existence receipt generated on Polygon.
+## Forensic Integrity & Verification
+Every verified document in DoVER produces an **AI Forensic Verdict**:
+
+1. **Hash Registration**: Binary fingerprinting using SHA-256 to verify binary integrity.
+2. **Identity Verification**: Validates the PKI signature against the X.509 CA chain.
+3. **AI Semantic Audit**: Vertex AI (Gemini) compares current content against the "Birth Record" to detect semantic tampering.
+4. **Blockchain Anchoring**: Proof-of-existence receipt generated on the Polygon network.
 
 ---
 
