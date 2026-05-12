@@ -5,17 +5,17 @@ DoVER is a secure, blockchain-anchored platform for issuing, storing, and verify
 
 ---
 
-## 🚀 Key Features
+##  Key Features
 
-- **🛡️ 3-Tier PKI Hierarchy**: Uses a full Certificate Authority (CA) chain for identity-verified document issuance.
-- **🧠 Vertex AI Forensic Engine**: Powered by **Google Gemini 1.5 Flash** for automated semantic audits and anomaly detection.
-- **⛓️ Polygon Blockchain Anchoring**: Document proofs are anchored to the Polygon network for permanent, third-party verification.
-- **🔒 HMAC-SHA256 Security**: Every request and file upload is protected by signed cryptographic headers to prevent tampering.
-- **📂 Universal AI Intelligence**: Automated summarization for both Image-based (OCR) and Plain Text documents.
+- **3-Tier PKI Hierarchy**: Uses a full Certificate Authority (CA) chain for identity-verified document issuance.
+- **Vertex AI Forensic Engine**: Powered by **Google Gemini 1.5 Flash** for automated semantic audits and anomaly detection.
+- **Polygon Blockchain Anchoring**: Document proofs are anchored to the Polygon network for permanent, third-party verification.
+- **HMAC-SHA256 Security**: Every request and file upload is protected by signed cryptographic headers to prevent tampering.
+- **Universal AI Intelligence**: Automated summarization for both Image-based (OCR) and Plain Text documents.
 
 ---
 
-## 🏗️ Enterprise Architecture (Google Cloud Native)
+##  Enterprise Architecture (Google Cloud Native)
 
 DoVER is designed for the Google Cloud ecosystem, ensuring scalability and security:
 
@@ -26,7 +26,7 @@ DoVER is designed for the Google Cloud ecosystem, ensuring scalability and secur
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 |---|---|
@@ -39,7 +39,7 @@ DoVER is designed for the Google Cloud ecosystem, ensuring scalability and secur
 
 ---
 
-## 📦 Deployment on Google Cloud
+##  Deployment on Google Cloud
 
 DoVER is optimized for **Google Cloud Run**.
 
@@ -59,7 +59,7 @@ DoVER is optimized for **Google Cloud Run**.
 
 ---
 
-## 📜 Forensic Integrity Report
+##  Forensic Integrity Report
 Every verified document in DoVER produces an **AI Forensic Verdict**:
 1. **Hash Check**: Verifies the binary integrity of the file.
 2. **Identity Check**: Validates the PKI signature against the CA chain.
