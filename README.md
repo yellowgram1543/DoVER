@@ -6,7 +6,7 @@
 [![AI Engine](https://img.shields.io/badge/AI-Google_Gemini-blue.svg)](https://ai.google.dev/)
 [![Blockchain](https://img.shields.io/badge/Blockchain-Polygon_L2-8247E5.svg)](https://polygon.technology/)
 
-DoVER is a secure, blockchain-anchored platform designed to eliminate document forgery. It provides an immutable "Birth Record" for critical digital assets (degrees, titles, identity documents) using a combination of **3-Tier PKI Hierarchy**, **Google Vertex AI**, and **Polygon L2 Anchoring**.
+DoVER is a secure, blockchain-anchored platform designed to eliminate document forgery. It provides an immutable "Birth Record" for critical digital assets (degrees, titles, identity documents) using a combination of **3-Tier PKI Hierarchy**, **Google Vertex AI**, and **Polygon L2 Anchoring**.     
 
 ---
 
