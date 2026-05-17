@@ -232,6 +232,9 @@ function updateSidebarUI(user) {
             <a href="#audit" data-page="audit" class="nav-link flex items-center px-4 py-3 mx-2 rounded-lg transition-all group">
                 <span class="material-symbols-outlined mr-3 text-xl">history_edu</span><span class="font-medium text-sm">Compliance Logs</span>
             </a>
+            <a href="#chain" data-page="chain" class="nav-link flex items-center px-4 py-3 mx-2 rounded-lg transition-all group">
+                <span class="material-symbols-outlined mr-3 text-xl">account_tree</span><span class="font-medium text-sm">Corporate Ledger</span>
+            </a>
         `;
 
         if (user.role === 'authority') {
