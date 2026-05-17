@@ -35,15 +35,17 @@ router.get('/', (req, res) => {
             // Authorities see everything for oversight
             documents = db.prepare('SELECT block_index, filename, file_type, uploaded_by, uploader_email, department, upload_timestamp, file_hash, block_hash, is_tampered, version_number, polygon_txid, merkle_root, merkle_proof FROM documents ORDER BY block_index DESC').all();
         } else if (mode === 'b2b') {
-            // Institutional Ledger: Show documents within the same department
-            // This isolates corporate records from personal citizen records.
-            const userDept = req.user.department || 'General';
+            // Institutional Ledger: Show documents that belong to B2B categories.
+            // This ensures corporate records are shown together, separate from personal ones.
+            const b2bDepts = ['Employee Records', 'Financial Audit', 'Compliance', 'Legal', 'Executive Office']; 
+            const placeholders = b2bDepts.map(() => '?').join(',');
+            
             documents = db.prepare(`
                 SELECT block_index, filename, file_type, uploaded_by, uploader_email, department, upload_timestamp, file_hash, block_hash, is_tampered, version_number, polygon_txid, merkle_root, merkle_proof 
                 FROM documents 
-                WHERE department = ? 
+                WHERE department IN (${placeholders}) 
                 ORDER BY block_index DESC
-            `).all(userDept);
+            `).all(...b2bDepts);
         } else {
             // Personal Ledger (B2C): Show only the user's own life records.
             documents = db.prepare(`
