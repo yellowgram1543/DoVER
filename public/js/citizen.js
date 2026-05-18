@@ -110,7 +110,44 @@ const CitizenModule = {
     },
 
     renderHelp(app) {
-        if (typeof renderHelp === 'function') renderHelp(app);
+        document.getElementById('page-title').textContent = 'Citizen Help Guide';
+        const wrap = document.createElement('div');
+        wrap.className = 'max-w-7xl mx-auto space-y-20 fade-in';
+
+        wrap.innerHTML = `
+            <div class="text-center space-y-4">
+                <div class="inline-flex items-center gap-2 px-3 py-1 bg-primary text-white rounded-full text-[10px] font-black tracking-widest uppercase mb-2">Citizen Portal v1.0</div>
+                <h1 class="text-5xl font-black text-primary tracking-tight">Your Personal <span class="text-secondary">Vault</span> Guide</h1>
+                <p class="text-on-surface-variant text-lg max-w-2xl mx-auto font-medium">Learn how to secure, manage, and verify your personal documents on the blockchain.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="bg-white p-8 rounded-[2rem] shadow-xl shadow-slate-200/40 border border-slate-100 space-y-6">
+                    <div class="w-12 h-12 bg-blue-50 text-primary rounded-xl flex items-center justify-center">
+                        <span class="material-symbols-outlined">add_moderator</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-primary">Storing Documents</h3>
+                    <p class="text-sm text-slate-500 leading-relaxed">Navigate to "Secure Personal Doc" to upload your records. Every document is hashed and timestamped, ensuring you have an immutable original copy forever.</p>
+                </div>
+
+                <div class="bg-white p-8 rounded-[2rem] shadow-xl shadow-slate-200/40 border border-slate-100 space-y-6">
+                    <div class="w-12 h-12 bg-blue-50 text-primary rounded-xl flex items-center justify-center">
+                        <span class="material-symbols-outlined">verified_user</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-primary">Verifying Records</h3>
+                    <p class="text-sm text-slate-500 leading-relaxed">Use the "Quick Verify" tool to check if a document in your possession matches the official record. Ideal for proving certificates or IDs to third parties.</p>
+                </div>
+
+                <div class="bg-white p-8 rounded-[2rem] shadow-xl shadow-slate-200/40 border border-slate-100 space-y-6">
+                    <div class="w-12 h-12 bg-blue-50 text-primary rounded-xl flex items-center justify-center">
+                        <span class="material-symbols-outlined">account_balance_wallet</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-primary">Self-Sovereignty</h3>
+                    <p class="text-sm text-slate-500 leading-relaxed">You own your data. Our platform only stores cryptographic proofs. Your actual files are never accessible to us without your explicit action.</p>
+                </div>
+            </div>
+        `;
+        app.appendChild(wrap);
     }
 };
 

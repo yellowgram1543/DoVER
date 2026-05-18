@@ -70,6 +70,47 @@ const InstitutionModule = {
 
     renderSettings(app) {
         if (typeof renderSettings === 'function') renderSettings(app);
+    },
+
+    renderHelp(app) {
+        document.getElementById('page-title').textContent = 'Institutional Console Guide';
+        const wrap = document.createElement('div');
+        wrap.className = 'max-w-7xl mx-auto space-y-20 fade-in';
+
+        wrap.innerHTML = `
+            <div class="text-center space-y-4">
+                <div class="inline-flex items-center gap-2 px-3 py-1 bg-secondary text-white rounded-full text-[10px] font-black tracking-widest uppercase mb-2">Institutional Console v1.0</div>
+                <h1 class="text-5xl font-black text-primary tracking-tight">Organization <span class="text-secondary">Console</span> Guide</h1>
+                <p class="text-on-surface-variant text-lg max-w-2xl mx-auto font-medium">Enterprise tools for issuing, managing, and auditing official document flows.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="bg-white p-8 rounded-[2rem] shadow-xl shadow-slate-200/40 border border-slate-100 space-y-6">
+                    <div class="w-12 h-12 bg-blue-50 text-secondary rounded-xl flex items-center justify-center">
+                        <span class="material-symbols-outlined">upload_file</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-primary">Issuing Certificates</h3>
+                    <p class="text-sm text-slate-500 leading-relaxed">Use "Institutional Upload" to issue new official records. These are signed by your organization's cryptographic key and anchored to the blockchain.</p>
+                </div>
+
+                <div class="bg-white p-8 rounded-[2rem] shadow-xl shadow-slate-200/40 border border-slate-100 space-y-6">
+                    <div class="w-12 h-12 bg-blue-50 text-secondary rounded-xl flex items-center justify-center">
+                        <span class="material-symbols-outlined">folder_managed</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-primary">Batch Processing</h3>
+                    <p class="text-sm text-slate-500 leading-relaxed">The "Batch Ingestion" tool allows for large-scale document securing via CSV/Folder uploads, ideal for end-of-semester or payroll cycles.</p>
+                </div>
+
+                <div class="bg-white p-8 rounded-[2rem] shadow-xl shadow-slate-200/40 border border-slate-100 space-y-6">
+                    <div class="w-12 h-12 bg-blue-50 text-secondary rounded-xl flex items-center justify-center">
+                        <span class="material-symbols-outlined">history_edu</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-primary">Compliance & Auditing</h3>
+                    <p class="text-sm text-slate-500 leading-relaxed">Access the "Compliance Logs" to view a full history of all actions taken by your organization's personnel, ensuring total accountability.</p>
+                </div>
+            </div>
+        `;
+        app.appendChild(wrap);
     }
 };
 
