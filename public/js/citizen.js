@@ -3,19 +3,19 @@
  */
 const CitizenModule = {
     renderDashboard(app) {
-        if (typeof renderGlobalDashboard === 'function') renderGlobalDashboard(app);
+        if (typeof renderDashboard === 'function') renderDashboard(app);
     },
     renderUpload(app) {
         if (typeof renderGlobalUpload === 'function') renderGlobalUpload(app);
     },
     renderVerify(app) {
-        if (typeof renderGlobalVerify === 'function') renderGlobalVerify(app);
+        if (typeof renderVerify === 'function') renderVerify(app);
     },
     renderChain(app) {
-        if (typeof renderGlobalChain === 'function') renderGlobalChain(app);
+        if (typeof renderChain === 'function') renderChain(app);
     },
     renderSettings(app) {
-        if (typeof renderGlobalSettings === 'function') renderGlobalSettings(app);
+        if (typeof renderSettings === 'function') renderSettings(app);
     },
     renderHelp(app) {
         document.getElementById('page-title').textContent = 'Citizen Help Guide';

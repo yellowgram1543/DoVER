@@ -456,7 +456,7 @@ function navigate() {
                 location.hash = `/${mode}/dashboard`;
             }
             break;
-        case 'settings': module.renderGlobalSettings(app); break;
+        case 'settings': module.renderSettings(app); break;
         case 'help': module.renderHelp(app); break;
         default: module.renderDashboard(app); break;
     }
@@ -2726,11 +2726,3 @@ async function toggleAuthority(userId, newRole, btn) {
         btn.innerHTML = originalContent;
     }
 }
-
-}
-}
-
-
-}
-}
-
