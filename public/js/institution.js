@@ -48,28 +48,31 @@ const InstitutionModule = {
     },
 
     renderUpload(app) {
-        if (typeof renderUpload === 'function') renderUpload(app);
+        if (typeof renderGlobalUpload === 'function') renderGlobalUpload(app);
+    },
+
+    renderVerify(app) {
+        if (typeof renderGlobalVerify === 'function') renderGlobalVerify(app);
     },
 
     renderBatch(app) {
-        if (typeof renderBatch === 'function') renderBatch(app);
+        if (typeof renderGlobalBatch === 'function') renderGlobalBatch(app);
     },
 
     renderAudit(app) {
-        if (typeof renderAudit === 'function') renderAudit(app);
+        if (typeof renderGlobalAudit === 'function') renderGlobalAudit(app);
     },
 
     renderChain(app) {
-        document.getElementById('page-title').textContent = 'Corporate Ledger';
-        if (typeof renderChain === 'function') renderChain(app);
+        if (typeof renderGlobalChain === 'function') renderGlobalChain(app);
     },
 
     async renderAdmin(app) {
-        if (typeof renderAdmin === 'function') await renderAdmin(app);
+        if (typeof renderGlobalAdmin === 'function') await renderGlobalAdmin(app);
     },
 
     renderSettings(app) {
-        if (typeof renderSettings === 'function') renderSettings(app);
+        if (typeof renderGlobalSettings === 'function') renderGlobalSettings(app);
     },
 
     renderHelp(app) {

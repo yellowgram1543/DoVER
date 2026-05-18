@@ -557,7 +557,7 @@ async function loadVaultDocuments(container) {
 }
 
 // ── Stats Bar (shared) ──
-function renderStatsBar(container) {
+function renderGlobalStatsBar(container) {
     const el = document.createElement('div');
     el.id = 'stats-bar';
     el.className = 'grid grid-cols-1 md:grid-cols-3 gap-6 fade-in';
@@ -658,13 +658,13 @@ function renderDashboard(app) {
 // Global helper to switch categories
 window.setCategory = (cat) => {
     activeCategory = cat;
-    // Partial re-render (just the explorer if we were fancy, but simple for now)
     const app = document.getElementById('app');
-    renderDashboard(app);
+    const module = currentMode === 'b2c' ? CitizenModule : InstitutionModule;
+    module.renderDashboard(app);
 };
 
 // ── Upload Page ──
-function renderUpload(app) {
+function renderGlobalUpload(app) {
     document.getElementById('page-title').textContent = 'Upload Documents';
     const wrap = document.createElement('div');
     wrap.className = 'max-w-5xl mx-auto space-y-8 fade-in';
@@ -1570,7 +1570,7 @@ function renderSettings(app) {
 }
 
 // ── Help Guide Page ──
-function renderHelp(app) {
+function renderGlobalHelp(app) {
     document.getElementById('page-title').textContent = 'System Protocol Guide';
     const wrap = document.createElement('div');
     wrap.className = 'max-w-7xl mx-auto space-y-20 fade-in';
@@ -1842,7 +1842,7 @@ function renderHelp(app) {
     app.appendChild(wrap);
 }
 // ── Batch Upload Page ──
-function renderBatch(app) {
+function renderGlobalBatch(app) {
     document.getElementById('page-title').textContent = 'Batch Upload';
     let pollInterval = null;
 
