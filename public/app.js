@@ -196,7 +196,11 @@ async function checkAuth() {
         if (header) header.style.display = 'none';
         renderLogin(app);
     } else {
-        if (sidebar) sidebar.style.display = 'flex';
+        // Clear authentication query params from URL if present
+        if (window.location.search.includes('authenticated')) {
+            window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+        }
+
         if (header) {
             header.style.display = 'flex';
             updateHeaderUI(header, currentUser);
@@ -218,6 +222,12 @@ function updateSidebarUI(user) {
         } else {
             roleSwitcher.classList.add('hidden');
         }
+    }
+
+    // Update Help Link prefix
+    const helpLink = document.getElementById('help-link');
+    if (helpLink) {
+        helpLink.href = currentMode === 'b2c' ? '#/vault/help' : '#/console/help';
     }
 
     if (currentMode === 'b2c') {
@@ -307,6 +317,7 @@ function renderLogin(container) {
 function updateHeaderUI(header, user) {
     const isDark = document.documentElement.classList.contains('dark');
     const badge = user.role === 'authority' ? `<span class="px-2 py-0.5 rounded bg-[#E9C176]/20 text-[#E9C176] text-[9px] font-black uppercase border border-[#E9C176]/30">Authority</span>` : '';
+    const prefix = currentMode === 'b2c' ? '/vault' : '/console';
 
     header.innerHTML = `
         <div class="flex items-center gap-4">
@@ -317,12 +328,15 @@ function updateHeaderUI(header, user) {
             </div>
         </div>
         <div class="flex items-center gap-4">
-            <div class="flex items-center gap-3 pr-4 border-r border-slate-200 dark:border-slate-700">
-                <div class="text-right hidden sm:block">
-                    <p class="text-xs font-bold text-slate-700 dark:text-white leading-none">${user.name}</p>
-                    <p class="text-[10px] text-slate-400 font-medium">${user.email}</p>
+            <div class="flex items-center gap-2 pr-4 border-r border-slate-200 dark:border-slate-700">
+                <a href="#${prefix}/settings" class="p-2 rounded-full hover:bg-slate-200/50 dark:hover:bg-slate-700/50 transition-colors text-slate-500 dark:text-[#D6E3FF]"><span class="material-symbols-outlined">settings</span></a>
+                <div class="flex items-center gap-3">
+                    <div class="text-right hidden sm:block">
+                        <p class="text-xs font-bold text-slate-700 dark:text-white leading-none">${user.name}</p>
+                        <p class="text-[10px] text-slate-400 font-medium">${user.email}</p>
+                    </div>
+                    <img src="${user.picture}" class="h-9 w-9 rounded-full border-2 border-primary/10 shadow-sm" alt="Profile"/>
                 </div>
-                <img src="${user.picture}" class="h-9 w-9 rounded-full border-2 border-primary/10 shadow-sm" alt="Profile"/>
             </div>
             <button onclick="handleLogout()" class="flex items-center gap-2 text-slate-500 hover:text-error transition-colors text-xs font-bold uppercase tracking-wider">
                 <span class="material-symbols-outlined text-lg">logout</span>
@@ -394,9 +408,11 @@ function navigate() {
     } else if (hash === '' || hash === '/') {
         return renderGateway();
     } else {
-        // Fallback for legacy hashes if any
+        // Fallback for legacy hashes or malformed URLs
         const legacyPage = hash.split('/')[0] || 'dashboard';
-        location.hash = `#/vault/${legacyPage}`;
+        const prefix = currentMode === 'b2c' ? '/vault' : '/console';
+        // Use replace to avoid history loops on legacy redirects
+        location.replace(`#${prefix}/${legacyPage}`);
         return;
     }
 
