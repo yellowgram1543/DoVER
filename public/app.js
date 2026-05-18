@@ -255,6 +255,9 @@ function updateSidebarUI(user) {
             <a href="#/console/upload" class="nav-link flex items-center px-4 py-3 mx-2 rounded-lg transition-all group">
                 <span class="material-symbols-outlined mr-3 text-xl">upload_file</span><span class="font-medium text-sm">Institutional Upload</span>
             </a>
+            <a href="#/console/verify" class="nav-link flex items-center px-4 py-3 mx-2 rounded-lg transition-all group">
+                <span class="material-symbols-outlined mr-3 text-xl">verified_user</span><span class="font-medium text-sm">Verify Records</span>
+            </a>
             <a href="#/console/batch" class="nav-link flex items-center px-4 py-3 mx-2 rounded-lg transition-all group">
                 <span class="material-symbols-outlined mr-3 text-xl">folder_managed</span><span class="font-medium text-sm">Batch Ingestion</span>
             </a>
@@ -450,7 +453,7 @@ function navigate() {
             if (currentUser.role === 'authority') {
                 module.renderAdmin(app); 
             } else {
-                location.hash = '#/vault/dashboard';
+                location.hash = `/${mode}/dashboard`;
             }
             break;
         case 'settings': module.renderSettings(app); break;
@@ -2722,5 +2725,8 @@ async function toggleAuthority(userId, newRole, btn) {
         btn.disabled = false;
         btn.innerHTML = originalContent;
     }
+}
+
+}
 }
 
