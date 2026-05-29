@@ -39,12 +39,13 @@ router.get('/', (req, res) => {
             const b2bDepts = ['Employee Records', 'Financial Audit', 'Compliance', 'Legal', 'Executive Office']; 
             const placeholders = b2bDepts.map(() => '?').join(',');
             
+            // SECURITY FIX: Filter by uploader_email so standard users can only see their own B2B documents.
             documents = db.prepare(`
                 SELECT block_index, filename, file_type, uploaded_by, uploader_email, department, upload_timestamp, file_hash, block_hash, is_tampered, version_number, polygon_txid, merkle_root, merkle_proof 
                 FROM documents 
-                WHERE department IN (${placeholders}) 
+                WHERE department IN (${placeholders}) AND LOWER(uploader_email) = LOWER(?)
                 ORDER BY block_index DESC
-            `).all(...b2bDepts);
+            `).all(...b2bDepts, req.user.email);
         } else {
             // Personal Ledger (B2C): Show only personal records.
             // We EXCLUDE B2B departments to ensure a clean separation.
