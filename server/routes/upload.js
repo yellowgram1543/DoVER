@@ -17,7 +17,7 @@ const documentQueue = require('../utils/queue');
 const { processDocument } = require('../utils/processor');
 const apiKey = require('../middleware/apiKey');
 const { uploadLimiter } = require('../middleware/limiters');
-const { recordSignal } = require('../utils/abuse');
+const { recordUploadVelocity } = require('../utils/abuse');
 
 // Configure multer for temp storage
 const storage = multer.diskStorage({
@@ -45,8 +45,8 @@ const upload = multer({
 });
 
 router.post('/', uploadLimiter, (req, res) => {
-    // Record upload attempt for abuse scoring
-    if (req.user) recordSignal(req.user.id, 'RAPID_UPLOAD');
+    // Record upload attempt for abuse scoring via velocity check
+    if (req.user) recordUploadVelocity(req.user.id);
 
     upload.single('file')(req, res, async (err) => {
         if (err) return res.status(400).json({ success: false, error: err.message });

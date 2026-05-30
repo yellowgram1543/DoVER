@@ -96,8 +96,28 @@ async function isIpBlocked(ip) {
     }
 }
 
+async function recordUploadVelocity(userId) {
+    if (!userId) return;
+    try {
+        const client = await getRedisClient();
+        const key = `velocity:upload:${userId}`;
+        const count = await client.incr(key);
+        if (count === 1) {
+            await client.expire(key, 10); // 10 second window
+        }
+        
+        // If they upload more than 2 files in 10 seconds, it's considered rapid and abusive
+        if (count > 2) {
+            await recordSignal(userId, 'RAPID_UPLOAD');
+        }
+    } catch (error) {
+        console.error('[VELOCITY_ERROR]', error);
+    }
+}
+
 module.exports = {
     recordSignal,
     recordAuthFailure,
-    isIpBlocked
+    isIpBlocked,
+    recordUploadVelocity
 };
