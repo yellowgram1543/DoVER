@@ -340,17 +340,23 @@ router.post('/', verifyLimiter, apiKey, upload.single('file'), async (req, res) 
         let isComparisonVerify = false;
         const compareWith = req.body.compare_with;
 
+        // Compute hash early if a file is provided to avoid filename spoofing
+        let currentFileHash;
+        if (req.file && newPath) {
+            currentFileHash = hasher.generateFileHash(newPath);
+        }
+
         // 1. Identify the document to verify against
         if (req.body.document_id) {
             console.log('[TRACE] Received document_id:', req.body.document_id, 'Type:', typeof req.body.document_id);
             doc = db.prepare('SELECT * FROM documents WHERE block_index = ?').get(req.body.document_id);
             if (req.file) isComparisonVerify = true;
         } else if (req.file) {
-            const originalName = req.file.originalname;
             if (compareWith) {
-                doc = db.prepare('SELECT * FROM documents WHERE filename = ? AND uploaded_by = ? ORDER BY block_index DESC LIMIT 1').get(originalName, compareWith);
+                // SECURITY FIX: Match by file_hash and uploader_email instead of filename and uploaded_by (display name)
+                doc = db.prepare('SELECT * FROM documents WHERE file_hash = ? AND LOWER(uploader_email) = LOWER(?) ORDER BY block_index DESC LIMIT 1').get(currentFileHash, compareWith);
             } else {
-                doc = db.prepare('SELECT * FROM documents WHERE filename = ? ORDER BY block_index DESC LIMIT 1').get(originalName);
+                doc = db.prepare('SELECT * FROM documents WHERE file_hash = ? ORDER BY block_index DESC LIMIT 1').get(currentFileHash);
             }
             isComparisonVerify = true;
         }
@@ -361,11 +367,9 @@ router.post('/', verifyLimiter, apiKey, upload.single('file'), async (req, res) 
         }
 
         // 2. Perform Content Comparison
-        let currentFileHash;
         let verificationResult;
 
         if (isComparisonVerify) {
-            currentFileHash = hasher.generateFileHash(newPath);
             verificationResult = {
                 valid: (currentFileHash.trim() === doc.file_hash.trim()),
                 details: { computedFileHash: currentFileHash }
