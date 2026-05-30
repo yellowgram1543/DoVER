@@ -128,21 +128,41 @@ router.get('/public/verify/qr/:hash', verifyLimiter, async (req, res) => {
 
         // Logic for signature status (consistent with existing verification)
         let signature_status = "VERIFIED";
+        let issuer_name = "DoVER System Authority";
+
         if (!doc.signature) {
             signature_status = "NOT_SIGNED";
         } else {
-            const verify = crypto.createVerify('SHA256');
-            verify.update(doc.block_hash);
             let publicKey = '';
-            if (process.env.PUBLIC_KEY_B64) {
-                publicKey = Buffer.from(process.env.PUBLIC_KEY_B64, 'base64').toString('utf8');
-            } else if (process.env.PUBLIC_KEY) {
-                publicKey = process.env.PUBLIC_KEY.replace(/\\n/g, '\n');
+            
+            // SECURITY FIX: Support Business Key Validation in QR Route
+            if (doc.signer_fingerprint) {
+                const keyRecord = db.prepare('SELECT public_key, status, issuer_id FROM key_registry WHERE fingerprint = ?').get(doc.signer_fingerprint);
+                if (keyRecord && keyRecord.status === 'active') {
+                    publicKey = keyRecord.public_key;
+                    const issuer = db.prepare('SELECT name FROM users WHERE id = ?').get(keyRecord.issuer_id);
+                    if (issuer) issuer_name = issuer.name;
+                } else {
+                    signature_status = keyRecord ? "REVOKED_KEY" : "UNKNOWN_KEY";
+                }
+            } else {
+                // Fallback to default authority key
+                if (process.env.PUBLIC_KEY_B64) {
+                    publicKey = Buffer.from(process.env.PUBLIC_KEY_B64, 'base64').toString('utf8');
+                } else if (process.env.PUBLIC_KEY) {
+                    publicKey = process.env.PUBLIC_KEY.replace(/\\n/g, '\n');
+                }
             }
 
-            if (publicKey) {
-                const isValid = verify.verify(publicKey, doc.signature, 'hex');
-                signature_status = isValid ? "VERIFIED" : "INVALID";
+            if (publicKey && signature_status !== "REVOKED_KEY" && signature_status !== "UNKNOWN_KEY") {
+                try {
+                    const verify = crypto.createVerify('SHA256');
+                    verify.update(doc.block_hash);
+                    const isValid = verify.verify(publicKey, doc.signature, 'hex');
+                    signature_status = isValid ? "VERIFIED" : "INVALID";
+                } catch (e) {
+                    signature_status = "ERROR";
+                }
             }
         }
 
@@ -151,6 +171,7 @@ router.get('/public/verify/qr/:hash', verifyLimiter, async (req, res) => {
             document_id: doc.block_index,
             filename: doc.filename,
             uploaded_by: doc.uploaded_by,
+            issuer_name: issuer_name,
             upload_timestamp: doc.upload_timestamp,
             block_index: doc.block_index,
             block_hash: doc.block_hash,
