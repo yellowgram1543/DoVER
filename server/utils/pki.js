@@ -6,6 +6,16 @@ const path = require('path');
 const CERTS_DIR = path.resolve(__dirname, '..', '..', 'certs');
 if (!fs.existsSync(CERTS_DIR)) fs.mkdirSync(CERTS_DIR);
 
+function getCaPassphrase() {
+    const passphrase = process.env.CA_PASSPHRASE;
+
+    if (!passphrase || passphrase === 'default-secure-passphrase') {
+        throw new Error('CA_PASSPHRASE must be configured with a private, non-default value.');
+    }
+
+    return passphrase;
+}
+
 /**
  * PKI Utility for managing 3-tier Certificate Authority (Root -> Intermediate -> Business).
  */
@@ -45,7 +55,7 @@ class PKIUtils {
             { name: 'basicConstraints', cA: true },
             { name: 'keyUsage', keyCertSign: true, cRLSign: true }
         ]);
-        const caPassphrase = process.env.CA_PASSPHRASE || 'default-secure-passphrase';
+        const caPassphrase = getCaPassphrase();
 
         rootCert.sign(rootKeys.privateKey, forge.md.sha256.create());
 
@@ -91,7 +101,7 @@ class PKIUtils {
             throw new Error('Intermediate CA not bootstrapped. Run bootstrapCAs first.');
         }
 
-        const caPassphrase = process.env.CA_PASSPHRASE || 'default-secure-passphrase';
+        const caPassphrase = getCaPassphrase();
         const interCert = forge.pki.certificateFromPem(fs.readFileSync(interPath, 'utf8'));
         const interKey = forge.pki.decryptRsaPrivateKey(fs.readFileSync(interKeyPath, 'utf8'), caPassphrase);
         const rootCert = forge.pki.certificateFromPem(fs.readFileSync(rootPath, 'utf8'));
@@ -145,7 +155,7 @@ class PKIUtils {
         const interKeyPath = path.join(CERTS_DIR, 'dover_intermediate.key');
         if (!fs.existsSync(interKeyPath)) return null;
 
-        const caPassphrase = process.env.CA_PASSPHRASE || 'default-secure-passphrase';
+        const caPassphrase = getCaPassphrase();
         const interKeyForge = forge.pki.decryptRsaPrivateKey(fs.readFileSync(interKeyPath, 'utf8'), caPassphrase);
         const interKeyPem = forge.pki.privateKeyToPem(interKeyForge);
 
@@ -187,7 +197,7 @@ class PKIUtils {
      * Useful for storing secondary passwords securely.
      */
     static encryptData(text) {
-        const passphrase = process.env.CA_PASSPHRASE || 'default-secure-passphrase';
+        const passphrase = getCaPassphrase();
         // Create a 32-byte key from the passphrase
         const key = crypto.createHash('sha256').update(passphrase).digest();
         const iv = crypto.randomBytes(16);
@@ -202,7 +212,7 @@ class PKIUtils {
      */
     static decryptData(encryptedText) {
         try {
-            const passphrase = process.env.CA_PASSPHRASE || 'default-secure-passphrase';
+            const passphrase = getCaPassphrase();
             const key = crypto.createHash('sha256').update(passphrase).digest();
             const parts = encryptedText.split(':');
             const iv = Buffer.from(parts.shift(), 'hex');
