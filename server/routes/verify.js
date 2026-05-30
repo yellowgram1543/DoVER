@@ -22,6 +22,15 @@ if (!fs.existsSync('tmp')) fs.mkdirSync('tmp');
 
 const upload = multer({ dest: 'tmp/' });
 
+function canAccessProof(user, document) {
+    if (!user) return false;
+    if (user.role === 'authority') return true;
+
+    return document.uploader_email &&
+        user.email &&
+        document.uploader_email.toLowerCase() === user.email.toLowerCase();
+}
+
 router.get('/public/verify/:hash', verifyLimiter, async (req, res) => {
     try {
         const hash = req.params.hash;
@@ -197,6 +206,10 @@ router.get('/:id/proof', verifyLimiter, apiKey, (req, res) => {
 
         if (!doc) {
             return res.status(404).json({ success: false, error: 'Document not found' });
+        }
+
+        if (!canAccessProof(req.user, doc)) {
+            return res.status(403).json({ success: false, error: 'Permission denied' });
         }
 
         const publicKey = process.env.PUBLIC_KEY_B64 
