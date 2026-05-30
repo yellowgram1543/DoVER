@@ -34,6 +34,6 @@ Refactor the frontend architecture of the DoVER application to use "Module Mode.
 ## Verification & Testing
 
 1.  **Role Access Check:** Log in as a standard user. Verify that attempting to access `#/console/dashboard` gracefully redirects or shows an unauthorized message if they lack an institutional department, while `#/vault/dashboard` works perfectly.
-2.  **Judge Persona Check:** Log in using the Demo/Judge account (`demo-user`). Verify the mode switcher appears in the sidebar and successfully navigates between `#/vault/dashboard` and `#/console/dashboard` without losing session state.
+2.  **Judge Persona Check:** Log in through the normal authentication flow with a seeded authority/Judge account. Verify the mode switcher appears in the sidebar and successfully navigates between `#/vault/dashboard` and `#/console/dashboard` without losing session state.
 3.  **Module Isolation:** Ensure that clicking "Issue Document" while in the `#/vault/` space is not possible (the button shouldn't exist in the citizen UI), and verify that institutional API endpoints are not accidentally called from the citizen module.
 4.  **Visual Distinction:** Verify the UI styling shifts correctly when navigating between the two namespaces.

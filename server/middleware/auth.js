@@ -7,20 +7,6 @@ function requireAuth(req, res, next) {
         return next();
     }
 
-    // Demo Mode Bypass: Check for the specific Hackathon Judge ID
-    const demoUserId = req.headers['x-user-id'];
-    if (demoUserId === 'demo-user') {
-        // Mock a user object for the request
-        req.user = {
-            id: 'demo-user',
-            name: 'Hackathon Judge',
-            email: 'judge@hackathon.io',
-            role: 'authority',
-            api_secret: 'demo-secret-key-12345'
-        };
-        return next();
-    }
-
     res.status(401).json({ error: "Login required" });
 }
 
