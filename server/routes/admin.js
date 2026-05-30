@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db/db');
-const { requireAuthority } = require('../middleware/auth');
+const { requireAuth, requireAuthority } = require('../middleware/auth');
 const fs = require('fs');
 const path = require('path');
 
@@ -71,9 +71,10 @@ router.get('/keys/crl', requireAuthority, getCRL);
  * POST /api/admin/keys/request
  * Submit a request for a business signing key.
  */
-router.post('/keys/request', (req, res) => {
+router.post('/keys/request', requireAuth, (req, res) => {
     const { businessName, businessRegNo, note } = req.body;
     if (!businessName) return res.status(400).json({ error: 'Business name is required' });
+    if (!req.user?.id) return res.status(401).json({ error: 'Login required' });
 
     try {
         db.prepare(`
