@@ -73,16 +73,16 @@
 
   <!-- Subtitle -->
   <text x="420" y="240" fill="#A8B3CF" font-size="30" font-family="Inter, Arial, sans-serif">
-    Decentralized Official Vault & Evidence Registry
+    Decentralized Official Vault &amp; Evidence Registry
   </text>
 
   <!-- Description -->
   <text x="420" y="300" fill="#D6DCEB" font-size="24" font-family="Inter, Arial, sans-serif">
-    AI-Powered Digital Asset Protection • PKI Verification
+    AI-Powered Digital Asset Protection | PKI Verification
   </text>
 
   <text x="420" y="340" fill="#D6DCEB" font-size="24" font-family="Inter, Arial, sans-serif">
-    Polygon Blockchain Anchoring • Forensic Integrity
+    Polygon Blockchain Anchoring | Forensic Integrity
   </text>
 
   <!-- Feature Pills -->
