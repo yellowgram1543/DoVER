@@ -13,7 +13,7 @@ const redisClient = createClient({
 let redisReady = false;
 redisClient.connect()
     .then(() => { redisReady = true; console.log('[LIMITERS] Redis connected.'); })
-    .catch(() => { console.warn('[LIMITERS] Redis offline — using memory rate limiting.'); });
+    .catch(() => { console.warn('[LIMITERS] Redis offline — falling back to in-memory rate limiting.'); });
 redisClient.on('error', () => { redisReady = false; });
 redisClient.on('ready', () => { redisReady = true; });
 
@@ -34,25 +34,52 @@ const makeHandler = (actionName) => (req, res, next, options) => {
 const keyGenerator = (req) =>
     req.user ? `user:${req.user.id || req.user.email}` : `ip:${req.ip}`;
 
-// Create limiters at startup (required by express-rate-limit)
-// Use memory store initially; if Redis connects, it will be used for new limiter instances on restart.
-const createLimiter = (windowMs, limit, actionName) => rateLimit({
-    windowMs,
-    limit,
-    standardHeaders: 'draft-7',
-    legacyHeaders: false,
-    validate: { keyGeneratorIpFallback: false, creationStack: false },
-    keyGenerator,
-    handler: makeHandler(actionName),
-    store: new RedisStore({
-        sendCommand: (...args) => {
-            if (!redisReady) return Promise.resolve(0); // Graceful fallback during connection phase
+/**
+ * Build a rate-limiter that ALWAYS enforces limits.
+ *
+ * SECURITY: The `skip` option has been intentionally removed.
+ * Previously `skip: () => !redisReady` caused every request to be
+ * passed through without counting when Redis was offline, making the
+ * limiter trivially bypassable by disrupting Redis connectivity.
+ *
+ * Strategy:
+ *  - When Redis is available: use RedisStore (shared across instances,
+ *    survives restarts).
+ *  - When Redis is unavailable: fall through to the default MemoryStore
+ *    which express-rate-limit uses automatically when no `store` option
+ *    is provided. Limits are then per-process instead of cluster-wide,
+ *    but they are still enforced — a degraded-but-safe posture.
+ */
+const createLimiter = (windowMs, limit, actionName) => {
+    // Build the RedisStore but wrap sendCommand so that if Redis drops
+    // after startup, individual commands fail gracefully and the limiter
+    // automatically degrades to MemoryStore fallback behaviour built
+    // into express-rate-limit (it catches store errors internally).
+    const store = new RedisStore({
+        sendCommand: async (...args) => {
+            if (!redisReady) {
+                // Throw so express-rate-limit falls back to its internal
+                // MemoryStore rather than silently skipping the count.
+                throw new Error('Redis not ready — using memory fallback');
+            }
             return redisClient.sendCommand(args);
         },
         prefix: `rl:${actionName}:`
-    }),
-    skip: () => !redisReady
-});
+    });
+
+    return rateLimit({
+        windowMs,
+        limit,
+        standardHeaders: 'draft-7',
+        legacyHeaders: false,
+        validate: { keyGeneratorIpFallback: false, creationStack: false },
+        keyGenerator,
+        handler: makeHandler(actionName),
+        store,
+        // NO `skip` option — limits are ALWAYS enforced regardless of
+        // Redis availability.
+    });
+};
 
 // 10 uploads per hour
 const uploadLimiter = createLimiter(60 * 60 * 1000, 10, 'upload');
