@@ -1,7 +1,6 @@
 const { createClient } = require('redis');
 const db = require('../db/db');
 
-// Use the same Redis URL as the queue
 const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
 const isTLS = redisUrl.startsWith('rediss://');
 let redisClient;
@@ -19,50 +18,66 @@ async function getRedisClient() {
 }
 
 module.exports = async (req, res, next) => {
-    // Only check nonces for POST requests as per the plan
+    // Only check nonces for POST requests
     if (req.method !== 'POST') {
         return next();
     }
 
     const nonce = req.header('X-Nonce');
     if (!nonce) {
-        return res.status(400).json({ 
-            success: false, 
-            error: 'Missing X-Nonce header' 
+        return res.status(400).json({
+            success: false,
+            error: 'Missing X-Nonce header'
         });
     }
 
     try {
         const client = await getRedisClient();
         const key = `nonce:${nonce}`;
-        
-        // SETNX (set if not exists) with EX (expiry)
-        // In node-redis v4+, set returns 'OK' or null
-        // We can use SET with NX and EX options
+
         const result = await client.set(key, 'used', {
             NX: true,
-            EX: 300 // 5 minutes TTL
+            EX: 300 // 5-minute TTL
         });
 
         if (!result) {
-            // Log the replay attempt
+            // Nonce already consumed — log and reject the replay attempt
             db.prepare(`INSERT INTO audit_log (document_id, action, actor, details) VALUES (?, ?, ?, ?)`)
               .run(0, 'REPLAY_ATTEMPT', req.user ? req.user.email : req.ip, `Duplicate nonce detected: ${nonce}`);
 
-            return res.status(409).json({ 
-                success: false, 
-                error: 'Duplicate request', 
-                message: 'This request has already been processed (Nonce Replay).' 
+            return res.status(409).json({
+                success: false,
+                error: 'Duplicate request',
+                message: 'This request has already been processed (Nonce Replay).'
             });
         }
 
         next();
     } catch (error) {
-        console.error('[NONCE_MIDDLEWARE_ERROR]', error);
-        // Fail open if Redis is down? The plan says "reject duplicates", 
-        // but if Redis is down we might not want to block all traffic.
-        // However, for high security, we should probably fail closed.
-        // Given this is a hackathon/MVP foundation, let's just log and continue.
-        next();
+        // SECURITY: Fail CLOSED on Redis errors.
+        //
+        // Previously this block called next(), silently allowing requests
+        // through when Redis was unavailable. Any attacker who can disrupt
+        // Redis connectivity could therefore replay arbitrary POST requests
+        // indefinitely, defeating the entire purpose of nonce validation.
+        //
+        // We now return 503 Service Unavailable. This is a deliberate
+        // trade-off: a brief availability impact during Redis downtime is
+        // far less harmful than the complete loss of replay protection.
+        // Operators should configure Redis with high availability (Sentinel
+        // / Cluster) to minimise this window.
+        console.error('[NONCE_MIDDLEWARE_ERROR] Redis failure — rejecting request to prevent replay attack:', error.message);
+
+        try {
+            db.prepare(`INSERT INTO audit_log (document_id, action, actor, details) VALUES (?, ?, ?, ?)`)
+              .run(0, 'NONCE_CHECK_FAILED', req.user ? req.user.email : req.ip,
+                   `Nonce validation unavailable (Redis error): ${error.message}`);
+        } catch (_) {}
+
+        return res.status(503).json({
+            success: false,
+            error: 'SERVICE_UNAVAILABLE',
+            message: 'Request validation is temporarily unavailable. Please retry in a moment.'
+        });
     }
 };
