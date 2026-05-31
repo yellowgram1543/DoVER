@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db/db');
-const { requireAuthority } = require('../middleware/auth');
+const { requireAuth, requireAuthority } = require('../middleware/auth');
 const fs = require('fs');
 const path = require('path');
 
@@ -70,19 +70,57 @@ router.get('/keys/crl', requireAuthority, getCRL);
 /**
  * POST /api/admin/keys/request
  * Submit a request for a business signing key.
+ *
+ * Security requirements:
+ *  - requireAuth:      The caller must be a logged-in user (session or demo bypass).
+ *                      Without this the handler crashes on req.user.id when called
+ *                      anonymously, and unauthenticated actors could insert arbitrary
+ *                      rows into key_requests.
+ *  - Authority guard:  Authorities already have signing capability; they must not be
+ *                      able to self-issue key requests, which would bypass the review
+ *                      workflow and constitute a privilege escalation.
  */
-router.post('/keys/request', (req, res) => {
+router.post('/keys/request', requireAuth, (req, res) => {
+    // Authorities already hold signing keys issued through the admin approval flow.
+    // Allowing them to submit new requests would let an authority self-approve a
+    // second key under a different business name without independent review.
+    if (req.user.role === 'authority') {
+        return res.status(403).json({
+            error: 'Authorities may not submit key requests. Use the admin approval workflow.'
+        });
+    }
+
     const { businessName, businessRegNo, note } = req.body;
     if (!businessName) return res.status(400).json({ error: 'Business name is required' });
 
     try {
+        // Prevent duplicate pending requests from the same user for the same business.
+        // A user who already has a pending request should not flood the review queue.
+        const existing = db.prepare(`
+            SELECT id FROM key_requests
+            WHERE user_id = ? AND LOWER(business_name) = LOWER(?) AND status = 'pending'
+        `).get(req.user.id, businessName);
+
+        if (existing) {
+            return res.status(409).json({
+                error: 'A pending key request for this business already exists.',
+                existing_request_id: existing.id
+            });
+        }
+
         db.prepare(`
             INSERT INTO key_requests (user_id, business_name, business_reg_no, request_note)
             VALUES (?, ?, ?, ?)
-        `).run(req.user.id, businessName, businessRegNo, note);
+        `).run(req.user.id, businessName, businessRegNo || null, note || null);
+
+        // Audit trail so administrators can see who requested a key and when.
+        db.prepare(`INSERT INTO audit_log (document_id, action, actor, details) VALUES (?, ?, ?, ?)`)
+            .run(0, 'KEY_REQUEST_SUBMITTED', req.user.email || req.user.id,
+                `Key request submitted for business: ${businessName}`);
 
         res.json({ success: true, message: 'Key request submitted for review' });
     } catch (error) {
+        console.error('[KEY_REQUEST_ERROR]', error);
         res.status(500).json({ error: 'Failed to submit request' });
     }
 });
