@@ -4,10 +4,78 @@ const db = require('../db/db');
 const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
 const isTLS = redisUrl.startsWith('rediss://');
 let redisClient;
+let redisClientFactory = createClient;
+
+class MemoryAbuseStore {
+    constructor() {
+        this.entries = new Map();
+    }
+
+    now() {
+        return Date.now();
+    }
+
+    cleanupExpired() {
+        const now = this.now();
+        for (const [key, entry] of this.entries.entries()) {
+            if (entry.expiresAt && entry.expiresAt <= now) {
+                this.entries.delete(key);
+            }
+        }
+    }
+
+    getEntry(key) {
+        const entry = this.entries.get(key);
+        if (!entry) return null;
+        if (entry.expiresAt && entry.expiresAt <= this.now()) {
+            this.entries.delete(key);
+            return null;
+        }
+        return entry;
+    }
+
+    async incrBy(key, amount) {
+        const entry = this.getEntry(key);
+        const value = Number(entry?.value || 0) + amount;
+        this.entries.set(key, { value, expiresAt: entry?.expiresAt || null });
+        return value;
+    }
+
+    async incr(key) {
+        return this.incrBy(key, 1);
+    }
+
+    async expire(key, seconds) {
+        const entry = this.getEntry(key);
+        if (!entry) return false;
+        entry.expiresAt = this.now() + seconds * 1000;
+        this.entries.set(key, entry);
+        return true;
+    }
+
+    async set(key, value, options = {}) {
+        const expiresAt = options.EX ? this.now() + options.EX * 1000 : null;
+        this.entries.set(key, { value, expiresAt });
+        return 'OK';
+    }
+
+    async get(key) {
+        const entry = this.getEntry(key);
+        return entry ? entry.value : null;
+    }
+
+    reset() {
+        this.entries.clear();
+    }
+}
+
+const memoryStore = new MemoryAbuseStore();
+const cleanupTimer = setInterval(() => memoryStore.cleanupExpired(), 5 * 60 * 1000);
+if (cleanupTimer.unref) cleanupTimer.unref();
 
 async function getRedisClient() {
-    if (!redisClient) {
-        redisClient = createClient({
+    if (!redisClient || !redisClient.isOpen) {
+        redisClient = redisClientFactory({
             url: redisUrl,
             ...(isTLS ? { socket: { tls: true, rejectUnauthorized: false } } : {})
         });
@@ -15,6 +83,16 @@ async function getRedisClient() {
         await redisClient.connect();
     }
     return redisClient;
+}
+
+async function withAbuseStore(operation, label) {
+    try {
+        const client = await getRedisClient();
+        return await operation(client);
+    } catch (error) {
+        console.warn(`[${label}_REDIS_FALLBACK] Using in-memory abuse store:`, error.message);
+        return operation(memoryStore);
+    }
 }
 
 const SCORE_WEIGHTS = {
@@ -33,17 +111,15 @@ async function recordSignal(userId, signalType) {
     if (!userId) return;
 
     try {
-        const client = await getRedisClient();
-        const key = `abuse:score:${userId}`;
         const weight = SCORE_WEIGHTS[signalType] || 1;
-
-        // Increment score in Redis
-        const newScore = await client.incrBy(key, weight);
-        
-        // Set TTL if it's a new key
-        if (newScore === weight) {
-            await client.expire(key, 3600); // 1 hour window
-        }
+        const newScore = await withAbuseStore(async (store) => {
+            const key = `abuse:score:${userId}`;
+            const score = await store.incrBy(key, weight);
+            if (score === weight) {
+                await store.expire(key, 3600); // 1 hour window
+            }
+            return score;
+        }, 'ABUSE_SIGNAL');
 
         // Update DB if thresholds reached
         if (newScore >= THRESHOLDS.BLOCK) {
@@ -64,18 +140,19 @@ async function recordSignal(userId, signalType) {
 
 async function recordAuthFailure(ip) {
     try {
-        const client = await getRedisClient();
-        const key = `abuse:auth_fail:${ip}`;
-        const count = await client.incr(key);
-        
-        if (count === 1) {
-            await client.expire(key, 900); // 15 minutes window
-        }
+        const count = await withAbuseStore(async (store) => {
+            const key = `abuse:auth_fail:${ip}`;
+            const failures = await store.incr(key);
+            if (failures === 1) {
+                await store.expire(key, 900); // 15 minutes window
+            }
+            if (failures >= 5) {
+                await store.set(`blocklist:${ip}`, '1', { EX: 900 }); // Block for 15 mins
+            }
+            return failures;
+        }, 'AUTH_FAILURE');
 
         if (count >= 5) {
-            const blockKey = `blocklist:${ip}`;
-            await client.set(blockKey, '1', { EX: 900 }); // Block for 15 mins
-            
             db.prepare(`INSERT INTO audit_log (document_id, action, actor, details) VALUES (?, ?, ?, ?)`)
               .run(0, 'IP_BLOCKED', ip, `IP ${ip} blocked after ${count} auth failures.`);
         }
@@ -88,8 +165,10 @@ async function recordAuthFailure(ip) {
 
 async function isIpBlocked(ip) {
     try {
-        const client = await getRedisClient();
-        const isBlocked = await client.get(`blocklist:${ip}`);
+        const isBlocked = await withAbuseStore(
+            (store) => store.get(`blocklist:${ip}`),
+            'IP_BLOCKLIST'
+        );
         return !!isBlocked;
     } catch (error) {
         return false;
@@ -99,12 +178,14 @@ async function isIpBlocked(ip) {
 async function recordUploadVelocity(userId) {
     if (!userId) return;
     try {
-        const client = await getRedisClient();
-        const key = `velocity:upload:${userId}`;
-        const count = await client.incr(key);
-        if (count === 1) {
-            await client.expire(key, 10); // 10 second window
-        }
+        const count = await withAbuseStore(async (store) => {
+            const key = `velocity:upload:${userId}`;
+            const uploads = await store.incr(key);
+            if (uploads === 1) {
+                await store.expire(key, 10); // 10 second window
+            }
+            return uploads;
+        }, 'UPLOAD_VELOCITY');
         
         // If they upload more than 2 files in 10 seconds, it's considered rapid and abusive
         if (count > 2) {
@@ -119,5 +200,16 @@ module.exports = {
     recordSignal,
     recordAuthFailure,
     isIpBlocked,
-    recordUploadVelocity
+    recordUploadVelocity,
+    __test: {
+        memoryStore,
+        setRedisClientFactory(factory) {
+            redisClient = undefined;
+            redisClientFactory = factory;
+        },
+        resetRedisClientFactory() {
+            redisClient = undefined;
+            redisClientFactory = createClient;
+        }
+    }
 };
