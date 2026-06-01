@@ -1,14 +1,25 @@
+<picture>
+  <img src="public/hero-banner.svg" alt="DoVER - Official Portal" width="1600" height="480" />
+</picture>
+
 # DoVER: Decentralized Official Vault & Evidence Registry
-> **Enterprise-Grade Digital Asset Protection & Forensic Verification Powered by Google Vertex AI**
+> **AI Forensics + 3‑Tier PKI + Polygon Anchoring for tamper‑evident records**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
 [![AI Engine](https://img.shields.io/badge/AI-Google_Gemini-blue.svg)](https://ai.google.dev/)
 [![Blockchain](https://img.shields.io/badge/Blockchain-Polygon_L2-8247E5.svg)](https://polygon.technology/)
 
-DoVER is a secure, blockchain-anchored platform designed to eliminate document forgery. It provides an immutable "Birth Record" for critical digital assets (degrees, titles, identity documents) using a combination of **3-Tier PKI Hierarchy**, **Google Vertex AI**, and **Polygon L2 Anchoring**.     
+**Mission:** eliminate document forgery by creating an immutable **Birth Record** for high-stakes digital assets—backed by **Google Vertex AI**, **3‑Tier PKI**, and **Polygon L2** proofs.
+
+### Quick navigation
+- [Getting Started](#getting-started--deployment)
+- [Forensic Integrity & Verification](#forensic-integrity--verification)
+- [System Architecture](#system-architecture)
+- [Technology Stack](#technology-stack)
 
 ---
+
 
 ## Key Innovation Pillars
 
@@ -28,6 +39,9 @@ Every request and file upload is protected by signed cryptographic headers to pr
 
 ## System Architecture
 
+<a id="system-architecture"></a>
+
+
 ```mermaid
 graph TD
     A[User Upload] --> B[Express Server]
@@ -46,6 +60,10 @@ graph TD
 
 ## Technology Stack
 
+<a id="technology-stack"></a>
+
+
+
 | Layer | Technology |
 |---|---|
 | **Backend** | Node.js (Express), Bull Queue |
@@ -59,6 +77,9 @@ graph TD
 ---
 
 ## Getting Started & Deployment
+
+<a id="getting-started--deployment"></a>
+
 
 ### 1. Local Environment Configuration
 Create a `.env` file with the following keys:
@@ -90,6 +111,9 @@ DoVER is optimized for **Google Cloud Run**.
 ---
 
 ## Forensic Integrity & Verification
+
+<a id="forensic-integrity--verification"></a>
+
 Every verified document in DoVER produces an **AI Forensic Verdict**:
 
 1. **Hash Registration**: Binary fingerprinting using SHA-256 to verify binary integrity.
