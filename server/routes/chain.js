@@ -236,7 +236,6 @@ router.get('/document/:id/versions', (req, res) => {
             return res.status(403).json({ success: false, error: 'Permission denied' });
         }
 
-        const targetFilename = currentDoc.filename;
         const targetEmail = currentDoc.uploader_email;
 
         // 2. Trace back to the root document (parent_document_id is NULL)
@@ -247,8 +246,9 @@ router.get('/document/:id/versions', (req, res) => {
         while (parentId !== null && safety < 5000) {
             const parent = db.prepare('SELECT block_index, parent_document_id, filename, uploader_email FROM documents WHERE block_index = ?').get(parentId);
             
-            // STRICT LINEAGE: Stop if parent metadata mismatch
-            if (!parent || parent.filename !== targetFilename || parent.uploader_email !== targetEmail) {
+            // Follow the explicit version pointer. Filenames may change between versions,
+            // but ownership must still match to avoid crossing another user's lineage.
+            if (!parent || parent.uploader_email !== targetEmail) {
                 break;
             }
 
@@ -257,8 +257,9 @@ router.get('/document/:id/versions', (req, res) => {
             safety++;
         }
 
-        // 3. Fetch all documents in the version chain starting from root
-        // Using a recursive CTE to find all descendants, filtering by metadata for safety
+        // 3. Fetch all documents in the version chain starting from root.
+        // Use the parent_document_id relationship for lineage; filenames are display
+        // metadata and can legitimately change when users upload a renamed version.
         const versions = db.prepare(`
             WITH RECURSIVE descendants(id) AS (
                 SELECT block_index FROM documents WHERE block_index = ?
@@ -266,7 +267,7 @@ router.get('/document/:id/versions', (req, res) => {
                 SELECT d.block_index 
                 FROM documents d 
                 JOIN descendants ON d.parent_document_id = descendants.id
-                WHERE d.filename = ? AND (d.uploader_email = ? OR (d.uploader_email IS NULL AND ? IS NULL))
+                WHERE (d.uploader_email = ? OR (d.uploader_email IS NULL AND ? IS NULL))
             )
             SELECT 
                 version_number,
@@ -280,7 +281,7 @@ router.get('/document/:id/versions', (req, res) => {
             FROM documents 
             WHERE block_index IN descendants 
             ORDER BY version_number ASC
-        `).all(rootId, targetFilename, targetEmail, targetEmail);
+        `).all(rootId, targetEmail, targetEmail);
 
         res.json(versions);
     } catch (error) {
