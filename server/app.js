@@ -92,7 +92,69 @@ app.use((req, res, next) => {
     next();
 });
 
-app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:3000', credentials: true }));
+// ── Strict CORS Configuration ─────────────────────────────────────────────────
+// Build an explicit allowlist from the CORS_ORIGIN environment variable.
+// The variable may be a single origin or a comma-separated list of origins.
+// Rules:
+//   • Each entry must be an absolute HTTPS URL in production (HTTP only allowed
+//     for localhost during development).
+//   • Wildcards ('*') are never permitted — they are incompatible with
+//     credentials: true and would defeat session/cookie protection entirely.
+//   • An unrecognised or missing Origin header is rejected (origin: false).
+//   • If CORS_ORIGIN is not set, only http://localhost:3000 is allowed so that
+//     production deployments without explicit config fail securely rather than
+//     accidentally becoming open.
+const _isProd = process.env.NODE_ENV === 'production';
+
+const _allowedOrigins = (() => {
+    const raw = process.env.CORS_ORIGIN || 'http://localhost:3000';
+    return raw
+        .split(',')
+        .map(o => o.trim())
+        .filter(o => {
+            if (!o) return false;
+            if (o === '*') {
+                console.error('[CORS] Wildcard origin ("*") is not permitted with credentials. Entry ignored.');
+                return false;
+            }
+            try {
+                const u = new URL(o);
+                const isLocalhost = u.hostname === 'localhost' || u.hostname === '127.0.0.1';
+                if (_isProd && u.protocol !== 'https:' && !isLocalhost) {
+                    console.error(`[CORS] Non-HTTPS origin rejected in production: ${o}`);
+                    return false;
+                }
+                return true;
+            } catch {
+                console.error(`[CORS] Invalid origin URL ignored: ${o}`);
+                return false;
+            }
+        });
+})();
+
+if (_allowedOrigins.length === 0) {
+    console.error('[CORS] No valid origins configured — all cross-origin requests will be blocked.');
+}
+
+console.log('[CORS] Allowed origins:', _allowedOrigins);
+
+app.use(cors({
+    origin(requestOrigin, callback) {
+        // Same-origin requests (e.g. server-side curl, direct browser navigation)
+        // have no Origin header — allow them through.
+        if (!requestOrigin) return callback(null, false);
+
+        if (_allowedOrigins.includes(requestOrigin)) {
+            return callback(null, true);
+        }
+
+        // Log the rejected origin for visibility but return a generic error so
+        // attackers get no information about our allowlist.
+        console.warn(`[CORS] Rejected origin: ${requestOrigin}`);
+        return callback(new Error('CORS_ORIGIN_NOT_ALLOWED'));
+    },
+    credentials: true,
+}));
 app.use(express.json());
 
 // Session Configuration
@@ -116,15 +178,17 @@ app.use(passport.session());
 // Serve static frontend files
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
-const uploadRoutes = require('./routes/upload');
-const verifyRoutes = require('./routes/verify');
-const chainRoutes = require('./routes/chain');
-const statsRoutes = require('./routes/stats');
-const authRoutes = require('./routes/auth');
-const adminRoutes = require('./routes/admin');
-const { requireAuth } = require('./middleware/auth');
+const uploadRoutes      = require('./routes/upload');
+const verifyRoutes      = require('./routes/verify');        // privileged endpoints
+const verifyPublicRoutes = require('./routes/verify_public'); // unauthenticated endpoints
+const chainRoutes       = require('./routes/chain');
+const statsRoutes       = require('./routes/stats');
+const authRoutes        = require('./routes/auth');
+const adminRoutes       = require('./routes/admin');
+const { requireAuth }   = require('./middleware/auth');
 
 app.use('/auth', authRoutes);
+
 // Upload routes: GET /status/:id is fully public (guest-compatible), everything else requires HMAC + auth + apiKey
 app.use('/api/upload', (req, res, next) => {
     if (req.method === 'GET' && req.path.startsWith('/status/')) {
@@ -132,13 +196,23 @@ app.use('/api/upload', (req, res, next) => {
     }
     return hmacMiddleware(req, res, () => requireAuth(req, res, () => apiKey(req, res, next)));
 }, uploadRoutes);
+
+// ── Public verification (/api/public/verify) ─────────────────
+// Rate-limited, no API key, no session required.
+// Deliberately mounted on a separate prefix so it can NEVER
+// accidentally inherit middleware from the privileged block below.
+app.use('/api/public/verify', verifyPublicRoutes);
+
+// ── Privileged verification (/api/verify) ────────────────────
+// POST / and GET /:id/proof also require HMAC + auth (applied here).
+// GET /:hash requires only apiKey (applied inside the router itself).
 app.use('/api/verify', (req, res, next) => {
-    // Apply hmac, requireAuth, and apiKey only to POST /api/verify or GET /api/verify/:id/proof
     if (req.method === 'POST' || req.path.endsWith('/proof')) {
-        return hmacMiddleware(req, res, () => requireAuth(req, res, () => apiKey(req, res, next)));
+        return hmacMiddleware(req, res, () => requireAuth(req, res, () => next()));
     }
     next();
 }, verifyRoutes);
+
 app.use('/api/chain', hmacMiddleware, requireAuth, chainRoutes);
 app.use('/api/stats', hmacMiddleware, requireAuth, statsRoutes);
 app.use('/api/admin', hmacMiddleware, requireAuth, adminRoutes);
