@@ -23,19 +23,17 @@
 
 ## Key Innovation Pillars
 
-### AI-Powered Forensic Engine
-Leveraging **Google Gemini Flash**, DoVER performs automated semantic audits. It doesn't just check if the file changed—it understands *what* changed, detecting sophisticated alterations in text and images that traditional hash-checks miss.
-
-### 3-Tier PKI Hierarchy
-Every document is cryptographically signed using a full Certificate Authority chain. This ensures that the identity of the issuer is verified through a Root, Intermediate, and Issuing CA structure, mimicking global banking standards.
-
-### Decentralized Proof of Existence
-Document proofs are anchored to the **Polygon Blockchain**. This provides permanent, third-party verification that a document existed in its current state at a specific point in time, independent of the DoVER platform.
-
-### HMAC-SHA256 Security
-Every request and file upload is protected by signed cryptographic headers to prevent tampering and ensure end-to-end transport security.
+| Pillar | What it does | Benefit |
+|---|---|---|
+| **AI Forensic Audit** | Uses Google Vertex AI (Gemini) to compare content semantics between the document and its immutable “Birth Record”. | Detects sophisticated text/image tampering beyond simple hash checks. |
+| **3‑Tier PKI Hierarchy** | Signs documents with a Certificate Authority chain (Root → Intermediate → Issuing CA). | Verifies issuer identity with banking-grade certificate trust. |
+| **Polygon Blockchain Anchoring** | Anchors a proof-of-existence receipt on Polygon L2. | Independent, permanent verification that the record existed at a specific time. |
+| **OCR Verification** | Extracts text/structure from documents (Tesseract + vision pipeline) to support semantic audit workflows. | Improves audit accuracy for scanned and image-based documents. |
+| **Digital Vault** | Stores evidence (including artifacts like OCR outputs) for later verification and audit trails. | Centralized evidence management with tamper-aware workflows. |
+| **HMAC‑SHA256 Security** | Protects requests and uploads with signed cryptographic headers. | Prevents tampering and ensures secure end-to-end transport. |
 
 ---
+
 
 ## System Architecture
 
