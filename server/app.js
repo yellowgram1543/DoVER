@@ -24,13 +24,13 @@ const MongoStore = require('connect-mongo');
 const passport = require('./utils/passport');
 const apiKey = require('./middleware/apiKey');
 const { rateLimit } = require('express-rate-limit');
-const { RedisStore } = require('rate-limit-redis');
 const { createClient } = require('redis');
 const nonceMiddleware = require('./middleware/nonce');
 const blocklist = require('./middleware/blocklist');
 const hmacMiddleware = require('./middleware/hmac');
 const db = require('./db/db');
 const PKIUtils = require('./utils/pki');
+const { createRateLimitRedisStore } = require('./utils/rateLimitRedisStore');
 
 // ── Startup Initialization ──
 const requiredDirs = ['tmp', 'uploads', 'certs'];
@@ -69,9 +69,8 @@ const globalLimiter = rateLimit({
     standardHeaders: 'draft-7',
     legacyHeaders: false,
     validate: { keyGeneratorIpFallback: false },
-    store: redisClient.isOpen ? new RedisStore({
-        sendCommand: (...args) => redisClient.sendCommand(args),
-    }) : undefined, // Falls back to MemoryStore if Redis is closed
+    store: createRateLimitRedisStore(redisClient, { prefix: 'rl:global:' }),
+    passOnStoreError: false,
     handler: (req, res, next, options) => {
         db.prepare(`INSERT INTO audit_log (document_id, action, actor, details) VALUES (?, ?, ?, ?)`)
             .run(0, 'RATE_LIMIT_EXCEEDED', req.ip, `Global limit hit: ${req.method} ${req.url}`);
