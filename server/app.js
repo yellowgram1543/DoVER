@@ -106,7 +106,17 @@ app.use(session({
     }),
     cookie: {
         secure: process.env.NODE_ENV === 'production',
-        maxAge: 24 * 60 * 60 * 1000 // 1 day
+        maxAge: 24 * 60 * 60 * 1000, // 1 day
+        // SECURITY: httpOnly prevents JavaScript (including XSS payloads)
+        // from reading the session cookie via document.cookie.
+        httpOnly: true,
+        // SECURITY: sameSite 'strict' prevents the browser from sending
+        // this cookie on any cross-origin request, which blocks CSRF
+        // attacks against session-authenticated endpoints.
+        // Use 'lax' instead if you need top-level navigations from
+        // external sites to land authenticated (e.g. OAuth redirects),
+        // but 'strict' is the more secure default.
+        sameSite: 'strict'
     }
 }));
 
