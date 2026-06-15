@@ -52,7 +52,7 @@ const redisClient = createClient({
     url: REDIS_URL_MAIN,
     socket: {
         connectTimeout: 5000,
-        ...(isMainTLS ? { tls: true, rejectUnauthorized: false } : {})
+        ...(isMainTLS ? { tls: true } : {})
     }
 });
 

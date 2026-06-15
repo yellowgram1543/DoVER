@@ -7,7 +7,7 @@ const REDIS_URL = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
 const isTLS = REDIS_URL.startsWith('rediss://');
 const redisClient = createClient({
     url: REDIS_URL,
-    ...(isTLS ? { socket: { tls: true, rejectUnauthorized: false } } : {})
+    ...(isTLS ? { socket: { tls: true } } : {})
 });
 
 let redisReady = false;

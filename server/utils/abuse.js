@@ -9,7 +9,7 @@ async function getRedisClient() {
     if (!redisClient) {
         redisClient = createClient({
             url: redisUrl,
-            ...(isTLS ? { socket: { tls: true, rejectUnauthorized: false } } : {})
+            ...(isTLS ? { socket: { tls: true } } : {})
         });
         redisClient.on('error', (err) => console.error('Redis Client Error', err));
         await redisClient.connect();
