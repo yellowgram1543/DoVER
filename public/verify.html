@@ -91,9 +91,14 @@
 
     <script>
         // Fetch latest Merkle Root for header
-        fetch('/api/chain').then(r => r.json()).then(chain => {
+        fetch('/api/chain')
+        .then(r => r.json())
+        .then(chain => {
             const root = chain.length ? chain[chain.length-1].merkle_root : 'No Active Chain';
             document.getElementById('global-root').textContent = root ? root.slice(0,24) + '...' : 'Pending';
+        })
+        .catch(() => {
+            document.getElementById('global-root').textContent = 'Unavailable';
         });
 
         async function runVerification() {

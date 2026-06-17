@@ -24,13 +24,13 @@ const MongoStore = require('connect-mongo');
 const passport = require('./utils/passport');
 const apiKey = require('./middleware/apiKey');
 const { rateLimit } = require('express-rate-limit');
-const { RedisStore } = require('rate-limit-redis');
 const { createClient } = require('redis');
 const nonceMiddleware = require('./middleware/nonce');
 const blocklist = require('./middleware/blocklist');
 const hmacMiddleware = require('./middleware/hmac');
 const db = require('./db/db');
 const PKIUtils = require('./utils/pki');
+const { createRateLimitRedisStore } = require('./utils/rateLimitRedisStore');
 
 // ── Startup Initialization ──
 const requiredDirs = ['tmp', 'uploads', 'certs'];
@@ -52,7 +52,7 @@ const redisClient = createClient({
     url: REDIS_URL_MAIN,
     socket: {
         connectTimeout: 5000,
-        ...(isMainTLS ? { tls: true, rejectUnauthorized: false } : {})
+        ...(isMainTLS ? { tls: true } : {})
     }
 });
 
@@ -69,9 +69,8 @@ const globalLimiter = rateLimit({
     standardHeaders: 'draft-7',
     legacyHeaders: false,
     validate: { keyGeneratorIpFallback: false },
-    store: redisClient.isOpen ? new RedisStore({
-        sendCommand: (...args) => redisClient.sendCommand(args),
-    }) : undefined, // Falls back to MemoryStore if Redis is closed
+    store: createRateLimitRedisStore(redisClient, { prefix: 'rl:global:' }),
+    passOnStoreError: false,
     handler: (req, res, next, options) => {
         db.prepare(`INSERT INTO audit_log (document_id, action, actor, details) VALUES (?, ?, ?, ?)`)
             .run(0, 'RATE_LIMIT_EXCEEDED', req.ip, `Global limit hit: ${req.method} ${req.url}`);
@@ -106,7 +105,17 @@ app.use(session({
     }),
     cookie: {
         secure: process.env.NODE_ENV === 'production',
-        maxAge: 24 * 60 * 60 * 1000 // 1 day
+        maxAge: 24 * 60 * 60 * 1000, // 1 day
+        // SECURITY: httpOnly prevents JavaScript (including XSS payloads)
+        // from reading the session cookie via document.cookie.
+        httpOnly: true,
+        // SECURITY: sameSite 'strict' prevents the browser from sending
+        // this cookie on any cross-origin request, which blocks CSRF
+        // attacks against session-authenticated endpoints.
+        // Use 'lax' instead if you need top-level navigations from
+        // external sites to land authenticated (e.g. OAuth redirects),
+        // but 'strict' is the more secure default.
+        sameSite: 'strict'
     }
 }));
 
@@ -169,11 +178,13 @@ app.get('*', (req, res) => {
 // ── Background Integrity Watcher ──
 // Automatically checks files every 30 seconds to detect tampering
 const hasher = require('./utils/hasher');
-const { getBucket } = require('./db/mongodb');
+const { getBucket, mongoose: mongooseConn } = require('./db/mongodb');
+// Import Types once at module level — avoids repeated inline require() inside the interval
+const { Types: MongooseTypes } = mongooseConn;
 
 setInterval(async () => {
     const bucket = getBucket();
-    if (!bucket) return; // Wait for connection
+    if (!bucket) return; // Wait for GridFS connection to initialise
 
     try {
         const docs = db.prepare(`
@@ -184,17 +195,14 @@ setInterval(async () => {
         `).all();
 
         for (const doc of docs) {
-            // Update last_checked_at timestamp immediately so we don't retry failed/legacy ones forever
-            db.prepare("UPDATE documents SET last_checked_at = datetime('now') WHERE block_index = ?").run(doc.block_index);
-
             const storageId = doc.storage_id || doc.filename;
             // Skip legacy local files that aren't valid MongoDB ObjectIds (24 hex chars)
             if (!/^[0-9a-fA-F]{24}$/.test(storageId)) continue;
 
             let tmpPath = path.resolve('tmp', `bg_verify_${doc.block_index}`);
             try {
-                // Reconstruct from GridFS
-                const downloadStream = bucket.openDownloadStream(new (require('mongoose')).Types.ObjectId(storageId));
+                // Reconstruct from GridFS using the module-level MongooseTypes import
+                const downloadStream = bucket.openDownloadStream(new MongooseTypes.ObjectId(storageId));
                 const writeStream = fs.createWriteStream(tmpPath);
                 downloadStream.pipe(writeStream);
 
@@ -210,29 +218,30 @@ setInterval(async () => {
                         .run(doc.block_index, 'TAMPER_DETECTED', 'BG_WATCHER', `Automated sweep detected file modification.`);
                 }
 
+                // Only advance last_checked_at after a clean, definitive check (pass or tamper verdict).
+                // Leaving the timestamp unchanged on infrastructure errors lets the next watcher run retry.
+                db.prepare("UPDATE documents SET last_checked_at = datetime('now') WHERE block_index = ?").run(doc.block_index);
+
                 if (fs.existsSync(tmpPath)) {
-                    try {
-                        fs.unlinkSync(tmpPath);
-                    } catch (e) {
-                        // On Windows, files are often locked briefly. Silent fallback.
+                    try { fs.unlinkSync(tmpPath); } catch (e) {
+                        // On Windows, files are often locked briefly — silent fallback.
                     }
                 }
             } catch (err) {
-                // If file is missing in GridFS, it's a real tamper/deletion
-                if (err.code !== 'ENOENT') {
-                    console.error(`[BG_WATCHER] Error verifying block #${doc.block_index}:`, err.message);
-                }
+                // Infrastructure error (GridFS stream failure, hash I/O error, etc.).
+                // Do NOT update last_checked_at — preserve the original timestamp so this
+                // document is retried on the next watcher interval rather than silently skipped.
+                console.error(`[BG_WATCHER] Infrastructure error on block #${doc.block_index} — will retry:`, err.message);
                 if (fs.existsSync(tmpPath)) {
-                    try {
-                        fs.unlinkSync(tmpPath);
-                    } catch (e) { }
+                    try { fs.unlinkSync(tmpPath); } catch (e) { }
                 }
             }
         }
     } catch (e) {
-        // Silently handle database busy errors
+        // Outer catch: database-level failure (SQLite busy, schema error, etc.)
+        console.error('[BG_WATCHER] Fatal watcher cycle error — skipping batch:', e.message);
     }
-}, 30000); // Increased to 30s to reduce load
+}, 30000); // 30 s interval to reduce load
 
 // ── Batch Queue Processor ──
 const { initProcessor } = require('./utils/processor');

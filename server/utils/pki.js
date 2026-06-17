@@ -6,6 +6,44 @@ const path = require('path');
 const CERTS_DIR = path.resolve(__dirname, '..', '..', 'certs');
 if (!fs.existsSync(CERTS_DIR)) fs.mkdirSync(CERTS_DIR);
 
+
+function getCaPassphrase() {
+    const passphrase = process.env.CA_PASSPHRASE;
+
+    if (!passphrase) {
+        throw new Error(
+            '[PKI] CA_PASSPHRASE environment variable is not set. ' +
+            'Generate a strong passphrase (min 32 chars) and set it before starting the server. ' +
+            'Example: openssl rand -base64 48'
+        );
+    }
+
+    const KNOWN_WEAK = [
+        'default-secure-passphrase',
+        'password',
+        'passphrase',
+        'secret',
+        'changeme',
+        'dover'
+    ];
+
+    if (KNOWN_WEAK.includes(passphrase.toLowerCase())) {
+        throw new Error(
+            `[PKI] CA_PASSPHRASE is set to a known weak value ("${passphrase}"). ` +
+            'Set a strong, unique passphrase. Example: openssl rand -base64 48'
+        );
+    }
+
+    if (passphrase.length < 32) {
+        throw new Error(
+            `[PKI] CA_PASSPHRASE is too short (${passphrase.length} chars). ` +
+            'Minimum length is 32 characters for adequate CA key protection.'
+        );
+    }
+
+    return passphrase;
+}
+
 /**
  * PKI Utility for managing 3-tier Certificate Authority (Root -> Intermediate -> Business).
  */
@@ -23,6 +61,10 @@ class PKIUtils {
             console.log('[PKI] CAs already bootstrapped.');
             return;
         }
+
+        // Validate passphrase once at the start of bootstrapping.
+        // Fail loudly before generating any keys if the passphrase is invalid.
+        const caPassphrase = getCaPassphrase();
 
         console.log('[PKI] Bootstrapping DoVER PKI Hierarchy...');
 
@@ -45,7 +87,6 @@ class PKIUtils {
             { name: 'basicConstraints', cA: true },
             { name: 'keyUsage', keyCertSign: true, cRLSign: true }
         ]);
-        const caPassphrase = process.env.CA_PASSPHRASE || 'default-secure-passphrase';
 
         rootCert.sign(rootKeys.privateKey, forge.md.sha256.create());
 
@@ -91,14 +132,14 @@ class PKIUtils {
             throw new Error('Intermediate CA not bootstrapped. Run bootstrapCAs first.');
         }
 
-        const caPassphrase = process.env.CA_PASSPHRASE || 'default-secure-passphrase';
+        const caPassphrase = getCaPassphrase();
         const interCert = forge.pki.certificateFromPem(fs.readFileSync(interPath, 'utf8'));
         const interKey = forge.pki.decryptRsaPrivateKey(fs.readFileSync(interKeyPath, 'utf8'), caPassphrase);
         const rootCert = forge.pki.certificateFromPem(fs.readFileSync(rootPath, 'utf8'));
 
         const keys = forge.pki.rsa.generateKeyPair(2048);
         const cert = forge.pki.createCertificate();
-        
+
         cert.publicKey = keys.publicKey;
         cert.serialNumber = crypto.randomBytes(8).toString('hex');
         cert.validity.notBefore = new Date();
@@ -118,9 +159,8 @@ class PKIUtils {
 
         cert.sign(interKey, forge.md.sha256.create());
 
-        // Create P12 with full chain: [Business, Intermediate, Root]
         const p12Asn1 = forge.pkcs12.toPkcs12Asn1(
-            keys.privateKey, [cert, interCert, rootCert], password, 
+            keys.privateKey, [cert, interCert, rootCert], password,
             { algorithm: '3des' }
         );
         const p12Der = forge.asn1.toDer(p12Asn1).getBytes();
@@ -145,7 +185,7 @@ class PKIUtils {
         const interKeyPath = path.join(CERTS_DIR, 'dover_intermediate.key');
         if (!fs.existsSync(interKeyPath)) return null;
 
-        const caPassphrase = process.env.CA_PASSPHRASE || 'default-secure-passphrase';
+        const caPassphrase = getCaPassphrase();
         const interKeyForge = forge.pki.decryptRsaPrivateKey(fs.readFileSync(interKeyPath, 'utf8'), caPassphrase);
         const interKeyPem = forge.pki.privateKeyToPem(interKeyForge);
 
@@ -187,8 +227,7 @@ class PKIUtils {
      * Useful for storing secondary passwords securely.
      */
     static encryptData(text) {
-        const passphrase = process.env.CA_PASSPHRASE || 'default-secure-passphrase';
-        // Create a 32-byte key from the passphrase
+        const passphrase = getCaPassphrase();
         const key = crypto.createHash('sha256').update(passphrase).digest();
         const iv = crypto.randomBytes(16);
         const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
@@ -202,7 +241,7 @@ class PKIUtils {
      */
     static decryptData(encryptedText) {
         try {
-            const passphrase = process.env.CA_PASSPHRASE || 'default-secure-passphrase';
+            const passphrase = getCaPassphrase();
             const key = crypto.createHash('sha256').update(passphrase).digest();
             const parts = encryptedText.split(':');
             const iv = Buffer.from(parts.shift(), 'hex');

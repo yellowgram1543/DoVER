@@ -7,7 +7,7 @@ const isTLS = REDIS_URL.startsWith('rediss://');
 
 // Bull (ioredis) connection logic for Upstash
 const redisOptions = isTLS ? {
-    tls: { rejectUnauthorized: false },
+    tls: {},
     maxRetriesPerRequest: null,
     enableReadyCheck: false
 } : {

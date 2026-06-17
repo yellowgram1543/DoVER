@@ -8,6 +8,7 @@ const signatureEngine = require('../utils/signature_engine');
 const { getBucket, mongoose } = require('../db/mongodb');
 const fs = require('fs');
 const path = require('path');
+const { emailsEqual } = require('../utils/email');
 
 /**
  * Helper to check if a user can access the full content/files of a document.
@@ -17,7 +18,7 @@ const path = require('path');
 function canAccessFullContent(user, document) {
     if (!user) return false;
     if (user.role === 'authority') return true;
-    return document.uploader_email === user.email;
+    return emailsEqual(document.uploader_email, user.email);
 }
 
 router.get('/', (req, res) => {
@@ -39,12 +40,13 @@ router.get('/', (req, res) => {
             const b2bDepts = ['Employee Records', 'Financial Audit', 'Compliance', 'Legal', 'Executive Office']; 
             const placeholders = b2bDepts.map(() => '?').join(',');
             
+            // SECURITY FIX: Filter by uploader_email so standard users can only see their own B2B documents.
             documents = db.prepare(`
                 SELECT block_index, filename, file_type, uploaded_by, uploader_email, department, upload_timestamp, file_hash, block_hash, is_tampered, version_number, polygon_txid, merkle_root, merkle_proof 
                 FROM documents 
-                WHERE department IN (${placeholders}) 
+                WHERE department IN (${placeholders}) AND LOWER(uploader_email) = LOWER(?)
                 ORDER BY block_index DESC
-            `).all(...b2bDepts);
+            `).all(...b2bDepts, req.user.email);
         } else {
             // Personal Ledger (B2C): Show only personal records.
             // We EXCLUDE B2B departments to ensure a clean separation.
@@ -169,7 +171,7 @@ router.get('/batch/:batch_id/status', async (req, res) => {
 
         // RBAC: Ensure user owns this batch OR is authority
         const isAuthority = req.user && req.user.role === 'authority';
-        const ownsBatch = batchJobs.every(j => j.data.uploaderEmail === req.user?.email);
+        const ownsBatch = req.user && batchJobs.every(j => emailsEqual(j.data.uploaderEmail, req.user.email));
         
         if (!req.user || (!isAuthority && !ownsBatch)) {
             return res.status(403).json({ success: false, error: 'Permission denied' });
@@ -247,7 +249,7 @@ router.get('/document/:id/versions', (req, res) => {
             const parent = db.prepare('SELECT block_index, parent_document_id, filename, uploader_email FROM documents WHERE block_index = ?').get(parentId);
             
             // STRICT LINEAGE: Stop if parent metadata mismatch
-            if (!parent || parent.filename !== targetFilename || parent.uploader_email !== targetEmail) {
+            if (!parent || parent.filename !== targetFilename || !emailsEqual(parent.uploader_email, targetEmail)) {
                 break;
             }
 
@@ -265,7 +267,7 @@ router.get('/document/:id/versions', (req, res) => {
                 SELECT d.block_index 
                 FROM documents d 
                 JOIN descendants ON d.parent_document_id = descendants.id
-                WHERE d.filename = ? AND (d.uploader_email = ? OR (d.uploader_email IS NULL AND ? IS NULL))
+                WHERE d.filename = ? AND (LOWER(d.uploader_email) = LOWER(?) OR (d.uploader_email IS NULL AND ? IS NULL))
             )
             SELECT 
                 version_number,

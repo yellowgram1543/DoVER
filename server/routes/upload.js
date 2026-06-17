@@ -12,12 +12,13 @@ const gemini = require('../utils/gemini');
 const signature = require('../utils/signature');
 const crypto = require('crypto');
 const { getBucket } = require('../db/mongodb');
+const { emailsEqual } = require('../utils/email');
 
 const documentQueue = require('../utils/queue');
 const { processDocument } = require('../utils/processor');
 const apiKey = require('../middleware/apiKey');
 const { uploadLimiter } = require('../middleware/limiters');
-const { recordSignal } = require('../utils/abuse');
+const { recordUploadVelocity } = require('../utils/abuse');
 
 // Configure multer for temp storage
 const storage = multer.diskStorage({
@@ -45,8 +46,8 @@ const upload = multer({
 });
 
 router.post('/', uploadLimiter, (req, res) => {
-    // Record upload attempt for abuse scoring
-    if (req.user) recordSignal(req.user.id, 'RAPID_UPLOAD');
+    // Record upload attempt for abuse scoring via velocity check
+    if (req.user) recordUploadVelocity(req.user.id);
 
     upload.single('file')(req, res, async (err) => {
         if (err) return res.status(400).json({ success: false, error: err.message });
@@ -67,6 +68,14 @@ router.post('/', uploadLimiter, (req, res) => {
             
             let userDept = req.body.department || 'General';
 
+            // SECURITY FIX: Prevent unprivileged users from assigning documents to restricted B2B departments
+            const b2bDepts = ['Employee Records', 'Financial Audit', 'Compliance', 'Legal', 'Executive Office'];
+            if (b2bDepts.includes(userDept)) {
+                if (!req.user || req.user.role !== 'authority') {
+                    userDept = 'General';
+                }
+            }
+
             // Calculate hash
             const fileHash = await hasher.generateFileHashAsync(tmpFilePath);
 
@@ -76,8 +85,15 @@ router.post('/', uploadLimiter, (req, res) => {
             const version_note = req.body.version_note || null;
 
             if (parent_document_id) {
-                const parent = db.prepare('SELECT version_number FROM documents WHERE block_index = ?').get(parent_document_id);
-                if (parent) version_number = (parent.version_number || 1) + 1;
+                const parent = db.prepare('SELECT version_number, uploader_email FROM documents WHERE block_index = ?').get(parent_document_id);
+                if (parent) {
+                    // SECURITY FIX: IDOR / Version Poisoning
+                    if ((!emailsEqual(parent.uploader_email, uploaderEmail) || uploaderEmail === 'anonymous@dover.io') && (!req.user || req.user.role !== 'authority')) {
+                        if (tmpFilePath && fs.existsSync(tmpFilePath)) fs.unlinkSync(tmpFilePath);
+                        return res.status(403).json({ success: false, error: 'Unauthorized to append a new version to this document.' });
+                    }
+                    version_number = (parent.version_number || 1) + 1;
+                }
             }
 
             // GridFS Upload
@@ -151,7 +167,15 @@ router.post('/batch-upload', uploadLimiter, (req, res) => {
 
             const uploadedBy = req.user?.name || 'Anonymous';
             const uploaderEmail = req.user?.email || 'anonymous@dover.io';
-            const documentCategory = req.body.department || 'General';
+            let documentCategory = req.body.department || 'General';
+
+            // SECURITY FIX: Prevent unprivileged users from assigning documents to restricted B2B departments
+            const b2bDepts = ['Employee Records', 'Financial Audit', 'Compliance', 'Legal', 'Executive Office'];
+            if (b2bDepts.includes(documentCategory)) {
+                if (!req.user || req.user.role !== 'authority') {
+                    documentCategory = 'General';
+                }
+            }
 
             const batchId = Date.now();
             const jobIds = [];

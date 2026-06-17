@@ -128,21 +128,41 @@ router.get('/public/verify/qr/:hash', verifyLimiter, async (req, res) => {
 
         // Logic for signature status (consistent with existing verification)
         let signature_status = "VERIFIED";
+        let issuer_name = "DoVER System Authority";
+
         if (!doc.signature) {
             signature_status = "NOT_SIGNED";
         } else {
-            const verify = crypto.createVerify('SHA256');
-            verify.update(doc.block_hash);
             let publicKey = '';
-            if (process.env.PUBLIC_KEY_B64) {
-                publicKey = Buffer.from(process.env.PUBLIC_KEY_B64, 'base64').toString('utf8');
-            } else if (process.env.PUBLIC_KEY) {
-                publicKey = process.env.PUBLIC_KEY.replace(/\\n/g, '\n');
+            
+            // SECURITY FIX: Support Business Key Validation in QR Route
+            if (doc.signer_fingerprint) {
+                const keyRecord = db.prepare('SELECT public_key, status, issuer_id FROM key_registry WHERE fingerprint = ?').get(doc.signer_fingerprint);
+                if (keyRecord && keyRecord.status === 'active') {
+                    publicKey = keyRecord.public_key;
+                    const issuer = db.prepare('SELECT name FROM users WHERE id = ?').get(keyRecord.issuer_id);
+                    if (issuer) issuer_name = issuer.name;
+                } else {
+                    signature_status = keyRecord ? "REVOKED_KEY" : "UNKNOWN_KEY";
+                }
+            } else {
+                // Fallback to default authority key
+                if (process.env.PUBLIC_KEY_B64) {
+                    publicKey = Buffer.from(process.env.PUBLIC_KEY_B64, 'base64').toString('utf8');
+                } else if (process.env.PUBLIC_KEY) {
+                    publicKey = process.env.PUBLIC_KEY.replace(/\\n/g, '\n');
+                }
             }
 
-            if (publicKey) {
-                const isValid = verify.verify(publicKey, doc.signature, 'hex');
-                signature_status = isValid ? "VERIFIED" : "INVALID";
+            if (publicKey && signature_status !== "REVOKED_KEY" && signature_status !== "UNKNOWN_KEY") {
+                try {
+                    const verify = crypto.createVerify('SHA256');
+                    verify.update(doc.block_hash);
+                    const isValid = verify.verify(publicKey, doc.signature, 'hex');
+                    signature_status = isValid ? "VERIFIED" : "INVALID";
+                } catch (e) {
+                    signature_status = "ERROR";
+                }
             }
         }
 
@@ -151,6 +171,7 @@ router.get('/public/verify/qr/:hash', verifyLimiter, async (req, res) => {
             document_id: doc.block_index,
             filename: doc.filename,
             uploaded_by: doc.uploaded_by,
+            issuer_name: issuer_name,
             upload_timestamp: doc.upload_timestamp,
             block_index: doc.block_index,
             block_hash: doc.block_hash,
@@ -169,6 +190,53 @@ router.get('/public/verify/qr/:hash', verifyLimiter, async (req, res) => {
     }
 });
 
+/**
+ * Determines whether a user is permitted to access the full proof bundle for a document.
+ *
+ * Access is granted when ANY of the following is true:
+ *  1. The user holds the 'authority' role (platform-wide admin/authority access).
+ *  2. The user's email matches the uploader_email stored on the document (case-insensitive).
+ *  3. The user's display name matches the uploaded_by field — covers legacy records that
+ *     pre-date the uploader_email column and therefore have no email on the document.
+ *
+ * The function deliberately returns false for any falsy user value so it can safely be
+ * called without an additional null-guard at the call site.
+ *
+ * @param {object|null|undefined} user - The req.user object populated by Passport / auth middleware.
+ * @param {object} document            - The document row from the SQLite `documents` table.
+ * @returns {boolean}
+ */
+function canAccessProof(user, document) {
+    if (!user) return false;
+
+    // Authority role: platform-level access, may audit any document.
+    if (user.role === 'authority') return true;
+
+    // Primary ownership check: email comparison (case-insensitive).
+    // Both sides must be non-empty strings to avoid false positives when either is NULL/undefined.
+    if (
+        document.uploader_email &&
+        user.email &&
+        document.uploader_email.toLowerCase() === user.email.toLowerCase()
+    ) {
+        return true;
+    }
+
+    // Fallback ownership check: display-name comparison for legacy documents that were
+    // recorded before the uploader_email column was added (see migrate_email.js).
+    // Only used when the document has no uploader_email stored at all.
+    if (
+        !document.uploader_email &&
+        document.uploaded_by &&
+        user.name &&
+        document.uploaded_by === user.name
+    ) {
+        return true;
+    }
+
+    return false;
+}
+
 router.get('/:id/proof', verifyLimiter, apiKey, (req, res) => {
     try {
         const id = req.params.id;
@@ -178,10 +246,34 @@ router.get('/:id/proof', verifyLimiter, apiKey, (req, res) => {
             return res.status(404).json({ success: false, error: 'Document not found' });
         }
 
-        const publicKey = process.env.PUBLIC_KEY_B64 
-            ? Buffer.from(process.env.PUBLIC_KEY_B64, 'base64').toString('utf8')
-            : (process.env.PUBLIC_KEY ? process.env.PUBLIC_KEY.replace(/\\n/g, '\n') : null);
+        // ── Ownership / Role Check ────────────────────────────────────────────────
+        // req.user is populated by the requireAuth middleware that app.js wraps this
+        // route in (see the '/api/verify' mount block).  The apiKey middleware alone
+        // does NOT set req.user, so an unauthenticated API-key-only caller will always
+        // reach this branch and be rejected.
+        if (!canAccessProof(req.user, doc)) {
+            // Audit the denial so administrators can detect enumeration attempts.
+            try {
+                db.prepare(
+                    `INSERT INTO audit_log (document_id, action, actor, details) VALUES (?, ?, ?, ?)`
+                ).run(
+                    doc.block_index,
+                    'PROOF_ACCESS_DENIED',
+                    req.user ? (req.user.email || req.user.id || 'unknown') : 'unauthenticated',
+                    `Attempted proof download for document owned by ${doc.uploader_email || doc.uploaded_by}`
+                );
+            } catch (auditErr) {
+                console.error('[PROOF_AUDIT_ERROR]', auditErr);
+            }
+            return res.status(403).json({ success: false, error: 'Permission denied' });
+        }
 
+        // ── Build Proof Bundle ────────────────────────────────────────────────────
+        // NOTE: The authority's public key is deliberately excluded from the proof
+        // bundle.  It is a server-side infrastructure secret; embedding it in a
+        // downloadable file would expose key material to any party who later receives
+        // the proof document.  Verifiers who need the public key should fetch it from
+        // the canonical /api/public/crl or key-registry endpoints instead.
         const proof = {
             document_id: doc.block_index,
             filename: doc.filename,
@@ -192,11 +284,25 @@ router.get('/:id/proof', verifyLimiter, apiKey, (req, res) => {
             block_index: doc.block_index,
             prev_hash: doc.prev_hash,
             signature: doc.signature,
-            public_key: publicKey,
+            signer_fingerprint: doc.signer_fingerprint || null,
             ocr_text_stored: doc.ocr_text,
             forensic_score: doc.forensic_score ? JSON.parse(doc.forensic_score) : null,
             verified_at: new Date().toISOString()
         };
+
+        // Audit successful proof downloads for compliance / access-log purposes.
+        try {
+            db.prepare(
+                `INSERT INTO audit_log (document_id, action, actor, details) VALUES (?, ?, ?, ?)`
+            ).run(
+                doc.block_index,
+                'PROOF_DOWNLOADED',
+                req.user.email || req.user.id || 'unknown',
+                `Proof bundle downloaded by ${req.user.role || 'user'}`
+            );
+        } catch (auditErr) {
+            console.error('[PROOF_AUDIT_ERROR]', auditErr);
+        }
 
         res.setHeader('Content-Disposition', 'attachment; filename=proof_' + id + '.json');
         res.json(proof);
@@ -319,17 +425,23 @@ router.post('/', verifyLimiter, apiKey, upload.single('file'), async (req, res) 
         let isComparisonVerify = false;
         const compareWith = req.body.compare_with;
 
+        // Compute hash early if a file is provided to avoid filename spoofing
+        let currentFileHash;
+        if (req.file && newPath) {
+            currentFileHash = hasher.generateFileHash(newPath);
+        }
+
         // 1. Identify the document to verify against
         if (req.body.document_id) {
             console.log('[TRACE] Received document_id:', req.body.document_id, 'Type:', typeof req.body.document_id);
             doc = db.prepare('SELECT * FROM documents WHERE block_index = ?').get(req.body.document_id);
             if (req.file) isComparisonVerify = true;
         } else if (req.file) {
-            const originalName = req.file.originalname;
             if (compareWith) {
-                doc = db.prepare('SELECT * FROM documents WHERE filename = ? AND uploaded_by = ? ORDER BY block_index DESC LIMIT 1').get(originalName, compareWith);
+                // SECURITY FIX: Match by file_hash and uploader_email instead of filename and uploaded_by (display name)
+                doc = db.prepare('SELECT * FROM documents WHERE file_hash = ? AND LOWER(uploader_email) = LOWER(?) ORDER BY block_index DESC LIMIT 1').get(currentFileHash, compareWith);
             } else {
-                doc = db.prepare('SELECT * FROM documents WHERE filename = ? ORDER BY block_index DESC LIMIT 1').get(originalName);
+                doc = db.prepare('SELECT * FROM documents WHERE file_hash = ? ORDER BY block_index DESC LIMIT 1').get(currentFileHash);
             }
             isComparisonVerify = true;
         }
@@ -340,11 +452,9 @@ router.post('/', verifyLimiter, apiKey, upload.single('file'), async (req, res) 
         }
 
         // 2. Perform Content Comparison
-        let currentFileHash;
         let verificationResult;
 
         if (isComparisonVerify) {
-            currentFileHash = hasher.generateFileHash(newPath);
             verificationResult = {
                 valid: (currentFileHash.trim() === doc.file_hash.trim()),
                 details: { computedFileHash: currentFileHash }
