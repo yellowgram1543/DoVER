@@ -67,6 +67,8 @@ router.post('/', uploadLimiter, (req, res) => {
             const uploaderEmail = req.user?.email || 'anonymous@dover.io';
             
             let userDept = req.body.department || 'General';
+            if (Array.isArray(userDept)) userDept = userDept[0];
+            userDept = String(userDept).trim();
 
             // SECURITY FIX: Prevent unprivileged users from assigning documents to restricted B2B departments
             const b2bDepts = ['Employee Records', 'Financial Audit', 'Compliance', 'Legal', 'Executive Office'];
@@ -168,6 +170,8 @@ router.post('/batch-upload', uploadLimiter, (req, res) => {
             const uploadedBy = req.user?.name || 'Anonymous';
             const uploaderEmail = req.user?.email || 'anonymous@dover.io';
             let documentCategory = req.body.department || 'General';
+            if (Array.isArray(documentCategory)) documentCategory = documentCategory[0];
+            documentCategory = String(documentCategory).trim();
 
             // SECURITY FIX: Prevent unprivileged users from assigning documents to restricted B2B departments
             const b2bDepts = ['Employee Records', 'Financial Audit', 'Compliance', 'Legal', 'Executive Office'];
