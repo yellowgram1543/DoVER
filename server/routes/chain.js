@@ -173,7 +173,7 @@ router.get('/batch/:batch_id/status', async (req, res) => {
         const isAuthority = req.user && req.user.role === 'authority';
         const ownsBatch = req.user && batchJobs.every(j => emailsEqual(j.data.uploaderEmail, req.user.email));
         
-        if (!isAuthority && !ownsBatch) {
+        if (!req.user || (!isAuthority && !ownsBatch)) {
             return res.status(403).json({ success: false, error: 'Permission denied' });
         }
 
