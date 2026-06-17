@@ -332,23 +332,43 @@ router.get('/:hash', verifyLimiter, apiKey, async (req, res) => {
             signature_status = "NOT_SIGNED";
         } else {
             console.log('Verifying block_hash:', doc.block_hash);
-            const verify = crypto.createVerify('SHA256');
-            verify.update(doc.block_hash);
             
             let publicKey = '';
-            if (process.env.PUBLIC_KEY_B64) {
-                publicKey = Buffer.from(process.env.PUBLIC_KEY_B64, 'base64').toString('utf8');
-            } else if (process.env.PUBLIC_KEY) {
-                publicKey = process.env.PUBLIC_KEY.replace(/\\n/g, '\n');
+            if (doc.signer_fingerprint) {
+                const keyRecord = db.prepare('SELECT public_key_pem, serial_number, status FROM key_registry WHERE fingerprint = ?').get(doc.signer_fingerprint);
+                if (keyRecord) {
+                    publicKey = keyRecord.public_key_pem;
+                    if (keyRecord.status === 'revoked') {
+                        signature_status = "REVOKED_BY_CRL";
+                    }
+                } else {
+                    signature_status = "UNKNOWN_KEY";
+                }
+            } else {
+                // Fallback to default authority key
+                if (process.env.PUBLIC_KEY_B64) {
+                    publicKey = Buffer.from(process.env.PUBLIC_KEY_B64, 'base64').toString('utf8');
+                } else if (process.env.PUBLIC_KEY) {
+                    publicKey = process.env.PUBLIC_KEY.replace(/\\n/g, '\n');
+                }
             }
 
             if (!publicKey) {
                 return res.json({ success: true, status: "invalid", reason: "PUBLIC_KEY_MISSING" });
             }
 
-            const isValid = verify.verify(publicKey, doc.signature, 'hex');
-            console.log('Signature valid:', isValid);
-            signature_status = isValid ? "VERIFIED" : "INVALID";
+            if (signature_status === "VERIFIED") {
+                try {
+                    const verify = crypto.createVerify('SHA256');
+                    verify.update(doc.block_hash);
+                    const isValid = verify.verify(publicKey, doc.signature, 'hex');
+                    console.log('Signature valid:', isValid);
+                    signature_status = isValid ? "VERIFIED" : "INVALID";
+                } catch (e) {
+                    console.error('Signature verification error:', e);
+                    signature_status = "ERROR";
+                }
+            }
         }
 
         // ── Safe Async Traversal ──
@@ -492,14 +512,25 @@ router.post('/', verifyLimiter, apiKey, upload.single('file'), async (req, res) 
             signature_status = "NOT_SIGNED";
         } else {
             console.log('Verifying block_hash:', doc.block_hash);
-            const verify = crypto.createVerify('SHA256');
-            verify.update(doc.block_hash);
 
             let publicKey = '';
-            if (process.env.PUBLIC_KEY_B64) {
-                publicKey = Buffer.from(process.env.PUBLIC_KEY_B64, 'base64').toString('utf8');
-            } else if (process.env.PUBLIC_KEY) {
-                publicKey = process.env.PUBLIC_KEY.replace(/\\n/g, '\n');
+            if (doc.signer_fingerprint) {
+                const keyRecord = db.prepare('SELECT public_key_pem, serial_number, status FROM key_registry WHERE fingerprint = ?').get(doc.signer_fingerprint);
+                if (keyRecord) {
+                    publicKey = keyRecord.public_key_pem;
+                    if (keyRecord.status === 'revoked') {
+                        signature_status = "REVOKED_BY_CRL";
+                    }
+                } else {
+                    signature_status = "UNKNOWN_KEY";
+                }
+            } else {
+                // Fallback to default authority key
+                if (process.env.PUBLIC_KEY_B64) {
+                    publicKey = Buffer.from(process.env.PUBLIC_KEY_B64, 'base64').toString('utf8');
+                } else if (process.env.PUBLIC_KEY) {
+                    publicKey = process.env.PUBLIC_KEY.replace(/\\n/g, '\n');
+                }
             }
 
             if (!publicKey) {
@@ -507,15 +538,21 @@ router.post('/', verifyLimiter, apiKey, upload.single('file'), async (req, res) 
                 return res.json({ status: "invalid", reason: "PUBLIC_KEY_MISSING" });
             }
 
-            try {
-                const isValid = verify.verify(publicKey, doc.signature, 'hex');
-                console.log('Signature valid:', isValid);
-                signature_status = isValid ? "VERIFIED" : "INVALID";
-                if (!isValid) signature_mismatch = true;
-            } catch (err) {
-                console.error('[POST_SIG_VERIFY_ERROR]', err.message);
-                if (tmpPath && fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
-                return res.json({ status: "invalid", reason: "SIGNATURE_VERIFICATION_FAILED" });
+            if (signature_status === "VERIFIED") {
+                try {
+                    const verify = crypto.createVerify('SHA256');
+                    verify.update(doc.block_hash);
+                    const isValid = verify.verify(publicKey, doc.signature, 'hex');
+                    console.log('Signature valid:', isValid);
+                    signature_status = isValid ? "VERIFIED" : "INVALID";
+                    if (!isValid) signature_mismatch = true;
+                } catch (err) {
+                    console.error('[POST_SIG_VERIFY_ERROR]', err.message);
+                    if (tmpPath && fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+                    return res.json({ status: "invalid", reason: "SIGNATURE_VERIFICATION_FAILED" });
+                }
+            } else {
+                signature_mismatch = true;
             }
         }
 
