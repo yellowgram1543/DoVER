@@ -261,9 +261,19 @@ router.post('/promote', requireAuthority, (req, res) => {
     }
 
     try {
-        const user = db.prepare('SELECT id, name FROM users WHERE id = ?').get(userId);
+        const user = db.prepare('SELECT id, name, role FROM users WHERE id = ?').get(userId);
         if (!user) {
             return res.status(404).json({ success: false, error: 'User not found' });
+        }
+
+        // SECURITY FIX: Prevent self-demotion and administrative lockout
+        if (newRole === 'user') {
+            if (req.user.id.toString() === userId.toString()) {
+                return res.status(403).json({ success: false, error: 'You cannot demote yourself.' });
+            }
+            if (user.role === 'authority') {
+                return res.status(403).json({ success: false, error: 'Demoting other authorities is not allowed.' });
+            }
         }
 
         db.prepare('UPDATE users SET role = ? WHERE id = ?').run(newRole, userId);
