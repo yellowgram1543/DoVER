@@ -1,7 +1,6 @@
 const { parentPort, workerData } = require('worker_threads');
-const Jimp = require('jimp').Jimp || require('jimp');
+const { readImage, readGreyscaleImage } = require('./imageLoader');
 const tf = require('@tensorflow/tfjs');
-const fs = require('fs');
 
 /**
  * Heavy computation worker for image analysis.
@@ -16,6 +15,8 @@ async function runAnalysis() {
         } else if (type === 'signature') {
             const result = await detectSignatureInternal(filePath);
             parentPort.postMessage({ success: true, data: result });
+        } else {
+            throw new Error(`Unsupported analysis type: ${type}`);
         }
     } catch (error) {
         parentPort.postMessage({ success: false, error: error.message });
@@ -23,9 +24,7 @@ async function runAnalysis() {
 }
 
 async function fontConsistencyCheckInternal(filePath) {
-    const image = await Jimp.read(filePath);
-    if (!image || !image.bitmap || !image.bitmap.data) throw new Error('Invalid image data');
-    image.greyscale();
+    const image = await readGreyscaleImage(filePath);
     
     const width = Math.floor(image.bitmap.width);
     const height = Math.floor(image.bitmap.height);
@@ -62,6 +61,10 @@ async function fontConsistencyCheckInternal(filePath) {
         }
     }
 
+    if (variances.length === 0) {
+        return { score: 100, suspicious: false };
+    }
+
     const vTensor = tf.tensor1d(variances);
     const stdVal = vTensor.sub(vTensor.mean()).square().mean().sqrt().dataSync()[0];
     const meanVal = vTensor.mean().dataSync()[0];
@@ -73,8 +76,7 @@ async function fontConsistencyCheckInternal(filePath) {
 }
 
 async function alignmentCheckInternal(filePath) {
-    const image = await Jimp.read(filePath);
-    image.greyscale();
+    const image = await readGreyscaleImage(filePath);
     const width = image.bitmap.width;
     const height = image.bitmap.height;
     const lineY = [];
@@ -102,7 +104,7 @@ async function analyzeImageInternal(filePath) {
     const alignResult = await alignmentCheckInternal(filePath);
     
     // Additional simple variance check
-    const image = await Jimp.read(filePath);
+    const image = await readImage(filePath);
     const pixels = [];
     for (let i=0; i<image.bitmap.data.length; i+=1000) pixels.push(image.bitmap.data[i]);
     const t = tf.tensor1d(pixels);
@@ -123,8 +125,7 @@ async function analyzeImageInternal(filePath) {
 }
 
 async function detectSignatureInternal(filePath) {
-    const image = await Jimp.read(filePath);
-    image.greyscale();
+    const image = await readGreyscaleImage(filePath);
     const { width, height } = image.bitmap;
     const scanHeight = Math.floor(height * 0.3);
     const scanY = height - scanHeight;

@@ -1,4 +1,4 @@
-const { Jimp } = require('jimp');
+const { readGreyscaleImage } = require('./imageLoader');
 const fs = require('fs');
 
 /**
@@ -18,9 +18,7 @@ async function detectSignature(filePath) {
     try {
         if (!fs.existsSync(filePath)) return report;
 
-        const image = await Jimp.read(filePath);
-        if (!image || !image.bitmap || !image.bitmap.data) throw new Error('Invalid image data');
-        image.greyscale();
+        const image = await readGreyscaleImage(filePath);
         
         const width = Math.floor(image.bitmap.width);
         const height = Math.floor(image.bitmap.height);
