@@ -10,13 +10,23 @@ dotenv.config();
  * Simplified for maximum reliability with API Key.
  */
 
-const API_KEY = process.env.GEMINI_API_KEY || "AIzaSyASnQjxTl5JtUEj2_tvqjbtAe_yHxrt47Y";
-const genAI = new GoogleGenerativeAI(API_KEY);
+const API_KEY = process.env.GEMINI_API_KEY;
+
+if (!API_KEY) {
+    console.error('[GEMINI] CRITICAL ERROR: GEMINI_API_KEY environment variable is missing.');
+    console.error('Please set it in your .env file to enable AI summarization features.');
+}
+
+const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
 
 async function generateDocumentSummary(ocrText, forensicReport) {
     if (!ocrText || ocrText.trim().length === 0) return { status: "skipped", reason: "No OCR text" };
 
     try {
+        if (!genAI) {
+            throw new Error('GEMINI_API_KEY is missing. AI features are disabled.');
+        }
+
         // Use gemini-2.0-flash (current stable free-tier model)
         const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
 
@@ -55,6 +65,7 @@ async function generateDocumentSummary(ocrText, forensicReport) {
 async function extractTextFromImage(filePath) {
     try {
         if (!fs.existsSync(filePath)) throw new Error("File not found");
+        if (!genAI) throw new Error("GEMINI_API_KEY is missing. OCR features are disabled.");
         
         const mimeType = mime.lookup(filePath) || 'image/jpeg';
         const imageBase64 = fs.readFileSync(filePath).toString('base64');

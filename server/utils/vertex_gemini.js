@@ -6,12 +6,22 @@ dotenv.config();
  * Gemini Summary Service
  * Uses API Key (works on Render / any host — no GCP IAM needed)
  */
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const API_KEY = process.env.GEMINI_API_KEY;
+
+if (!API_KEY) {
+    console.error('[GEMINI] CRITICAL ERROR: GEMINI_API_KEY environment variable is missing.');
+}
+
+const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
 
 async function generateDocumentSummary(ocrText, forensicReport) {
     if (!ocrText || ocrText.trim().length === 0) return { status: "skipped", reason: "No OCR text" };
 
     try {
+        if (!genAI) {
+            throw new Error('GEMINI_API_KEY is missing. AI features are disabled.');
+        }
+        
         const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
 
         const prompt = `
