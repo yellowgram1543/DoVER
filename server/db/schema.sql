@@ -57,7 +57,22 @@ CREATE TABLE IF NOT EXISTS key_registry (
     public_key TEXT,
     serial_number TEXT,
     status TEXT DEFAULT 'active',
+    verified_by TEXT,
+    verification_method TEXT,
     issued_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     revoked_at DATETIME,
     FOREIGN KEY(issuer_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS key_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    business_name TEXT NOT NULL,
+    business_reg_no TEXT,
+    request_note TEXT,
+    status TEXT DEFAULT 'pending',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    processed_at DATETIME,
+    processed_by TEXT,
+    FOREIGN KEY(user_id) REFERENCES users(id)
 );

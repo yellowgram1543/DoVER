@@ -154,7 +154,7 @@ router.post('/keys/approve/:id', requireAuthority, async (req, res) => {
 
         // Update Registry
         db.prepare(`
-            INSERT INTO key_registry (issuer_id, public_key_pem, fingerprint, serial_number, verified_by, verification_method, status)
+            INSERT INTO key_registry (issuer_id, public_key, fingerprint, serial_number, verified_by, verification_method, status)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         `).run(request.user_id, publicKeyPem, fingerprint, serialNumber, req.user.id, 'admin_approval', 'active');
 

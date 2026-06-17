@@ -58,4 +58,11 @@ const userColumns = [
 ];
 userColumns.forEach(([col, type]) => addColumn('users', col, type));
 
+// Ensure key registry verification columns exist
+const keyRegistryColumns = [
+    ['verified_by', 'TEXT'],
+    ['verification_method', 'TEXT']
+];
+keyRegistryColumns.forEach(([col, type]) => addColumn('key_registry', col, type));
+
 module.exports = db;
