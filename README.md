@@ -128,4 +128,31 @@ Every verified document in DoVER produces an **AI Forensic Verdict**:
 DoVER addresses the trillion-dollar document fraud problem by creating a "Trust Layer" for the internet, ensuring that digital evidence remains indisputable, forever.
 
 ---
+
+## Contributors
+
+Thanks to all the amazing people who contribute to **DoVER** 🚀
+
+<p align="center">
+  <a href="https://github.com/yellowgram1543/DoVER/graphs/contributors">
+    <img src="https://contrib.rocks/image?repo=yellowgram1543/DoVER" alt="Contributors"/>
+  </a>
+</p>
+
+---
+
+## Project Support
+
+<p align="center">
+  <a href="https://github.com/yellowgram1543/DoVER/stargazers">
+    <img src="https://img.shields.io/github/stars/yellowgram1543/DoVER?style=social" alt="Stars">
+  </a>
+  &nbsp;&nbsp;
+  <a href="https://github.com/yellowgram1543/DoVER/network/members">
+    <img src="https://img.shields.io/github/forks/yellowgram1543/DoVER?style=social" alt="Forks">
+  </a>
+</p>
+
+---
+
 *Developed for the Google Cloud & Advanced AI Challenge.*
