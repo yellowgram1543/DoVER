@@ -166,9 +166,9 @@ Create a `.env` file with the following keys:
 SESSION_SECRET=your_secret_here
 GEMINI_API_KEY=your_google_ai_key
 
-# Infrastructure
+# Infrastructure (Use redis:// for local connections; use rediss:// with TLS settings enabled in production)
 MONGO_URI=your_mongodb_atlas_uri
-REDIS_URL=rediss://default:your_upstash_password@your_endpoint.upstash.io:6379
+REDIS_URL=redis://default:your_upstash_password@your_endpoint.upstash.io:6379
 
 # Blockchain (Optional)
 POLYGON_PRIVATE_KEY=your_wallet_key
