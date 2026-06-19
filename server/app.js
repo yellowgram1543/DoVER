@@ -91,7 +91,33 @@ app.use((req, res, next) => {
     next();
 });
 
-app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:3000', credentials: true }));
+// ── CORS Configuration (Issue #49 Fix) ──
+const ALLOWED_ORIGINS = (process.env.CORS_ALLOWED_ORIGINS || '')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (Postman, mobile apps, server-to-server)
+    if (!origin) return callback(null, true);
+
+    // Block wildcard — incompatible with credentials: true
+    if (ALLOWED_ORIGINS.includes('*')) {
+      return callback(new Error('Wildcard origin (*) cannot be used with credentials: true'));
+    }
+
+    if (ALLOWED_ORIGINS.includes(origin)) {
+      return callback(null, true);
+    }
+
+    console.warn(`[CORS] Blocked request from unlisted origin: ${origin}`);
+    return callback(new Error(`CORS policy: Origin '${origin}' is not allowed`));
+  },
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Session Configuration
