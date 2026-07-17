@@ -8,6 +8,7 @@ const signatureEngine = require('../utils/signature_engine');
 const { getBucket, mongoose } = require('../db/mongodb');
 const fs = require('fs');
 const path = require('path');
+const { emailsEqual } = require('../utils/email');
 
 /**
  * Helper to check if a user can access the full content/files of a document.
@@ -17,7 +18,7 @@ const path = require('path');
 function canAccessFullContent(user, document) {
     if (!user) return false;
     if (user.role === 'authority') return true;
-    return document.uploader_email === user.email;
+    return emailsEqual(document.uploader_email, user.email);
 }
 
 router.get('/', (req, res) => {
@@ -170,7 +171,7 @@ router.get('/batch/:batch_id/status', async (req, res) => {
 
         // RBAC: Ensure user owns this batch OR is authority
         const isAuthority = req.user && req.user.role === 'authority';
-        const ownsBatch = batchJobs.every(j => j.data.uploaderEmail === req.user.email);
+        const ownsBatch = req.user && batchJobs.every(j => emailsEqual(j.data.uploaderEmail, req.user.email));
         
         if (!isAuthority && !ownsBatch) {
             return res.status(403).json({ success: false, error: 'Permission denied' });
@@ -248,7 +249,7 @@ router.get('/document/:id/versions', (req, res) => {
             const parent = db.prepare('SELECT block_index, parent_document_id, filename, uploader_email FROM documents WHERE block_index = ?').get(parentId);
             
             // STRICT LINEAGE: Stop if parent metadata mismatch
-            if (!parent || parent.filename !== targetFilename || parent.uploader_email !== targetEmail) {
+            if (!parent || parent.filename !== targetFilename || !emailsEqual(parent.uploader_email, targetEmail)) {
                 break;
             }
 
@@ -266,7 +267,7 @@ router.get('/document/:id/versions', (req, res) => {
                 SELECT d.block_index 
                 FROM documents d 
                 JOIN descendants ON d.parent_document_id = descendants.id
-                WHERE d.filename = ? AND (d.uploader_email = ? OR (d.uploader_email IS NULL AND ? IS NULL))
+                WHERE d.filename = ? AND (LOWER(d.uploader_email) = LOWER(?) OR (d.uploader_email IS NULL AND ? IS NULL))
             )
             SELECT 
                 version_number,

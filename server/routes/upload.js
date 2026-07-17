@@ -12,6 +12,7 @@ const gemini = require('../utils/gemini');
 const signature = require('../utils/signature');
 const crypto = require('crypto');
 const { getBucket } = require('../db/mongodb');
+const { emailsEqual } = require('../utils/email');
 
 const documentQueue = require('../utils/queue');
 const { processDocument } = require('../utils/processor');
@@ -87,7 +88,7 @@ router.post('/', uploadLimiter, (req, res) => {
                 const parent = db.prepare('SELECT version_number, uploader_email FROM documents WHERE block_index = ?').get(parent_document_id);
                 if (parent) {
                     // SECURITY FIX: IDOR / Version Poisoning
-                    if ((parent.uploader_email !== uploaderEmail || uploaderEmail === 'anonymous@dover.io') && (!req.user || req.user.role !== 'authority')) {
+                    if ((!emailsEqual(parent.uploader_email, uploaderEmail) || uploaderEmail === 'anonymous@dover.io') && (!req.user || req.user.role !== 'authority')) {
                         if (tmpFilePath && fs.existsSync(tmpFilePath)) fs.unlinkSync(tmpFilePath);
                         return res.status(403).json({ success: false, error: 'Unauthorized to append a new version to this document.' });
                     }

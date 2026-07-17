@@ -5,7 +5,8 @@
   "main": "server/app.js",
   "scripts": {
     "start": "node server/app.js",
-    "dev": "nodemon server/app.js"
+    "dev": "nodemon server/app.js",
+    "test": "node --test"
   },
   "dependencies": {
     "@google-cloud/vertexai": "^1.12.0",
@@ -26,7 +27,7 @@
     "express-session": "^1.19.0",
     "google-auth-library": "^10.6.2",
     "gridfs-stream": "^1.1.1",
-    "jimp": "^0.22.12",
+    "jimp": "^1.6.1",
     "mongoose": "^9.4.1",
     "multer": "^2.1.1",
     "node-forge": "^1.4.0",

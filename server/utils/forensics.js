@@ -1,4 +1,4 @@
-const { Jimp } = require('jimp');
+const { readImage, readGreyscaleImage } = require('./imageLoader');
 const tf = require('@tensorflow/tfjs');
 const fs = require('fs');
 
@@ -9,9 +9,7 @@ const fs = require('fs');
  */
 async function fontConsistencyCheck(filePath) {
     try {
-        const image = await Jimp.read(filePath);
-        if (!image || !image.bitmap || !image.bitmap.data) throw new Error('Invalid image data');
-        image.greyscale();
+        const image = await readGreyscaleImage(filePath);
         
         const width = Math.floor(image.bitmap.width);
         const height = Math.floor(image.bitmap.height);
@@ -61,6 +59,10 @@ async function fontConsistencyCheck(filePath) {
             }
         }
 
+        if (variances.length === 0) {
+            return { score: 100, suspicious: false };
+        }
+
         const vTensor = tf.tensor1d(variances);
         const vMean = vTensor.mean();
         const vStd = vTensor.sub(vMean).square().mean().sqrt();
@@ -86,9 +88,7 @@ async function fontConsistencyCheck(filePath) {
  */
 async function alignmentCheck(filePath) {
     try {
-        const image = await Jimp.read(filePath);
-        if (!image || !image.bitmap || !image.bitmap.data) throw new Error('Invalid image data');
-        image.greyscale();
+        const image = await readGreyscaleImage(filePath);
         
         const width = Math.floor(image.bitmap.width);
         const height = Math.floor(image.bitmap.height);
@@ -183,8 +183,7 @@ async function analyzeImage(filePath) {
             report.flags.push(...alignResult.misaligned_regions.map(r => `${r} (Score: ${report.alignment_score})`));
         }
 
-        const image = await Jimp.read(filePath);
-        if (!image || !image.bitmap || !image.bitmap.data) return report;
+        const image = await readImage(filePath);
         const width = Math.floor(image.bitmap.width);
         const height = Math.floor(image.bitmap.height);
 
