@@ -1,194 +1,49 @@
-const express = require('express');
-const router = express.Router();
-const multer = require('multer');
-const db = require('../db/db');
-const hasher = require('../utils/hasher');
-const ocr = require('../utils/ocr');
-const gemini = require('../utils/gemini');
+/**
+ * server/routes/verify.js  —  Privileged verification endpoints
+ *
+ * Every route in this file is protected by at minimum:
+ *   verifyLimiter  → rate-limit abuse
+ *   apiKey         → valid X-Api-Key header
+ *
+ * The POST / and GET /:id/proof routes additionally require:
+ *   hmacMiddleware + requireAuth  (applied at the app.js mount point)
+ *
+ * Public (unauthenticated) hash/QR lookups have been moved to
+ *   server/routes/verify_public.js
+ * which is mounted under /api/public/verify and never inherits
+ * the middleware chain below.
+ *
+ * All key-registry queries and signature crypto have been moved to
+ *   server/utils/verificationService.js
+ * so that neither this router nor the public router duplicates that logic.
+ */
+
+'use strict';
+
+const express   = require('express');
+const router    = express.Router();
+const multer    = require('multer');
+const db        = require('../db/db');
+const hasher    = require('../utils/hasher');
+const ocr       = require('../utils/ocr');
+const gemini    = require('../utils/gemini');
 const forensics = require('../utils/forensics');
 const signature = require('../utils/signature');
-const crypto = require('crypto');
-const fs = require('fs');
-const path = require('path');
-const { getBucket, mongoose } = require('../db/mongodb');
-const { calculateSimilarity } = require('../utils/ocr');
-const apiKey = require('../middleware/apiKey');
-const { verifyMerkleProof } = require('../utils/merkle');
-const { verifyLimiter } = require('../middleware/limiters');
-const { recordSignal } = require('../utils/abuse');
+const crypto    = require('crypto');
+const fs        = require('fs');
+const path      = require('path');
+const { getBucket, mongoose }   = require('../db/mongodb');
+const { calculateSimilarity }   = require('../utils/ocr');
+const apiKey                    = require('../middleware/apiKey');
+const { verifyMerkleProof }     = require('../utils/merkle');
+const { verifyLimiter }         = require('../middleware/limiters');
+const { recordSignal }          = require('../utils/abuse');
+const { resolveSignatureStatus } = require('../utils/verificationService');
 
 if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
-if (!fs.existsSync('tmp')) fs.mkdirSync('tmp');
+if (!fs.existsSync('tmp'))     fs.mkdirSync('tmp');
 
 const upload = multer({ dest: 'tmp/' });
-
-router.get('/public/verify/:hash', verifyLimiter, async (req, res) => {
-    try {
-        const hash = req.params.hash;
-        const doc = db.prepare('SELECT * FROM documents WHERE block_hash = ?').get(hash);
-
-        if (!doc) {
-            return res.json({ found: false, message: "No record found" });
-        }
-
-        // Logic for signature status (consistent with existing verification)
-        let signature_status = "VERIFIED";
-        let issuer_name = "DoVER Authority";
-
-        if (!doc.signature) {
-            signature_status = "NOT_SIGNED";
-        } else {
-            let publicKey = null;
-
-            // 1. Check if it has a specific signer in the registry
-            if (doc.signer_fingerprint) {
-                const keyRecord = db.prepare('SELECT * FROM key_registry WHERE fingerprint = ?').get(doc.signer_fingerprint);
-                if (keyRecord) {
-                    if (keyRecord.status === 'active') {
-                        publicKey = keyRecord.public_key_pem;
-                        // Fetch issuer name for display
-                        const issuer = db.prepare('SELECT name FROM users WHERE id = ?').get(keyRecord.issuer_id);
-                        if (issuer) issuer_name = issuer.name;
-                    } else {
-                        signature_status = "REVOKED_KEY";
-                    }
-                } else {
-                    signature_status = "UNKNOWN_KEY";
-                }
-            } else {
-                // Fallback to default authority key
-                if (process.env.PUBLIC_KEY_B64) {
-                    publicKey = Buffer.from(process.env.PUBLIC_KEY_B64, 'base64').toString('utf8');
-                } else if (process.env.PUBLIC_KEY) {
-                    publicKey = process.env.PUBLIC_KEY.replace(/\\n/g, '\n');
-                }
-            }
-
-            if (publicKey && signature_status !== "REVOKED_KEY") {
-                try {
-                    // Check CRL
-                    if (doc.signer_fingerprint) {
-                        const keyRecord = db.prepare('SELECT serial_number FROM key_registry WHERE fingerprint = ?').get(doc.signer_fingerprint);
-                        if (keyRecord && keyRecord.serial_number) {
-                            // In a real app, we'd fetch the CRL from /api/public/crl and parse it.
-                            // For this prototype, we'll check the registry status directly (which the CRL is derived from).
-                            const isRevoked = db.prepare("SELECT 1 FROM key_registry WHERE serial_number = ? AND status = 'revoked'").get(keyRecord.serial_number);
-                            if (isRevoked) {
-                                signature_status = "REVOKED_BY_CRL";
-                            }
-                        }
-                    }
-
-                    if (signature_status !== "REVOKED_BY_CRL") {
-                        const verify = crypto.createVerify('SHA256');
-                        verify.update(doc.block_hash);
-                        const isValid = verify.verify(publicKey, doc.signature, 'hex');
-                        signature_status = isValid ? "VERIFIED" : "INVALID";
-                    }
-                } catch (e) {
-                    signature_status = "ERROR";
-                }
-            }
-        }
-
-        return res.json({
-            found: true,
-            document_id: doc.block_index,
-            filename: doc.filename,
-            uploaded_by: doc.uploaded_by,
-            issuer_name: issuer_name,
-            upload_timestamp: doc.upload_timestamp,
-            block_index: doc.block_index,
-            block_hash: doc.block_hash,
-            ipfs_cid: doc.ipfs_cid,
-            is_tampered: doc.is_tampered,
-            signature_status: signature_status,
-            signer_fingerprint: doc.signer_fingerprint,
-            ocr_similarity_score: doc.ocr_hash ? 100 : null,
-            verdict: doc.is_tampered ? "TAMPERED" : "ORIGINAL",
-            polygon_txid: doc.polygon_txid,
-            forensic_summary: doc.is_tampered 
-                ? "Potential anomalies detected in document structure." 
-                : "No forensic anomalies detected. Document integrity verified."
-        });
-    } catch (error) {
-        console.error('[PUBLIC_VERIFY_ERROR]', error);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-router.get('/public/verify/qr/:hash', verifyLimiter, async (req, res) => {
-    try {
-        const hash = req.params.hash;
-        const doc = db.prepare('SELECT * FROM documents WHERE block_hash = ?').get(hash);
-
-        if (!doc) {
-            return res.json({ found: false, message: "No record found" });
-        }
-
-        // Logic for signature status (consistent with existing verification)
-        let signature_status = "VERIFIED";
-        let issuer_name = "DoVER System Authority";
-
-        if (!doc.signature) {
-            signature_status = "NOT_SIGNED";
-        } else {
-            let publicKey = '';
-            
-            // SECURITY FIX: Support Business Key Validation in QR Route
-            if (doc.signer_fingerprint) {
-                const keyRecord = db.prepare('SELECT public_key, status, issuer_id FROM key_registry WHERE fingerprint = ?').get(doc.signer_fingerprint);
-                if (keyRecord && keyRecord.status === 'active') {
-                    publicKey = keyRecord.public_key;
-                    const issuer = db.prepare('SELECT name FROM users WHERE id = ?').get(keyRecord.issuer_id);
-                    if (issuer) issuer_name = issuer.name;
-                } else {
-                    signature_status = keyRecord ? "REVOKED_KEY" : "UNKNOWN_KEY";
-                }
-            } else {
-                // Fallback to default authority key
-                if (process.env.PUBLIC_KEY_B64) {
-                    publicKey = Buffer.from(process.env.PUBLIC_KEY_B64, 'base64').toString('utf8');
-                } else if (process.env.PUBLIC_KEY) {
-                    publicKey = process.env.PUBLIC_KEY.replace(/\\n/g, '\n');
-                }
-            }
-
-            if (publicKey && signature_status !== "REVOKED_KEY" && signature_status !== "UNKNOWN_KEY") {
-                try {
-                    const verify = crypto.createVerify('SHA256');
-                    verify.update(doc.block_hash);
-                    const isValid = verify.verify(publicKey, doc.signature, 'hex');
-                    signature_status = isValid ? "VERIFIED" : "INVALID";
-                } catch (e) {
-                    signature_status = "ERROR";
-                }
-            }
-        }
-
-        return res.json({
-            found: true,
-            document_id: doc.block_index,
-            filename: doc.filename,
-            uploaded_by: doc.uploaded_by,
-            issuer_name: issuer_name,
-            upload_timestamp: doc.upload_timestamp,
-            block_index: doc.block_index,
-            block_hash: doc.block_hash,
-            is_tampered: doc.is_tampered,
-            signature_status: signature_status,
-            ocr_similarity_score: doc.ocr_hash ? 100 : null,
-            verdict: doc.is_tampered ? "TAMPERED" : "ORIGINAL",
-            polygon_txid: doc.polygon_txid,
-            forensic_summary: doc.is_tampered 
-                ? "Potential anomalies detected in document structure." 
-                : "No forensic anomalies detected. Document integrity verified."
-        });
-    } catch (error) {
-        console.error('[PUBLIC_QR_VERIFY_ERROR]', error);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
 
 /**
  * Determines whether a user is permitted to access the full proof bundle for a document.
@@ -237,10 +92,16 @@ function canAccessProof(user, document) {
     return false;
 }
 
+// ─────────────────────────────────────────────────────────────
+// GET /:id/proof  — download a full proof bundle (privileged)
+// Requires: verifyLimiter + apiKey (+ hmac + auth from app.js)
+// ─────────────────────────────────────────────────────────────
 router.get('/:id/proof', verifyLimiter, apiKey, (req, res) => {
     try {
-        const id = req.params.id;
-        const doc = db.prepare('SELECT * FROM documents WHERE block_index = ?').get(id);
+        const id  = req.params.id;
+        const doc = db
+            .prepare('SELECT * FROM documents WHERE block_index = ?')
+            .get(id);
 
         if (!doc) {
             return res.status(404).json({ success: false, error: 'Document not found' });
@@ -305,18 +166,24 @@ router.get('/:id/proof', verifyLimiter, apiKey, (req, res) => {
         }
 
         res.setHeader('Content-Disposition', 'attachment; filename=proof_' + id + '.json');
-        res.json(proof);
+        return res.json(proof);
+
     } catch (error) {
         console.error('[PROOF_ERROR]', error);
-        res.status(500).json({ success: false, error: 'Failed to generate proof' });
+        return res.status(500).json({ success: false, error: 'Failed to generate proof' });
     }
 });
 
-// Quick Verification via Hash
+// ─────────────────────────────────────────────────────────────
+// GET /:hash  — quick chain verification (privileged)
+// Requires: verifyLimiter + apiKey
+// ─────────────────────────────────────────────────────────────
 router.get('/:hash', verifyLimiter, apiKey, async (req, res) => {
     try {
         const hash = req.params.hash;
-        const doc = db.prepare('SELECT * FROM documents WHERE block_hash = ?').get(hash);
+        const doc  = db
+            .prepare('SELECT * FROM documents WHERE block_hash = ?')
+            .get(hash);
 
         if (!doc) {
             return res.status(404).json({ success: false, status: 'invalid', error: 'Hash not found in chain' });
@@ -326,94 +193,95 @@ router.get('/:hash', verifyLimiter, apiKey, async (req, res) => {
             return res.json({ success: true, status: 'tampered', block_index: doc.block_index });
         }
 
-        // ── Digital Signature Verification ──
-        let signature_status = "VERIFIED";
-        if (!doc.signature) {
-            signature_status = "NOT_SIGNED";
-        } else {
-            console.log('Verifying block_hash:', doc.block_hash);
-            const verify = crypto.createVerify('SHA256');
-            verify.update(doc.block_hash);
-            
-            let publicKey = '';
-            if (process.env.PUBLIC_KEY_B64) {
-                publicKey = Buffer.from(process.env.PUBLIC_KEY_B64, 'base64').toString('utf8');
-            } else if (process.env.PUBLIC_KEY) {
-                publicKey = process.env.PUBLIC_KEY.replace(/\\n/g, '\n');
-            }
+        // ── Digital Signature Verification (via service layer) ──
+        const { signature_status } = resolveSignatureStatus(doc);
 
-            if (!publicKey) {
-                return res.json({ success: true, status: "invalid", reason: "PUBLIC_KEY_MISSING" });
-            }
-
-            const isValid = verify.verify(publicKey, doc.signature, 'hex');
-            console.log('Signature valid:', isValid);
-            signature_status = isValid ? "VERIFIED" : "INVALID";
+        if (signature_status === 'NO_KEY_CONFIGURED') {
+            return res.json({ success: true, status: 'invalid', reason: 'PUBLIC_KEY_MISSING' });
         }
 
-        // ── Safe Async Traversal ──
-        const MAX_DEPTH = 10000; // Increased significantly to support larger chains
-        const visited = new Set();
+        // ── Safe Async Chain Traversal ──
+        const MAX_DEPTH = 10000;
+        const visited   = new Set();
         let currentHash = doc.prev_hash;
-        let checked = 0;
+        let checked     = 0;
 
-        for (let depth = 0; depth < MAX_DEPTH && currentHash && currentHash !== '0000000000000000'; depth++) {
+        for (
+            let depth = 0;
+            depth < MAX_DEPTH && currentHash && currentHash !== '0000000000000000';
+            depth++
+        ) {
             if (visited.has(currentHash)) {
-                return res.json({ success: true, status: "invalid", reason: "CYCLE_DETECTED", checked_blocks: checked });
+                return res.json({
+                    success: true,
+                    status: 'invalid',
+                    reason: 'CYCLE_DETECTED',
+                    checked_blocks: checked,
+                });
             }
             visited.add(currentHash);
 
-            const current = db.prepare("SELECT * FROM documents WHERE block_hash = ?").get(currentHash);
-            if (!current) {
-                // If we hit a block that isn't in our local DB, we can't verify further. 
-                // But we don't mark it invalid unless it's a critical break.
-                break;
-            }
+            const current = db
+                .prepare('SELECT * FROM documents WHERE block_hash = ?')
+                .get(currentHash);
+
+            if (!current) break;
+
             if (current.is_tampered) {
-                return res.json({ success: true, status: "invalid", reason: "HISTORICAL_TAMPER", checked_blocks: checked, tampered_block: current.block_index });
+                return res.json({
+                    success: true,
+                    status: 'invalid',
+                    reason: 'HISTORICAL_TAMPER',
+                    checked_blocks: checked,
+                    tampered_block: current.block_index,
+                });
             }
 
             checked++;
             currentHash = current.prev_hash;
-            
-            // If we hit a checkpoint, we can trust the ancestry before it (conceptually)
+
             if (current.checkpoint_hash) {
                 console.log(`[VERIFY] Trust anchor reached at Block #${current.block_index}`);
                 break;
             }
-            
+
             if (depth % 50 === 0) await new Promise(resolve => setImmediate(resolve));
         }
 
         if (checked >= MAX_DEPTH) {
             return res.json({
                 success: true,
-                status: "invalid",
-                reason: "MAX_DEPTH_EXCEEDED",
-                checked_blocks: checked
+                status: 'invalid',
+                reason: 'MAX_DEPTH_EXCEEDED',
+                checked_blocks: checked,
             });
         }
 
-        res.json({
-            success: true,
-            status: (signature_status === "INVALID") ? "tampered" : "valid",
-            block_index: doc.block_index,
-            checked_blocks: checked,
+        return res.json({
+            success:         true,
+            status:          signature_status === 'INVALID' ? 'tampered' : 'valid',
+            block_index:     doc.block_index,
+            checked_blocks:  checked,
             signature_status,
-            is_checkpoint: !!doc.checkpoint_hash
+            is_checkpoint:   !!doc.checkpoint_hash,
         });
+
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        return res.status(500).json({ success: false, error: error.message });
     }
 });
 
+// ─────────────────────────────────────────────────────────────
+// POST /  — deep file verification (privileged)
+// Requires: verifyLimiter + apiKey (+ hmac + auth from app.js)
+// ─────────────────────────────────────────────────────────────
 router.post('/', verifyLimiter, apiKey, upload.single('file'), async (req, res) => {
     let tmpPath = '';
     try {
         let newPath = null;
         if (req.file) {
             const ext = req.file.mimetype === 'image/png' ? '.png' : '.jpg';
-            newPath = req.file.path + ext;
+            newPath   = req.file.path + ext;
             fs.renameSync(req.file.path, newPath);
         }
 
@@ -425,300 +293,304 @@ router.post('/', verifyLimiter, apiKey, upload.single('file'), async (req, res) 
         let isComparisonVerify = false;
         const compareWith = req.body.compare_with;
 
-        // Compute hash early if a file is provided to avoid filename spoofing
+        // Compute hash early (before any DB lookup) to avoid filename-spoofing attacks.
         let currentFileHash;
         if (req.file && newPath) {
             currentFileHash = hasher.generateFileHash(newPath);
         }
 
-        // 1. Identify the document to verify against
+        // 1. Identify the document to verify against.
         if (req.body.document_id) {
-            console.log('[TRACE] Received document_id:', req.body.document_id, 'Type:', typeof req.body.document_id);
-            doc = db.prepare('SELECT * FROM documents WHERE block_index = ?').get(req.body.document_id);
+            console.log('[TRACE] Received document_id:', req.body.document_id);
+            doc = db
+                .prepare('SELECT * FROM documents WHERE block_index = ?')
+                .get(req.body.document_id);
             if (req.file) isComparisonVerify = true;
+
         } else if (req.file) {
             if (compareWith) {
-                // SECURITY FIX: Match by file_hash and uploader_email instead of filename and uploaded_by (display name)
-                doc = db.prepare('SELECT * FROM documents WHERE file_hash = ? AND LOWER(uploader_email) = LOWER(?) ORDER BY block_index DESC LIMIT 1').get(currentFileHash, compareWith);
+                doc = db
+                    .prepare(
+                        'SELECT * FROM documents WHERE file_hash = ? AND LOWER(uploader_email) = LOWER(?) ORDER BY block_index DESC LIMIT 1'
+                    )
+                    .get(currentFileHash, compareWith);
             } else {
-                doc = db.prepare('SELECT * FROM documents WHERE file_hash = ? ORDER BY block_index DESC LIMIT 1').get(currentFileHash);
+                doc = db
+                    .prepare(
+                        'SELECT * FROM documents WHERE file_hash = ? ORDER BY block_index DESC LIMIT 1'
+                    )
+                    .get(currentFileHash);
             }
             isComparisonVerify = true;
         }
 
         if (!doc) {
             if (newPath && fs.existsSync(newPath)) fs.unlinkSync(newPath);
-            return res.status(404).json({ success: false, error: 'No original record found for this document identity.' });
+            return res.status(404).json({
+                success: false,
+                error: 'No original record found for this document identity.',
+            });
         }
 
-        // 2. Perform Content Comparison
+        // 2. Perform Content Comparison.
         let verificationResult;
 
         if (isComparisonVerify) {
             verificationResult = {
-                valid: (currentFileHash.trim() === doc.file_hash.trim()),
-                details: { computedFileHash: currentFileHash }
+                valid:   currentFileHash.trim() === doc.file_hash.trim(),
+                details: { computedFileHash: currentFileHash },
             };
-            tmpPath = newPath; // Keep uploaded file for analysis
+            tmpPath = newPath;
         } else {
-            const bucket = getBucket();
+            const bucket    = getBucket();
             const storageId = doc.storage_id || doc.filename;
 
             if (!mongoose.Types.ObjectId.isValid(storageId)) {
                 return res.status(400).json({ success: false, error: 'Invalid or legacy document ID' });
             }
 
-            const extMap = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/jpg': '.jpg', 'text/plain': '.txt' };
+            const extMap = {
+                'image/png':  '.png',
+                'image/jpeg': '.jpg',
+                'image/jpg':  '.jpg',
+                'text/plain': '.txt',
+            };
             const ext = extMap[doc.file_type] || '';
-            tmpPath = path.resolve('tmp', `verify_${Date.now()}_${storageId}${ext}`);
+            tmpPath   = path.resolve('tmp', `verify_${Date.now()}_${storageId}${ext}`);
 
-            const downloadStream = bucket.openDownloadStream(new mongoose.Types.ObjectId(storageId));
+            const downloadStream = bucket.openDownloadStream(
+                new mongoose.Types.ObjectId(storageId)
+            );
             const writeStream = fs.createWriteStream(tmpPath);
             downloadStream.pipe(writeStream);
 
             await new Promise((resolve, reject) => {
                 writeStream.on('finish', resolve);
-                writeStream.on('error', reject);
+                writeStream.on('error',  reject);
             });
 
             console.log('Calling verifyDocument with:', tmpPath);
             verificationResult = hasher.verifyDocument(doc.block_index, db, tmpPath);
         }
 
-        // ── Digital Signature Verification ──
-        let signature_status = "VERIFIED";
-        let signature_mismatch = false;
-        if (!doc.signature) {
-            signature_status = "NOT_SIGNED";
-        } else {
-            console.log('Verifying block_hash:', doc.block_hash);
-            const verify = crypto.createVerify('SHA256');
-            verify.update(doc.block_hash);
+        // ── Digital Signature Verification (via service layer) ──
+        const { signature_status } = resolveSignatureStatus(doc);
+        const signature_mismatch   = signature_status === 'INVALID';
 
-            let publicKey = '';
-            if (process.env.PUBLIC_KEY_B64) {
-                publicKey = Buffer.from(process.env.PUBLIC_KEY_B64, 'base64').toString('utf8');
-            } else if (process.env.PUBLIC_KEY) {
-                publicKey = process.env.PUBLIC_KEY.replace(/\\n/g, '\n');
-            }
-
-            if (!publicKey) {
-                if (tmpPath && fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
-                return res.json({ status: "invalid", reason: "PUBLIC_KEY_MISSING" });
-            }
-
-            try {
-                const isValid = verify.verify(publicKey, doc.signature, 'hex');
-                console.log('Signature valid:', isValid);
-                signature_status = isValid ? "VERIFIED" : "INVALID";
-                if (!isValid) signature_mismatch = true;
-            } catch (err) {
-                console.error('[POST_SIG_VERIFY_ERROR]', err.message);
-                if (tmpPath && fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
-                return res.json({ status: "invalid", reason: "SIGNATURE_VERIFICATION_FAILED" });
-            }
+        if (signature_status === 'NO_KEY_CONFIGURED') {
+            if (tmpPath && fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+            return res.json({ status: 'invalid', reason: 'PUBLIC_KEY_MISSING' });
         }
 
-        // 1 & 2. Run extraction ONCE at the top and store in current_ocr_text
-        let current_ocr_text = '';
+        if (signature_status === 'ERROR') {
+            if (tmpPath && fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+            return res.json({ status: 'invalid', reason: 'SIGNATURE_VERIFICATION_FAILED' });
+        }
+
+        // 3. OCR Extraction (run once and reuse).
+        let current_ocr_text        = '';
         let currentOcrLowConfidence = false;
+
         if (tmpPath && fs.existsSync(tmpPath)) {
             if (/png|jpg|jpeg/.test(doc.file_type)) {
-                const ocrResult = await ocr.extractText(tmpPath);
-                current_ocr_text = ocrResult.text;
+                const ocrResult         = await ocr.extractText(tmpPath);
+                current_ocr_text        = ocrResult.text;
                 currentOcrLowConfidence = ocrResult.lowConfidence;
             } else if (doc.file_type === 'text/plain' || doc.filename.endsWith('.txt')) {
-                current_ocr_text = fs.readFileSync(tmpPath, 'utf8');
+                current_ocr_text        = fs.readFileSync(tmpPath, 'utf8');
                 currentOcrLowConfidence = false;
             }
         }
 
-        if (!current_ocr_text || current_ocr_text.trim().length === 0) {
-            current_ocr_text = 'extraction_failed';
-        } else {
-            current_ocr_text = current_ocr_text.trim();
-        }
+        current_ocr_text = (!current_ocr_text || current_ocr_text.trim().length === 0)
+            ? 'extraction_failed'
+            : current_ocr_text.trim();
 
-        // 3. Deep Analysis
+        // 4. Deep Analysis.
         const OCR_THRESHOLD = 95;
-        let ocr_similarity = 100;
-        let ocr_tampered = false;
-
-        let forensic_comparison = null;
+        let ocr_similarity  = 100;
+        let ocr_tampered    = false;
+        let forensic_comparison  = null;
         let signature_comparison = null;
 
         if (doc.ocr_text && !currentOcrLowConfidence) {
             ocr_similarity = calculateSimilarity(doc.ocr_text, current_ocr_text);
-            ocr_tampered = ocr_similarity < OCR_THRESHOLD;
+            ocr_tampered   = ocr_similarity < OCR_THRESHOLD;
         } else if (currentOcrLowConfidence) {
-            console.log('[VERIFY] Low OCR confidence detected, skipping similarity check to avoid false positives.');
-            ocr_similarity = null; // Indicate skip
+            console.log('[VERIFY] Low OCR confidence — skipping similarity check.');
+            ocr_similarity = null;
         }
 
         if (/png|jpg|jpeg/.test(doc.file_type)) {
             const currentForensic = await forensics.analyzeImage(tmpPath);
-            const storedForensic = doc.forensic_score ? JSON.parse(doc.forensic_score) : null;
+            const storedForensic  = doc.forensic_score ? JSON.parse(doc.forensic_score) : null;
             if (storedForensic) {
                 forensic_comparison = {
-                    suspicious_change: (currentForensic.suspicious !== storedForensic.suspicious),
-                    font_diff: Math.abs(currentForensic.font_consistency - storedForensic.font_consistency),
-                    align_diff: Math.abs(currentForensic.alignment_score - storedForensic.alignment_score),
-                    new_flags: currentForensic.flags.filter(f => !storedForensic.flags.includes(f))
+                    suspicious_change: currentForensic.suspicious !== storedForensic.suspicious,
+                    font_diff:  Math.abs(currentForensic.font_consistency - storedForensic.font_consistency),
+                    align_diff: Math.abs(currentForensic.alignment_score  - storedForensic.alignment_score),
+                    new_flags:  currentForensic.flags.filter(f => !storedForensic.flags.includes(f)),
                 };
             }
 
             const currentSig = await signature.detectSignature(tmpPath);
-            const storedSig = doc.signature_score ? JSON.parse(doc.signature_score) : null;
+            const storedSig  = doc.signature_score ? JSON.parse(doc.signature_score) : null;
             if (storedSig) {
-                // Use explicit boolean conversion (!!) to ensure correct comparison
-                const statusChanged = (!!currentSig.signature_found !== !!storedSig.signature_found) || (!!currentSig.seal_found !== !!storedSig.seal_found);
+                const statusChanged = (
+                    !!currentSig.signature_found !== !!storedSig.signature_found ||
+                    !!currentSig.seal_found      !== !!storedSig.seal_found
+                );
                 signature_comparison = {
-                    status_change: statusChanged,
-                    original_had_signature: !!storedSig.signature_found,
-                    current_has_signature: !!currentSig.signature_found,
-                    original_had_seal: !!storedSig.seal_found,
-                    current_has_seal: !!currentSig.seal_found
+                    status_change:           statusChanged,
+                    original_had_signature:  !!storedSig.signature_found,
+                    current_has_signature:   !!currentSig.signature_found,
+                    original_had_seal:       !!storedSig.seal_found,
+                    current_has_seal:        !!currentSig.seal_found,
                 };
             }
         }
 
-        // 4. Backward Chain Validation (Safe Async Step Loop)
+        // 5. Backward Chain Validation.
         const MAX_DEPTH = 10000;
-        const visited = new Set();
+        const visited   = new Set();
         let currentHash = doc.prev_hash;
-        let checked = 0;
+        let checked     = 0;
         let historical_tamper_detected = false;
-        let tampered_block_id = null;
+        let tampered_block_id          = null;
 
         try {
-            for (let depth = 0; depth < MAX_DEPTH && currentHash && currentHash !== '0000000000000000'; depth++) {
-
+            for (
+                let depth = 0;
+                depth < MAX_DEPTH && currentHash && currentHash !== '0000000000000000';
+                depth++
+            ) {
                 if (visited.has(currentHash)) break;
                 visited.add(currentHash);
 
-                const current = db.prepare("SELECT * FROM documents WHERE block_hash = ?").get(currentHash);
-                if (!current) break; // Broken chain, but we continue verifying current
+                const current = db
+                    .prepare('SELECT * FROM documents WHERE block_hash = ?')
+                    .get(currentHash);
+                if (!current) break;
 
                 if (current.is_tampered) {
                     historical_tamper_detected = true;
-                    tampered_block_id = current.block_index;
-                    // We don't return early anymore; we just flag it as a warning
-                    break; 
+                    tampered_block_id          = current.block_index;
+                    break;
                 }
 
                 checked++;
                 currentHash = current.prev_hash;
-                
-                // Trust anchor
+
                 if (current.checkpoint_hash) {
                     console.log(`[VERIFY-POST] Trust anchor reached at Block #${current.block_index}`);
                     break;
                 }
-                
+
                 if (depth % 50 === 0) await new Promise(resolve => setImmediate(resolve));
             }
         } catch (chainError) {
             console.error('[CHAIN_TRAVERSAL_ERROR]', chainError);
         }
 
-        // 4.5 Merkle Verification
-        let merkle_valid = null;
-        let merkle_status = "VERIFIED";
+        // 5.5 Merkle Verification.
+        let merkle_valid        = null;
+        let merkle_status       = 'VERIFIED';
         let merkle_proof_length = 0;
 
         if (!doc.merkle_proof) {
-            merkle_status = "NOT_COMPUTED";
+            merkle_status = 'NOT_COMPUTED';
         } else {
             try {
-                const proof = JSON.parse(doc.merkle_proof);
+                const proof       = JSON.parse(doc.merkle_proof);
                 merkle_proof_length = proof.length;
-                merkle_valid = verifyMerkleProof(doc.block_hash, proof, doc.merkle_root);
-                merkle_status = merkle_valid ? "VERIFIED" : "INVALID";
+                merkle_valid      = verifyMerkleProof(doc.block_hash, proof, doc.merkle_root);
+                merkle_status     = merkle_valid ? 'VERIFIED' : 'INVALID';
             } catch (err) {
                 console.error('[MERKLE_VERIFY_ERROR]', err);
-                merkle_status = "ERROR";
+                merkle_status = 'ERROR';
             }
         }
 
-        // 5. Final Result
-        let tamper_reasons = [];
-        const fileHashValid = !!verificationResult.valid;
-        
+        // 6. Final Verdict.
+        const tamper_reasons = [];
+        const fileHashValid  = !!verificationResult.valid;
+
         if (!fileHashValid) {
-            tamper_reasons.push("File hash mismatch");
-            
-            // If the hash doesn't match, these content-based checks become the primary evidence for tampering
-            if (ocr_tampered) tamper_reasons.push("OCR text similarity below threshold");
-            if (forensic_comparison && forensic_comparison.suspicious_change) tamper_reasons.push("Forensic analysis detected modifications");
-            if (signature_comparison && signature_comparison.status_change) tamper_reasons.push("Signature/Seal presence changed");
+            tamper_reasons.push('File hash mismatch');
+            if (ocr_tampered) tamper_reasons.push('OCR text similarity below threshold');
+            if (forensic_comparison && forensic_comparison.suspicious_change)
+                tamper_reasons.push('Forensic analysis detected modifications');
+            if (signature_comparison && signature_comparison.status_change)
+                tamper_reasons.push('Signature/Seal presence changed');
         }
-        
-        // Digital Signature is a cryptographic requirement independent of heuristics
+
         if (signature_mismatch) {
-            tamper_reasons.push("Signature mismatch");
+            tamper_reasons.push('Signature mismatch');
         }
-        
+
         const isTampered = tamper_reasons.length > 0;
-        
+
         console.log(`\n┌── Verification Results for Block #${doc.block_index}`);
         console.log(`│ - File Hash Match: ${fileHashValid ? 'YES' : 'NO'}`);
         console.log(`│ - OCR Similarity: ${ocr_similarity !== null ? ocr_similarity.toFixed(2) + '%' : 'SKIPPED (Low Confidence)'}`);
         console.log(`│ - Forensic Suspicious: ${forensic_comparison ? (forensic_comparison.suspicious_change ? 'YES (CHANGE)' : 'NO CHANGE') : 'N/A'}`);
         console.log(`│ - Signature Valid: ${!signature_mismatch}`);
-        console.log(`│ - Chain Status: ${historical_tamper_detected ? '⚠️ WARNING (Historical Tamper at #' + tampered_block_id + ')' : '✅ SECURE'}`);
+        console.log(`│ - Chain Status: ${historical_tamper_detected ? '⚠️  WARNING (Historical Tamper at #' + tampered_block_id + ')' : '✅ SECURE'}`);
         console.log(`│ - Final Verdict: ${isTampered ? '🔴 TAMPERED' : '✅ ORIGINAL'}`);
         if (tamper_reasons.length > 0) {
             console.log(`│ - Reasons: ${tamper_reasons.join(', ')}`);
-        } else if (fileHashValid && (ocr_tampered || (forensic_comparison && forensic_comparison.suspicious_change))) {
-            console.log(`│ - Note: Minor content analysis variance detected but ignored due to valid file hash.`);
         }
         console.log(`└── Verification Cycle Complete\n`);
 
-        if (isTampered) {
-            // Record abuse signal
-            if (req.user) {
-                recordSignal(req.user.id, 'FAILED_VERIFICATION');
-            }
+        if (isTampered && req.user) {
+            recordSignal(req.user.id, 'FAILED_VERIFICATION');
         }
 
         if (tmpPath && fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
 
-        // 4.6 Gemini AI Integrity Report
+        // 6.5 Gemini AI Integrity Report.
         let ai_report = null;
         if (!currentOcrLowConfidence && current_ocr_text !== 'extraction_failed') {
             console.log('[VERIFY] Generating AI Integrity Report via Gemini...');
-            ai_report = await gemini.generateDocumentSummary(current_ocr_text, verificationResult.forensics || {});
+            ai_report = await gemini.generateDocumentSummary(
+                current_ocr_text,
+                verificationResult.forensics || {}
+            );
         }
 
-        const merkle_warning = (merkle_valid === false) ? "Merkle proof mismatch (legacy data)" : null;
-        const chain_warning = historical_tamper_detected ? `Historical tamper detected in ancestry (Block #${tampered_block_id}). Current version integrity verified independently.` : null;
+        const merkle_warning = merkle_valid === false
+            ? 'Merkle proof mismatch (legacy data)'
+            : null;
+        const chain_warning  = historical_tamper_detected
+            ? `Historical tamper detected in ancestry (Block #${tampered_block_id}). Current version integrity verified independently.`
+            : null;
 
         return res.json({
-            status: isTampered ? "tampered" : "valid",
-            valid: !isTampered,
-            verdict: isTampered ? "TAMPERED" : "ORIGINAL",
-            document_id: doc.block_index,
-            block_index: doc.block_index,
-            checked_blocks: checked,
+            status:              isTampered ? 'tampered' : 'valid',
+            valid:               !isTampered,
+            verdict:             isTampered ? 'TAMPERED' : 'ORIGINAL',
+            document_id:         doc.block_index,
+            block_index:         doc.block_index,
+            checked_blocks:      checked,
             signature_status,
             merkle_status,
-            merkle_root: doc.merkle_root,
+            merkle_root:         doc.merkle_root,
             merkle_proof_length,
-            tamper_reasons: isTampered ? tamper_reasons : [],
+            tamper_reasons:      isTampered ? tamper_reasons : [],
             ocr_similarity_score: ocr_similarity,
-            ocr_threshold: OCR_THRESHOLD,
-            ocr_tampered: ocr_tampered,
+            ocr_threshold:       OCR_THRESHOLD,
+            ocr_tampered,
             forensic_comparison,
             signature_comparison,
             merkle_warning,
             chain_warning,
-            ai_report // Added Gemini report
+            ai_report,
         });
 
     } catch (error) {
         console.error('[VERIFY_ERROR]', error);
         if (tmpPath && fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
-        res.status(500).json({ success: false, error: error.message });
+        return res.status(500).json({ success: false, error: error.message });
     }
 });
 
